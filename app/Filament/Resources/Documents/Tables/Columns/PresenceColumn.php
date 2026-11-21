@@ -16,7 +16,9 @@ class PresenceColumn extends TextColumn
     protected function setUp(): void
     {
         parent::setUp();
-        $this->label('Currently viewing');
+        $this->label('People on record');
+        $this->badge();
+        $this->color('success');
         $this->state(fn (Document $record): string => implode(', ', $this->presenceFor($record)));
     }
 

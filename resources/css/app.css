@@ -7,7 +7,3 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
-.collaboration-box { margin-bottom: 1rem; padding: 1rem; border: 1px solid #cbd5e1; border-radius: .6rem; background: white; color: #111827; }
-.collaboration-box p { margin: .4rem 0; }
-.collaboration-editor { border: 1px solid #94a3b8; padding: .75rem; min-height: 8rem; }
-.collaboration-editor .tiptap { min-height: 7rem; outline: none; }

@@ -1,4 +1,4 @@
 @if (auth()->check())
     <meta name="collaboration-user" content="{{ auth()->id() }}">
-    @vite(['resources/css/app.css', 'resources/js/collaboration.js'])
+    @vite(['resources/css/collaboration.css', 'resources/js/collaboration.js'])
 @endif

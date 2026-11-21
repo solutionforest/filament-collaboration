@@ -28,8 +28,14 @@ try {
     await b.keyboard.press('End');
     await b.keyboard.type('Hello from Bob.');
     await a.getByText('Hello from Bob.', {exact: false}).waitFor({timeout: 15000});
-    await a.waitForTimeout(11000);
+    await a.getByText('Bob · Edit page open · Focused: shared draft').waitFor({timeout: 15000});
+    if (await a.locator('[data-presence]').getByText('Alice', {exact: false}).count()) throw new Error('Own presence is displayed as another person');
+    await a.getByRole('button', {name: 'Copy document link'}).waitFor();
     await a.screenshot({path: 'docs/media/shared-edit.png', fullPage: true});
+    await b.locator('input[id$=".title"]').focus();
+    await a.getByText('Bob · Edit page open · Focused: title').waitFor({timeout: 15000});
+    await b.goto('http://127.0.0.1:8765/admin/documents');
+    await b.getByText('Alice (edit)').waitFor({timeout: 15000});
     console.log('Two independent users synchronized a shared draft.');
     const video = a.video();
     await alice.close();

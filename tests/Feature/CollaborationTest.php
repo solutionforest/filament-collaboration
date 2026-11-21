@@ -123,3 +123,34 @@ it('shows current presence beside its record in the resource table', function ()
     ])->assertOk();
     Livewire\Livewire::test(ListDocuments::class)->assertSee('Viewer (view)');
 });
+
+it('identifies the current user and keeps stable identities across tabs', function (): void {
+    $alice = User::factory()->create(['name' => 'Alice']);
+    $bob = User::factory()->create(['name' => 'Bob']);
+    $this->actingAs($bob)->postJson('/collaboration/presence', ['session_id' => (string) Str::uuid(), 'page' => 'list'])->assertOk();
+    $this->postJson('/collaboration/presence', ['session_id' => (string) Str::uuid(), 'page' => 'list'])->assertOk();
+    $response = $this->actingAs($alice)->postJson('/collaboration/presence', ['session_id' => (string) Str::uuid(), 'page' => 'list'])->assertOk();
+    $people = $response->json('presence');
+    $bobs = array_values(array_filter($people, fn ($person) => $person['name'] === 'Bob'));
+    $self = array_values(array_filter($people, fn ($person) => $person['name'] === 'Alice'));
+    expect($bobs)->toHaveCount(2)
+        ->and($bobs[0]['user_key'])->toBe($bobs[1]['user_key'])
+        ->and($bobs[0]['is_you'])->toBeFalse()
+        ->and($self[0]['is_you'])->toBeTrue()
+        ->and($self[0])->not->toHaveKey('id');
+});
+
+it('reports allowed focused fields only for an edit page', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Focus']);
+    $session = (string) Str::uuid();
+    $this->actingAs($user)->postJson('/collaboration/presence', [
+        'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => 'title',
+    ])->assertOk()->assertJsonPath('presence.0.focused_field', 'title');
+    $this->postJson('/collaboration/presence', [
+        'session_id' => $session, 'document_id' => $document->id, 'page' => 'view', 'focused_field' => 'title',
+    ])->assertUnprocessable();
+    $this->postJson('/collaboration/presence', [
+        'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => 'arbitrary',
+    ])->assertUnprocessable();
+});

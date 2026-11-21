@@ -20,6 +20,7 @@ final class CollaborationController extends Controller
             'session_id' => ['required', 'uuid'],
             'document_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['required', Rule::in(['list', 'create', 'view', 'edit'])],
+            'focused_field' => ['nullable', Rule::in(['title', 'draft'])],
         ]);
         $user = $request->user();
         abort_unless($user instanceof User, 401);
@@ -32,12 +33,14 @@ final class CollaborationController extends Controller
             abort_if($documentId !== 0, 422);
             abort_unless($user->can($page === 'create' ? 'create' : 'viewAny', Document::class), 403);
         }
+        abort_if($page !== 'edit' && $request->filled('focused_field'), 422);
         $sessionId = $request->string('session_id')->toString();
         DB::table('collaboration_presence')->insertOrIgnore([
             'session_id' => $sessionId,
             'user_id' => $user->getAuthIdentifier(),
             'document_id' => $request->input('document_id'),
             'page' => $page,
+            'focused_field' => $request->input('focused_field'),
             'seen_at' => now(),
         ]);
         $owned = DB::table('collaboration_presence')->where('session_id', $sessionId)
@@ -46,6 +49,7 @@ final class CollaborationController extends Controller
         $owned->update([
             'document_id' => $request->input('document_id'),
             'page' => $page,
+            'focused_field' => $request->input('focused_field'),
             'seen_at' => now(),
         ]);
         $presence = DB::table('collaboration_presence')->join('users', 'users.id', '=', 'collaboration_presence.user_id')
@@ -56,8 +60,27 @@ final class CollaborationController extends Controller
                     ->orWhereColumn('documents.workspace_id', 'users.workspace_id');
             })
             ->where('seen_at', '>=', now()->subSeconds(45))
-            ->select('users.name', 'collaboration_presence.page', 'collaboration_presence.document_id')
-            ->get();
+            ->select('users.id', 'users.name', 'collaboration_presence.page', 'collaboration_presence.document_id', 'collaboration_presence.focused_field')
+            ->get()->map(function ($person) use ($user): array {
+                $id = $person->id;
+                if (! is_int($id) && ! is_string($id)) {
+                    abort(500);
+                }
+                $key = config('app.key');
+                $currentId = $user->getAuthIdentifier();
+                if (! is_string($key) || (! is_int($currentId) && ! is_string($currentId))) {
+                    abort(500);
+                }
+
+                return [
+                    'user_key' => hash_hmac('sha256', (string) $id, $key),
+                    'is_you' => (string) $id === (string) $currentId,
+                    'name' => $person->name,
+                    'page' => $person->page,
+                    'focused_field' => $person->focused_field,
+                    'document_id' => $person->document_id,
+                ];
+            });
 
         return response()->json(['presence' => $presence]);
     }
