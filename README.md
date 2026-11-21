@@ -25,7 +25,7 @@ npm run build
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/admin` in two separate browser profiles. Sign in as `alice@example.test` and `bob@example.test` respectively, both with password `password`. These credentials are **only for a local disposable demo**. Open Documents, select Team planning and click Edit in both browsers. Type into **Shared draft** on either page; changes should appear in the other after polling. The presence panel shows active people and their current page; the list also shows activity for each record. Creating a document opens its shareable edit page. A View page shows the shared draft read-only. The title is an ordinary Filament form field and is saved separately.
+Open `http://127.0.0.1:8000/admin` in two separate browser profiles. Sign in as `alice@example.test` and `bob@example.test` respectively, both with password `password`. These credentials are **only for a local disposable demo**. Open Documents, select Team planning and click Edit in both browsers. Type into **Shared draft** on either page; changes should appear in the other after polling. The presence panel shows active people and their current page; the list also shows activity for each record. Creating a document opens its shareable edit page. A View page shows the shared draft read-only. The title is saved separately with a revision check: if another editor saved it since the page opened, reload before saving. This demo check covers only its Filament save path; other writers must participate in the revision protocol.
 
 The seed creates the demo accounts and a record. Never seed these accounts on a reachable production system. The demo assigns each user to a workspace and checks a document policy for draft access. Accounts created by the demo seeder belong to workspace 1.
 
@@ -42,12 +42,12 @@ The panel injects a small client on the Documents list, create, view, and edit p
 npm run build
 ```
 
-For the browser check, seed a fresh local database, start `php artisan serve --host=127.0.0.1 --port=8765`, install Playwright Chromium (`npx playwright install chromium`), then run `node scripts/browser-demo.mjs`. This writes a screenshot and recording in `docs/media` and edits document #1.
+For the browser checks, seed a fresh local database, start `php artisan serve --host=127.0.0.1 --port=8765`, install Playwright Chromium (`npx playwright install chromium`), then run `node scripts/browser-demo.mjs` and `node scripts/browser-reconnect.mjs`. This writes a screenshot and recording in `docs/media` and edits document #1.
 
 ## Limitations and next steps
 
 - Workspace isolation and the document policy are demo-specific, not a complete multi-tenant integration. The update endpoint accepts opaque Yjs bytes without validating the document format; abuse limits, authorization integration, untrusted-content handling and security review are required before deployment.
 - This is application code, not a reusable Composer plugin. Presence covers the demo resource and its table rows; custom pages, relation managers, modals, field focus and user cursors are not implemented. A shared draft begins after a record is created; there is no pre-record collaborative creation flow.
-- The rich text is a standalone shared draft. There is no publish action, revision history, validation against a form, or protection for concurrent edits to normal Filament fields.
+- The rich text is a standalone shared draft. There is no publish action, revision history or validation against a form. The demo title uses a revision check only in its Filament save path; writes outside that path must also advance the revision, and the query update bypasses Eloquent model update events.
 - Pending client updates are also held in session storage for reload and retry within the same browser tab. Closing the tab, clearing storage, storage quota errors, or opening a different browser can still lose pending changes. The server update log grows without bound; snapshots, compaction, retention, multi-database concurrency validation and load testing remain to be designed. Polling and presence are approximate; inactive or closed tabs disappear after the timeout.
-- The browser check covers a simple two-user sequence only. It does not prove simultaneous offline merges, operational robustness or production security. Compatibility is tested only against the locked dependency versions in this repository.
+- Browser checks cover a simple two-user sequence and a same-tab reload with pending writes only. It does not prove simultaneous offline merges, operational robustness or production security. Compatibility is tested only against the locked dependency versions in this repository.

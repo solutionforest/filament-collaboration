@@ -33,12 +33,19 @@ final class CollaborationController extends Controller
             abort_unless($user->can($page === 'create' ? 'create' : 'viewAny', Document::class), 403);
         }
         $sessionId = $request->string('session_id')->toString();
-        $claimed = DB::table('collaboration_presence')->where('session_id', $sessionId)->where('user_id', '!=', $user->getAuthIdentifier())->exists();
-        abort_if($claimed, 403);
-        DB::table('collaboration_presence')->updateOrInsert(['session_id' => $sessionId], [
+        DB::table('collaboration_presence')->insertOrIgnore([
+            'session_id' => $sessionId,
             'user_id' => $user->getAuthIdentifier(),
             'document_id' => $request->input('document_id'),
-            'page' => $request->string('page')->toString(),
+            'page' => $page,
+            'seen_at' => now(),
+        ]);
+        $owned = DB::table('collaboration_presence')->where('session_id', $sessionId)
+            ->where('user_id', $user->getAuthIdentifier());
+        abort_unless((clone $owned)->exists(), 403);
+        $owned->update([
+            'document_id' => $request->input('document_id'),
+            'page' => $page,
             'seen_at' => now(),
         ]);
         $presence = DB::table('collaboration_presence')->join('users', 'users.id', '=', 'collaboration_presence.user_id')

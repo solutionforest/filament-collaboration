@@ -2,6 +2,7 @@
 
 use App\Filament\Resources\Documents\DocumentResource;
 use App\Filament\Resources\Documents\Pages\CreateDocument;
+use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Filament\Resources\Documents\Pages\ListDocuments;
 use App\Models\Document;
 use App\Models\User;
@@ -101,4 +102,24 @@ it('creates a workspace document and opens the shared draft', function (): void 
     $document = Document::query()->where('title', 'New shared draft')->firstOrFail();
     expect($document->workspace_id)->toBe(2);
     $page->assertRedirect(DocumentResource::getUrl('edit', ['record' => $document]));
+});
+
+it('rejects stale form saves rather than overwriting a newer title', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Original']);
+    $this->actingAs($user);
+    $first = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $second = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $first->fillForm(['title' => 'First'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+    $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)->assertHasFormErrors(['title']);
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'First', 'revision' => 1]);
+});
+
+it('shows current presence beside its record in the resource table', function (): void {
+    $viewer = User::factory()->create(['name' => 'Viewer']);
+    $document = Document::create(['title' => 'Visible record']);
+    $this->actingAs($viewer)->postJson('/collaboration/presence', [
+        'session_id' => (string) Str::uuid(), 'document_id' => $document->id, 'page' => 'view',
+    ])->assertOk();
+    Livewire\Livewire::test(ListDocuments::class)->assertSee('Viewer (view)');
 });

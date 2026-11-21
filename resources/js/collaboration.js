@@ -39,11 +39,19 @@ if (match) {
         const user = document.querySelector('meta[name="collaboration-user"]').content;
         const queueKey = `collaboration-pending:${user}:${id}`;
         let queue = [];
-        try { queue = JSON.parse(sessionStorage.getItem(queueKey) || '[]'); }
-        catch { status.textContent = 'Could not recover pending edits'; }
+        let recoveryFailed = false;
+        let storageFailed = false;
+        try {
+            const saved = JSON.parse(sessionStorage.getItem(queueKey) || '[]');
+            if (!Array.isArray(saved) || saved.some(item => typeof item?.update !== 'string' || typeof item?.client_update_id !== 'string')) throw new Error('Invalid queue');
+            queue = saved;
+        } catch {
+            recoveryFailed = true;
+            status.textContent = 'Pending edits could not be recovered. Keep this tab open and contact an administrator.';
+        }
         const persist = () => {
-            try { sessionStorage.setItem(queueKey, JSON.stringify(queue)); }
-            catch { status.textContent = 'Storage full: keep this tab open until synced'; }
+            try { sessionStorage.setItem(queueKey, JSON.stringify(queue)); storageFailed = false; }
+            catch { storageFailed = true; status.textContent = 'Storage unavailable: keep this tab open until synced'; }
         };
         window.addEventListener('beforeunload', event => {
             if (queue.length) { event.preventDefault(); event.returnValue = ''; }
@@ -66,11 +74,11 @@ if (match) {
             if (origin === 'remote') return;
             queue.push({client_update_id: crypto.randomUUID(), update: btoa(Array.from(update, byte => String.fromCharCode(byte)).join(''))});
             persist();
-            status.textContent = 'Saving draft…';
+            if (!storageFailed) status.textContent = 'Saving draft…';
             send();
         });
         const sync = async () => {
-            if (syncing) return;
+            if (syncing || recoveryFailed) return;
             syncing = true;
             try {
                 let updates;
@@ -82,6 +90,11 @@ if (match) {
                     }
                 } while (updates.length === 500);
                 if (!editor) {
+                    // The persisted queue may contain edits not yet known to the server.
+                    // Reapply them before enabling the editor so reload does not hide them.
+                    for (const item of queue) {
+                        Y.applyUpdate(ydoc, Uint8Array.from(atob(item.update), c => c.charCodeAt(0)), 'remote');
+                    }
                     editor = new Editor({element: editorBox.querySelector('.collaboration-editor'), editable: page === 'edit', extensions: [StarterKit.configure({undoRedo: false}), Collaboration.configure({document: ydoc})]});
                 }
                 if (!queue.length) status.textContent = 'Draft synced';

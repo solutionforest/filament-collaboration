@@ -14,6 +14,6 @@ class Document extends Model
 
     protected function casts(): array
     {
-        return ['workspace_id' => 'integer'];
+        return ['workspace_id' => 'integer', 'revision' => 'integer'];
     }
 }
