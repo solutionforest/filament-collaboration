@@ -11,7 +11,7 @@ if (match) {
     const session = crypto.randomUUID();
     const box = document.createElement('section');
     box.className = 'collaboration-box';
-    box.innerHTML = `<div class="collaboration-heading"><div><span class="collaboration-eyebrow">COLLABORATION</span><h2>${id ? 'Working on this document' : 'People in Documents'}</h2><p>${id ? 'See who has this record open. Presence may take up to 45 seconds to clear after they leave.' : 'See who is browsing, creating or working on a record. Presence can take up to 45 seconds to clear.'}</p></div><span class="collaboration-connection" data-presence-status>Connecting</span></div><div class="collaboration-people" data-presence role="status" aria-live="polite">Loading people…</div>${id ? '<div class="collaboration-actions"><button type="button" data-copy>Copy document link</button><span data-copy-status role="status"></span></div>' : ''}<div data-editor></div>`;
+    box.innerHTML = `<div class="collaboration-heading"><div><span class="collaboration-eyebrow">COLLABORATION</span><h2>${id ? 'Working on this document' : 'People in Articles'}</h2><p>${id ? 'See who has this record open. Presence may take up to 45 seconds to clear after they leave.' : 'See who is browsing, creating or working on a record. Presence can take up to 45 seconds to clear.'}</p></div><span class="collaboration-connection" data-presence-status>Connecting</span></div><div class="collaboration-people" data-presence role="status" aria-live="polite">Loading people…</div>${id ? '<div class="collaboration-actions"><button type="button" data-copy>Copy document link</button><span data-copy-status role="status"></span></div>' : ''}<div data-editor></div>`;
     document.querySelector('main')?.prepend(box);
     const headers = {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'};
     const call = async (url, options = {}) => {
@@ -39,7 +39,7 @@ if (match) {
             const container = box.querySelector('[data-presence]');
             container.replaceChildren();
             if (people.size === 0) {
-                container.textContent = id ? 'You are the only person on this record right now.' : 'No one else is active in Documents right now.';
+                container.textContent = id ? 'You are the only person on this record right now.' : 'No one else is active in Articles right now.';
             } else {
                 for (const person of people.values()) {
                     const chip = document.createElement('span');

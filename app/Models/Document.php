@@ -10,7 +10,7 @@ class Document extends Model
 {
     protected $attributes = ['workspace_id' => 1];
 
-    protected $fillable = ['title', 'workspace_id'];
+    protected $fillable = ['title', 'workspace_id', 'slug', 'category', 'status', 'excerpt'];
 
     protected function casts(): array
     {

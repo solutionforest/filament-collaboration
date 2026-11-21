@@ -6,6 +6,7 @@ use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Filament\Resources\Documents\Pages\ListDocuments;
 use App\Models\Document;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -153,4 +154,40 @@ it('reports allowed focused fields only for an edit page', function (): void {
     $this->postJson('/collaboration/presence', [
         'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => 'arbitrary',
     ])->assertUnprocessable();
+});
+
+it('renders a private article summary preview and escapes its content', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => '<script>unsafe</script>', 'excerpt' => 'A summary', 'status' => 'review']);
+    $this->get(route('articles.preview', $document))->assertRedirect();
+    $this->actingAs($user)->get(route('articles.preview', $document))
+        ->assertOk()->assertSee('A summary')->assertSee('&lt;script&gt;unsafe&lt;/script&gt;', false)
+        ->assertDontSee('<script>unsafe</script>', false)
+        ->assertSee('shared draft is not published');
+});
+
+it('prevents another workspace from viewing an article preview', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Private', 'workspace_id' => 2]);
+    $this->actingAs($user)->get(route('articles.preview', $document))->assertForbidden();
+});
+
+it('saves article details and rejects stale edits to them', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Article']);
+    $this->actingAs($user);
+    $first = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $stale = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $first->fillForm(['title' => 'Article', 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary'])
+        ->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+    $stale->fillForm(['title' => 'Article', 'status' => 'published'])->call('save', shouldRedirect: false)->assertHasFormErrors(['title']);
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary']);
+});
+
+it('seeds sample article drafts without duplicating them on repeat runs', function (): void {
+    $this->seed(DatabaseSeeder::class);
+    $this->seed(DatabaseSeeder::class);
+    $this->assertDatabaseCount('documents', 3);
+    $this->assertDatabaseCount('collaboration_updates', 3);
+    $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'review']);
 });

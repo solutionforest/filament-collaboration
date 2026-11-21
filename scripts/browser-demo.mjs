@@ -21,6 +21,7 @@ try {
     await b.goto('http://127.0.0.1:8765/admin/documents/1/edit');
     await a.locator('.tiptap').waitFor();
     await b.locator('.tiptap').waitFor();
+    await a.locator('.tiptap').getByText('Start here:', {exact: false}).waitFor();
     await a.locator('.tiptap').click();
     await a.keyboard.type('Hello from Alice. ', {delay: 60});
     await b.getByText('Hello from Alice.', {exact: false}).waitFor({timeout: 15000});

@@ -21,6 +21,10 @@ class DocumentResource extends Resource
 {
     protected static ?string $model = Document::class;
 
+    protected static ?string $navigationLabel = 'Articles';
+
+    protected static ?string $modelLabel = 'article';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function getEloquentQuery(): Builder

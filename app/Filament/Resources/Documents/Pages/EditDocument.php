@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Documents\Pages;
 
 use App\Filament\Resources\Documents\DocumentResource;
 use App\Models\Document;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
@@ -37,6 +38,10 @@ class EditDocument extends EditRecord
             ->where('revision', $this->documentRevision)
             ->update([
                 'title' => $data['title'] ?? '',
+                'slug' => $data['slug'] ?? null,
+                'category' => $data['category'] ?? 'News',
+                'status' => $data['status'] ?? 'draft',
+                'excerpt' => $data['excerpt'] ?? null,
                 'revision' => DB::raw('revision + 1'),
                 'updated_at' => now(),
             ]);
@@ -51,6 +56,9 @@ class EditDocument extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [ViewAction::make(), DeleteAction::make()];
+        return [
+            Action::make('preview')->label('Preview summary')->url(fn (): string => route('articles.preview', $this->getRecord()))->openUrlInNewTab(),
+            ViewAction::make(), DeleteAction::make(),
+        ];
     }
 }
