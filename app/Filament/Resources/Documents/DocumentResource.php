@@ -15,12 +15,18 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class DocumentResource extends Resource
 {
     protected static ?string $model = Document::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('workspace_id', auth()->user()?->workspace_id);
+    }
 
     public static function form(Schema $schema): Schema
     {

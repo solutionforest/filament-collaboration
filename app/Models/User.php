@@ -14,6 +14,8 @@ use Illuminate\Notifications\Notifiable;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+    protected $attributes = ['workspace_id' => 1];
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -27,6 +29,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'workspace_id' => 'integer',
         ];
     }
 }

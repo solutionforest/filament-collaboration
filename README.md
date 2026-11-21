@@ -25,9 +25,9 @@ npm run build
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/admin` in two separate browser profiles. Sign in as `alice@example.test` and `bob@example.test` respectively, both with password `password`. These credentials are **only for a local disposable demo**. Open Documents, select Team planning and click Edit in both browsers. Type into **Shared draft** on either page; changes should appear in the other after polling. The presence panel shows active people and their current page. A View page shows the shared draft read-only. The title is an ordinary Filament form field and is saved separately.
+Open `http://127.0.0.1:8000/admin` in two separate browser profiles. Sign in as `alice@example.test` and `bob@example.test` respectively, both with password `password`. These credentials are **only for a local disposable demo**. Open Documents, select Team planning and click Edit in both browsers. Type into **Shared draft** on either page; changes should appear in the other after polling. The presence panel shows active people and their current page; the list also shows activity for each record. Creating a document opens its shareable edit page. A View page shows the shared draft read-only. The title is an ordinary Filament form field and is saved separately.
 
-The seed creates the demo accounts and a record. Never seed these accounts on a reachable production system. The app assumes every authenticated user can access every document and presence entry.
+The seed creates the demo accounts and a record. Never seed these accounts on a reachable production system. The demo assigns each user to a workspace and checks a document policy for draft access. Accounts created by the demo seeder belong to workspace 1.
 
 ## How it works
 
@@ -46,8 +46,8 @@ For the browser check, seed a fresh local database, start `php artisan serve --h
 
 ## Limitations and next steps
 
-- No policy or tenant isolation: all authenticated users can read and write every document and see all presence. The endpoints are demo-only and need authorization, tenant scoping, abuse limits, data validation, and a security review before any real deployment.
-- This is application code, not a reusable Composer plugin. Presence is a panel-level list, not per-row badges; custom pages, relation managers, modals, field focus, user cursors and a shared create draft are not implemented.
+- Workspace isolation and the document policy are demo-specific, not a complete multi-tenant integration. The update endpoint accepts opaque Yjs bytes without validating the document format; abuse limits, authorization integration, untrusted-content handling and security review are required before deployment.
+- This is application code, not a reusable Composer plugin. Presence covers the demo resource and its table rows; custom pages, relation managers, modals, field focus and user cursors are not implemented. A shared draft begins after a record is created; there is no pre-record collaborative creation flow.
 - The rich text is a standalone shared draft. There is no publish action, revision history, validation against a form, or protection for concurrent edits to normal Filament fields.
-- Client updates are held in memory during connection failures; closing a tab can lose pending changes. The server update log grows without bound; snapshots, compaction, retention, concurrent-writer ordering and load testing remain to be designed. Polling and presence are approximate; inactive or closed tabs disappear after the timeout.
+- Pending client updates are also held in session storage for reload and retry within the same browser tab. Closing the tab, clearing storage, storage quota errors, or opening a different browser can still lose pending changes. The server update log grows without bound; snapshots, compaction, retention, multi-database concurrency validation and load testing remain to be designed. Polling and presence are approximate; inactive or closed tabs disappear after the timeout.
 - The browser check covers a simple two-user sequence only. It does not prove simultaneous offline merges, operational robustness or production security. Compatibility is tested only against the locked dependency versions in this repository.

@@ -35,15 +35,28 @@ if (match) {
         let cursor = 0;
         let editor;
         let sending = false;
-        const queue = [];
+        let syncing = false;
+        const user = document.querySelector('meta[name="collaboration-user"]').content;
+        const queueKey = `collaboration-pending:${user}:${id}`;
+        let queue = [];
+        try { queue = JSON.parse(sessionStorage.getItem(queueKey) || '[]'); }
+        catch { status.textContent = 'Could not recover pending edits'; }
+        const persist = () => {
+            try { sessionStorage.setItem(queueKey, JSON.stringify(queue)); }
+            catch { status.textContent = 'Storage full: keep this tab open until synced'; }
+        };
+        window.addEventListener('beforeunload', event => {
+            if (queue.length) { event.preventDefault(); event.returnValue = ''; }
+        });
         const url = `/collaboration/documents/${id}/updates`;
         const send = async () => {
             if (sending || !queue.length) return;
             sending = true;
             try {
                 while (queue.length) {
-                    await call(url, {method: 'POST', body: JSON.stringify({update: queue[0]})});
+                    await call(url, {method: 'POST', body: JSON.stringify(queue[0])});
                     queue.shift();
+                    persist();
                 }
                 status.textContent = 'Draft synced';
             } catch { status.textContent = 'Offline: changes pending in this tab'; }
@@ -51,11 +64,14 @@ if (match) {
         };
         ydoc.on('update', (update, origin) => {
             if (origin === 'remote') return;
-            queue.push(btoa(String.fromCharCode(...update)));
+            queue.push({client_update_id: crypto.randomUUID(), update: btoa(Array.from(update, byte => String.fromCharCode(byte)).join(''))});
+            persist();
             status.textContent = 'Saving draft…';
             send();
         });
         const sync = async () => {
+            if (syncing) return;
+            syncing = true;
             try {
                 let updates;
                 do {
@@ -71,6 +87,7 @@ if (match) {
                 if (!queue.length) status.textContent = 'Draft synced';
                 await send();
             } catch { status.textContent = 'Connection unavailable; retrying.'; }
+            finally { syncing = false; }
         };
         sync();
         setInterval(sync, 2000);
