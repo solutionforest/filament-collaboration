@@ -8,7 +8,6 @@ use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use ThirdParty\Collab\Actions\CollabAction;
 
 class DocumentsTable
 {
@@ -22,6 +21,6 @@ class DocumentsTable
             }),
             TextColumn::make('updated_at')->label('Last updated')->since()->sortable(),
             PresenceColumn::make('presence'),
-        ])->filters([SelectFilter::make('status')->options(['draft' => 'Draft', 'review' => 'In review', 'published' => 'Published'])])->recordActions([ViewAction::make(), EditAction::make(), CollabAction::configure(EditAction::make('quickEdit')->label('Quick edit')->modal())]);
+        ])->filters([SelectFilter::make('status')->options(['draft' => 'Draft', 'review' => 'In review', 'published' => 'Published'])])->recordActions([ViewAction::make(), EditAction::make()]);
     }
 }
