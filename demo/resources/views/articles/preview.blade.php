@@ -18,7 +18,7 @@
 <body>
 <header>Fieldnotes <span style="font-weight:400;opacity:.7">/ CMS demo</span></header>
 <main>
-    <p class="notice">Private summary preview · {{ ucfirst($document->status) }}. The shared draft is not published or displayed here.</p>
+    <p class="notice">Private summary preview · {{ ucfirst($document->status) }}. The shared draft is not published or displayed here until someone saves it.</p>
     <p class="meta">{{ $document->category }} · {{ $document->updated_at?->format('M j, Y') }}</p>
     <h1>{{ $document->title }}</h1>
     <p class="summary">{{ $document->excerpt ?: 'No summary has been added yet.' }}</p>

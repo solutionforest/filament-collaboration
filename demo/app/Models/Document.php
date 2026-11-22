@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -42,7 +43,6 @@ class Document extends Model
         return [
             'workspace_id' => 'integer',
             'author_id' => 'integer',
-            'revision' => 'integer',
             'tags' => 'array',
             'published_at' => 'datetime',
             'robots_noindex' => 'boolean',
@@ -90,6 +90,11 @@ class Document extends Model
         }
 
         return (string) ($this->excerpt ?? '');
+    }
+
+    public function bodyHtml(): string
+    {
+        return filled($this->body_html) ? RichContentRenderer::make((string) $this->body_html)->toHtml() : '';
     }
 
     public function publicUrl(): string

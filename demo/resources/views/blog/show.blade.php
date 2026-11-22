@@ -25,7 +25,7 @@
         .hero { width:100%; border-radius:1rem; border:1px solid var(--line); margin:0 0 1.5rem; }
         .deck { font-size:1.15rem; line-height:1.55; color:var(--muted); margin:0 0 1.5rem; }
         .body { font-size:1.08rem; line-height:1.7; }
-        .body p { margin:0 0 1rem; white-space: pre-wrap; }
+        .body p { margin:0 0 1rem; }
         .related { margin-top:2.5rem; padding-top:1.25rem; border-top:1px solid var(--line); }
         .related h2 { font-size:1.2rem; margin:0 0 .8rem; }
         .related ul { margin:0; padding-left:1.1rem; }
@@ -54,7 +54,8 @@
     @endif
 
     <div class="body">
-        <p>{{ $post->body_html ?: 'This article has no public body yet. Editors can fill Article body (HTML) in the CMS.' }}</p>
+        {{-- `bodyHtml()` is sanitised by Filament's rich content renderer. --}}
+        {!! $post->bodyHtml() ?: '<p>This article has no body yet.</p>' !!}
     </div>
 
     @if (! empty($post->tags))
