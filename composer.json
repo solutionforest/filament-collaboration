@@ -1,7 +1,7 @@
 {
     "name": "solutionforest/filament-collaboration",
-    "description": "Collaborative Filament editing: presence, field-level three-way merge on save, and optional shared CRDT drafts — without depending on third-party collaboration plugins.",
-    "keywords": ["laravel", "filament", "filament-plugin", "collaboration", "crdt", "presence", "merge"],
+    "description": "Google Docs-style collaborative editing for Filament: live fields, presence, cursors and merge on save, over plain HTTP with its own CRDT.",
+    "keywords": ["laravel", "filament", "filament-plugin", "collaboration", "crdt", "presence", "real-time", "collaborative editing"],
     "license": "MIT",
     "authors": [
         {
@@ -20,15 +20,15 @@
             "SolutionForest\\FilamentCollaboration\\": "src/"
         }
     },
-    "autoload-dev": {
-        "psr-4": {
-            "SolutionForest\\FilamentCollaboration\\Tests\\": "tests/"
-        }
-    },
     "extra": {
         "laravel": {
             "providers": [
                 "SolutionForest\\FilamentCollaboration\\FilamentCollaborationServiceProvider"
+            ]
+        },
+        "phpstan": {
+            "includes": [
+                "extension.neon"
             ]
         }
     },
