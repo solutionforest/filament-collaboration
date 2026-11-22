@@ -1,102 +1,123 @@
-# Filament collaboration
+# Filament Collaboration
 
-Installable Filament collaboration package plus a Fieldnotes **blog CMS** demo. Built to match the plugin’s collaboration surface without depending on `third-party/collaboration-plugin`. Yjs is optional — only for live co-typing the same rich-text pad.
+Installable Filament package for collaborative editing: live presence, field-level three-way merge on save, conflict UI, modal edits, and an optional TipTap + Yjs rich editor.
 
-## Package
+**This repository is the package.** The runnable Fieldnotes CMS lives in [`demo/`](demo/).
 
-Path package: `packages/filament-collaboration` (`solutionforest/filament-collaboration`).
+```
+/
+├── src/                 # package PHP
+├── resources/           # views, lang, Alpine dist
+├── config/
+├── demo/                # Laravel + Filament blog CMS demo
+└── docs/media/          # screenshots
+```
+
+## Requirements
+
+- PHP 8.3+
+- Laravel 12 or 13
+- Filament 4.13.3+ or 5.8.3+
+- Shared cache with atomic locks (Redis / database) in production
+
+## Install
+
+```bash
+composer require solutionforest/filament-collaboration
+php artisan vendor:publish --tag=filament-collaboration-config
+```
+
+## Quick API
+
+| Piece | Purpose |
+| --- | --- |
+| `InteractsWithCollaboration` | Edit pages: merge-on-save, conflicts, presence, pull-their-changes |
+| `HasPresence` | View pages: header avatar stack + field focus |
+| `PresenceColumn` | Table column: who is on each record (avatar stack + `+N`) |
+| `EditAction::collaborate()` / `CollaborateAction` | Modal edit with merge + optional presence |
+| `CollaborativeRichEditor` | Optional live rich text (TipTap + Yjs over HTTP) |
+| `Collaboration::store()` | Presence / last-save cache API |
+| `PresenceStore::room()` / `resolveRoomUsing()` | Room keys (multi-tenant safe) |
+| Events | `ChangesMerged`, `ConflictDetected`, `ConflictResolved` |
+
+### Edit page
 
 ```php
 use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
-use SolutionForest\FilamentCollaboration\Concerns\HasPresence;
-use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
-use SolutionForest\FilamentCollaboration\Tables\PresenceColumn;
 
 class EditPost extends EditRecord
 {
     use InteractsWithCollaboration;
-}
 
-class ViewPost extends ViewRecord
-{
-    use HasPresence;
+    protected function getCollaborationIgnoredFields(): array
+    {
+        return ['live_draft']; // CRDT pad is authoritative
+    }
 }
-
-// Table
-PresenceColumn::make('presence');
-CollaborateAction::configure(EditAction::make()); // or EditAction::make()->collaborate()
 ```
 
-feature parity in this package:
+### Table
 
-- Record presence (Livewire heartbeat + cache store) and field focus
-- Field-by-field three-way merge on save, conflict dialog, pull-their-changes notice
-- Modal edit merge (`collaborate()` / `CollaborateAction::configure`)
-- Table presence column
-- Events: `ChangesMerged`, `ConflictDetected`, `ConflictResolved`
-- Tenant/workspace rooms via `PresenceStore::resolveRoomUsing()`
+```php
+use SolutionForest\FilamentCollaboration\Tables\PresenceColumn;
 
-Beyond the plugin: optional `CollaborativeRichEditor` (TipTap + Yjs over HTTP) for live co-writing. Ordinary blog fields (title, body HTML, SEO, related posts…) merge on save and show per-field presence without Yjs.
+$table->poll('10s')->columns([
+    PresenceColumn::make('presence'),
+]);
+```
 
-Google-Docs-style UX:
+### Live rich editor (optional)
 
-- Colour-coded avatar stack in the page header (with `+N` overflow)
-- Coloured field outlines + name tags for who is in which field
-- Blinking remote caret markers on occupied fields
+```php
+use SolutionForest\FilamentCollaboration\Forms\Components\CollaborativeRichEditor;
 
-See `packages/filament-collaboration/README.md`.
+CollaborativeRichEditor::make('live_draft');
+```
 
-## Demo (Fieldnotes blog CMS)
+Yjs is **not** required for presence, merge, conflicts, or ordinary fields. Use it only when two people type the same rich text at once.
 
-Seed loads **100 editors** and **15 articles**. Open Spring product update as Alice to see a busy desk (`+91` overflow avatars, field highlights).
+Full usage notes: keep reading below / see `demo/` for a complete CMS.
 
-![100 editors on one article — avatar stack, field chips, coloured outlines](docs/media/presence-avatars.png)
+## Demo app
 
-![Article list with live presence](docs/media/cms-articles.png)
-
-![Field highlights + name tags while editing](docs/media/field-highlight.png)
-
-![Public blog index](docs/media/public-blog.png)
-
-![Public article page](docs/media/public-article.png)
-
-[Conflict dialog](docs/media/conflict-dialog.png) · [Private summary preview](docs/media/cms-preview.png) · [Mobile edit](docs/media/mobile-edit.png)
-
-Public site: `/blog` and `/blog/{slug}` (SEO meta, tags, related posts). CMS: Filament Articles with Article / SEO / Related posts / optional Live Yjs pad.
-
-### Run locally
-
-```sh
+```bash
+cd demo
 composer install
-cp .env.example .env
+cp .env.example .env   # if needed
 php artisan key:generate
-mkdir -p database
 touch database/database.sqlite
 php artisan migrate --seed
-php artisan filament:assets
-npm ci
-npm run build
+npm install
+npm run build          # demo assets + package Alpine build
 php artisan serve
 ```
 
+- CMS: `http://127.0.0.1:8000/admin` — `alice@example.test` / `password`
 - Public blog: `http://127.0.0.1:8000/blog`
-- CMS: `http://127.0.0.1:8000/admin` — `alice@example.test` / `bob@example.test` (password `password`). Local disposable accounts only.
-- Optional screenshots: `node scripts/capture-screenshots.mjs` (with `php artisan serve` running)
+- Seed: 100 editors + 15 articles; Spring product update has busy presence for screenshots
 
-### Checks
+### Screenshots
 
-```sh
-./vendor/bin/pest
-./vendor/bin/phpstan analyse --no-progress
-./vendor/bin/pint --test
-npm run build
-```
+![Presence avatars + field highlights](docs/media/presence-avatars.png)
 
-## Limitations
+![People on record column](docs/media/cms-articles.png)
 
-- Optional live pad: Yjs updates are opaque bytes (no server-side Yjs validation). Core CMS collab does not need Yjs.
-- Seeded presence expires with the package timeout (default 20s); re-open the edit page or re-seed to refresh a busy desk.
-- Reliable offline, multi-database concurrency validation and security review remain open.
-- the plugin extras not fully mirrored yet: spatie-translatable locale merge, leave beacon middleware matrix, and their full comparison edge-case suite.
-- Demo presence HTTP endpoint and package Livewire presence both run; unify further before a public release.
-- Keep the PR draft; use only local fake data.
+![Collaborative rich editor](docs/media/rich-editor.png)
+
+![Field highlights](docs/media/field-highlight.png)
+
+![Public blog](docs/media/public-blog.png)
+
+## What is “presence” vs the old demo panel?
+
+Package UX (what you should use):
+
+- **Header avatars** — Google-style stack of who is on this record
+- **Field outlines + name tags** — which editor is in which field
+- **People on record** — `PresenceColumn` on the list (same PresenceStore)
+
+The previous demo-only “Collaboration” HTML panel (Vite `collaboration.js`) was removed. It duplicated package presence over a separate HTTP table and made the list column look empty. Presence now flows through `Collaboration::store()` only.
+
+## License
+
+MIT

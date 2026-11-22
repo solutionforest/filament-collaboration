@@ -1,22 +1,12 @@
 {
-    "$schema": "https://www.schemastore.org/package.json",
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build && vite build --config packages/filament-collaboration/vite.config.js",
-        "build:package": "vite build --config packages/filament-collaboration/vite.config.js",
-        "dev": "vite"
+        "build": "vite build",
+        "dev": "vite build --watch"
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
-        "concurrently": "^10.0.3",
-        "laravel-vite-plugin": "^3.1",
-        "playwright": "^1.65.1",
-        "tailwindcss": "^4.0.0",
         "vite": "^8.0.0"
-    },
-    "optionalDependencies": {
-        "@laravel/multiplex": "^0.4.1"
     },
     "dependencies": {
         "@tiptap/core": "^3.35.0",
