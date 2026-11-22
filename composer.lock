@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7a2bcb30aafc3d156f08c3de1693a0c2",
+    "content-hash": "f01748907b052ddf461f4bd0f4f7510b",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -4157,6 +4157,92 @@
                 }
             ],
             "time": "2026-11-19T13:20:45+00:00"
+        },
+        {
+            "name": "third-party/collaboration-plugin",
+            "version": "v1.0.0-beta.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/third-party/collaboration-plugin.git",
+                "reference": "8e95983b5c7f199dde70211e1b4c1f7b1e8250f2"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/third-party/collaboration-plugin/zipball/8e95983b5c7f199dde70211e1b4c1f7b1e8250f2",
+                "reference": "8e95983b5c7f199dde70211e1b4c1f7b1e8250f2",
+                "shasum": ""
+            },
+            "require": {
+                "filament/filament": "^4.13.3 || ^5.8.3",
+                "illuminate/contracts": "^12.0 || ^13.0",
+                "php": "^8.3",
+                "spatie/laravel-package-tools": "^1.92"
+            },
+            "require-dev": {
+                "lara-zeus/spatie-translatable": "^1.0 || ^2.0",
+                "laravel/pint": "^1.27",
+                "orchestra/testbench": "^10.0 || ^11.0",
+                "pestphp/pest": "^4.0 || ^5.0",
+                "pestphp/pest-plugin-livewire": "^4.0 || ^5.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "ThirdParty\\Collab\\CollabServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "ThirdParty\\Collab\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Third Party Developer",
+                    "email": "developer@example.com",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Third Party",
+                    "email": "support@example.com",
+                    "homepage": "https://example.com"
+                }
+            ],
+            "description": "Edit Filament records together without locks: live presence down to the field someone is typing in, and saves that merge field by field instead of overwriting a colleague's changes. Polling, no websockets.",
+            "homepage": "https://github.com/third-party/collaboration-plugin",
+            "keywords": [
+                "collaboration",
+                "concurrent-editing",
+                "filament",
+                "filament-plugin",
+                "filament-v4",
+                "filament-v5",
+                "laravel",
+                "livewire",
+                "optimistic-locking",
+                "third-party",
+                "presence",
+                "record-lock",
+                "resource-lock"
+            ],
+            "support": {
+                "docs": "https://example.com/collaboration-plugin",
+                "issues": "https://github.com/third-party/collaboration-plugin/issues",
+                "source": "https://github.com/third-party/collaboration-plugin"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/sponsors/third-party",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-11-09T18:31:39+00:00"
         },
         {
             "name": "paragonie/constant_time_encoding",
@@ -12450,7 +12536,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "third-party/collaboration-plugin": 10
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

@@ -37,6 +37,9 @@ try {
     await a.getByText('Bob · Edit page open · Focused: title').waitFor({timeout: 15000});
     await b.goto('http://127.0.0.1:8765/admin/documents');
     await b.getByText('Alice (edit)').waitFor({timeout: 15000});
+    await b.getByRole('row', {name: /Team planning/}).getByRole('button', {name: 'Quick edit'}).click();
+    await b.locator('.fi-modal-window').waitFor();
+    await b.screenshot({path: 'docs/media/quick-edit.png', fullPage: true});
     console.log('Two independent users synchronized a shared draft.');
     const video = a.video();
     await alice.close();

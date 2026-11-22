@@ -7,8 +7,11 @@ use App\Filament\Resources\Documents\Pages\ListDocuments;
 use App\Models\Document;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use ThirdParty\Collab\Collab;
+use ThirdParty\Collab\Presence\PresenceStore;
 
 it('requires authentication for collaboration endpoints', function (): void {
     $document = Document::create(['title' => 'Test']);
@@ -112,8 +115,8 @@ it('rejects stale form saves rather than overwriting a newer title', function ()
     $first = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $second = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'First'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
-    $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)->assertHasFormErrors(['title']);
-    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'First', 'revision' => 1]);
+    $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)->assertActionMounted('collabResolve');
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'First']);
 });
 
 it('shows current presence beside its record in the resource table', function (): void {
@@ -180,7 +183,7 @@ it('saves article details and rejects stale edits to them', function (): void {
     $stale = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'Article', 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary'])
         ->call('save', shouldRedirect: false)->assertHasNoFormErrors();
-    $stale->fillForm(['title' => 'Article', 'status' => 'published'])->call('save', shouldRedirect: false)->assertHasFormErrors(['title']);
+    $stale->fillForm(['title' => 'Article', 'status' => 'published'])->call('save', shouldRedirect: false)->assertActionMounted('collabResolve');
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary']);
 });
 
@@ -190,4 +193,83 @@ it('seeds sample article drafts without duplicating them on repeat runs', functi
     $this->assertDatabaseCount('documents', 3);
     $this->assertDatabaseCount('collaboration_updates', 3);
     $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'review']);
+});
+
+it('merges different article fields changed by two editors', function (): void {
+    $alice = User::factory()->create(['name' => 'Alice']);
+    $bob = User::factory()->create(['name' => 'Bob']);
+    $document = Document::create(['title' => 'Original', 'status' => 'draft', 'category' => 'News']);
+    $this->actingAs($alice);
+    $alicePage = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $this->actingAs($bob);
+    $bobPage = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $bobPage->fillForm(['status' => 'review'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+    $this->actingAs($alice);
+    $alicePage->fillForm(['title' => 'Revised'])->call('save', shouldRedirect: false)->assertActionNotMounted('collabResolve');
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Revised', 'status' => 'review']);
+});
+
+it('allows an editor to choose the other version of a conflicting field', function (): void {
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+    $document = Document::create(['title' => 'Original']);
+    $this->actingAs($alice);
+    $alicePage = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $this->actingAs($bob);
+    Livewire\Livewire::test(EditDocument::class, ['record' => $document->id])
+        ->fillForm(['title' => 'Bob title'])->call('save', shouldRedirect: false);
+    $this->actingAs($alice);
+    $alicePage->fillForm(['title' => 'Alice title'])->call('save', shouldRedirect: false)
+        ->assertActionMounted('collabResolve')
+        ->setActionData(['choices' => ['title' => 'theirs']])->callMountedAction()
+        ->assertHasNoActionErrors();
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Bob title']);
+});
+
+it('merges an article edit page with a simultaneous quick-edit modal', function (): void {
+    $alice = User::factory()->create(['name' => 'Alice']);
+    $bob = User::factory()->create(['name' => 'Bob']);
+    $document = Document::create(['title' => 'Original', 'status' => 'draft', 'category' => 'News']);
+    $this->actingAs($alice);
+    $alicePage = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
+    $this->actingAs($bob);
+    Livewire\Livewire::test(ListDocuments::class)
+        ->mountAction(TestAction::make('quickEdit')->table($document))
+        ->fillForm(['status' => 'review'])->callMountedAction()->assertHasNoFormErrors();
+    $this->actingAs($alice);
+    $alicePage->fillForm(['title' => 'Revised'])->call('save', shouldRedirect: false)->assertActionNotMounted('collabResolve');
+    $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Revised', 'status' => 'review']);
+});
+
+it('keeps the shared draft unchanged during a collaborative form save', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Original']);
+    $this->actingAs($user)->postJson("/collaboration/documents/{$document->id}/updates", ['update' => base64_encode('draft-state')])->assertOk();
+    Livewire\Livewire::test(EditDocument::class, ['record' => $document->id])
+        ->fillForm(['title' => 'Revised'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+    $this->assertDatabaseHas('collaboration_updates', ['document_id' => $document->id, 'update' => base64_encode('draft-state')]);
+    $this->assertDatabaseCount('collaboration_updates', 1);
+});
+
+it('uses workspace and database identity in collaboration rooms', function (): void {
+    $first = new Document;
+    $first->id = 42;
+    $first->workspace_id = 1;
+    $second = new Document;
+    $second->id = 42;
+    $second->workspace_id = 2;
+    expect(PresenceStore::room($first))->not->toBe(PresenceStore::room($second));
+});
+
+it('shows quick-edit presence in the table without duplicating a person', function (): void {
+    $viewer = User::factory()->create(['name' => 'Viewer']);
+    $editor = User::factory()->create(['name' => 'Editor']);
+    $document = Document::create(['title' => 'Record']);
+    $this->actingAs($editor)->postJson('/collaboration/presence', [
+        'session_id' => (string) Str::uuid(), 'document_id' => $document->id, 'page' => 'edit',
+    ])->assertOk();
+    $who = Collab::who($editor);
+    Collab::store()->touch(PresenceStore::room($document), 'modal', $who, 'editing');
+    $this->actingAs($viewer);
+    Livewire\Livewire::test(ListDocuments::class)->assertSee('Editor (edit)')->assertDontSee('Editor (edit), Editor (edit)');
 });

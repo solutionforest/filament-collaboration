@@ -14,7 +14,7 @@ class DocumentForm
     {
         return $schema->components([
             Section::make('Article details')
-                ->description('The shared draft above saves automatically. Save these article details separately.')
+                ->description('Article details are saved separately from the shared draft.')
                 ->schema([
                     TextInput::make('title')->required()->maxLength(255),
                     TextInput::make('slug')->label('Proposed URL slug')->maxLength(255)
