@@ -1,3 +1,25 @@
+const fieldLabels = {
+    title: 'Title',
+    slug: 'Slug',
+    author_id: 'Author',
+    category: 'Category',
+    status: 'Status',
+    published_at: 'Publish at',
+    tags: 'Tags',
+    featured_image_url: 'Featured image',
+    excerpt: 'Summary',
+    body_html: 'Article body',
+    seo_title: 'SEO title',
+    seo_description: 'SEO description',
+    seo_keywords: 'SEO keywords',
+    canonical_url: 'Canonical URL',
+    robots_noindex: 'Noindex',
+    relatedPosts: 'Related posts',
+    live_draft: 'Live draft',
+    body: 'Live draft',
+    draft: 'Live draft',
+};
+
 const match = location.pathname.match(/^\/admin\/documents(?:\/(create|\d+)(?:\/(edit))?)?\/?$/);
 if (match) {
     const id = /^\d+$/.test(match[1] || '') ? match[1] : null;
@@ -6,7 +28,7 @@ if (match) {
     const session = crypto.randomUUID();
     const box = document.createElement('section');
     box.className = 'collaboration-box';
-    box.innerHTML = `<div class="collaboration-heading"><div><span class="collaboration-eyebrow">COLLABORATION</span><h2>${id ? 'Working on this document' : 'People in Articles'}</h2><p>${id ? 'See who has this record open. Presence may take up to 45 seconds to clear after they leave.' : 'See who is browsing, creating or working on a record. Presence can take up to 45 seconds to clear.'}</p></div><span class="collaboration-connection" data-presence-status>Connecting</span></div><div class="collaboration-people" data-presence role="status" aria-live="polite">Loading people…</div>${id ? '<div class="collaboration-actions"><button type="button" data-copy>Copy document link</button><span data-copy-status role="status"></span></div>' : ''}`;
+    box.innerHTML = `<div class="collaboration-heading"><div><span class="collaboration-eyebrow">COLLABORATION</span><h2>${id ? 'Editors on this article' : 'People in Articles'}</h2><p>${id ? 'See who is editing and which field they are in (title, SEO, body, related posts…).' : 'See who is browsing or editing articles. Presence can take up to 45 seconds to clear.'}</p></div><span class="collaboration-connection" data-presence-status>Connecting</span></div><div class="collaboration-people" data-presence role="status" aria-live="polite">Loading people…</div>${id ? '<div class="collaboration-actions"><button type="button" data-copy>Copy document link</button> <a href="/blog" target="_blank" rel="noreferrer">Open public blog</a><span data-copy-status role="status"></span></div>' : ''}`;
     document.querySelector('main')?.prepend(box);
     const headers = {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'};
     const call = async (url, options = {}) => {
@@ -45,10 +67,8 @@ if (match) {
                     avatar.textContent = person.name.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase() || '?';
                     const detail = document.createElement('span');
                     const activity = {edit: 'Edit page open', view: 'Viewing', create: 'Creating a record', list: 'Browsing records'}[person.page] || 'Active';
-                    const focusLabel = person.focused_field === 'body' || person.focused_field === 'draft'
-                        ? 'rich editor'
-                        : person.focused_field === 'title' ? 'title' : null;
-                    const focus = id && person.page === 'edit' && focusLabel ? ` · Focused: ${focusLabel}` : '';
+                    const focusLabel = person.focused_field ? (fieldLabels[person.focused_field] || person.focused_field) : null;
+                    const focus = id && person.page === 'edit' && focusLabel ? ` · In: ${focusLabel}` : '';
                     detail.textContent = `${person.name} · ${activity}${focus}${!id && person.document_id ? ` #${person.document_id}` : ''}`;
                     chip.append(avatar, detail);
                     container.append(chip);
@@ -67,9 +87,17 @@ if (match) {
     if (page === 'edit') {
         const updateFocus = () => {
             const active = document.activeElement;
-            const next = active?.closest('[data-collaborative-rich-editor], .tiptap, .fi-collaborative-rich-editor')
-                ? 'body'
-                : active?.matches('input[id$=".title"]') ? 'title' : null;
+            const collab = active?.closest?.('[data-collaborative-rich-editor]');
+            if (collab) {
+                const next = collab.getAttribute('data-field') || 'live_draft';
+                if (next !== focusedField) { focusedField = next; heartbeat(); }
+                return;
+            }
+            const bound = active?.closest?.('[wire\\:model], [wire\\:model\\.live], [wire\\:model\\.blur]');
+            const name = bound?.getAttribute('wire:model')
+                || bound?.getAttribute('wire:model.live')
+                || bound?.getAttribute('wire:model.blur');
+            const next = name?.startsWith('data.') ? name.slice(5) : null;
             if (next !== focusedField) { focusedField = next; heartbeat(); }
         };
         document.addEventListener('focusin', updateFocus);

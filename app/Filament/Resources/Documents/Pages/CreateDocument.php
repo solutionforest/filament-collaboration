@@ -19,6 +19,7 @@ class CreateDocument extends CreateRecord
         $user = auth()->user();
         abort_unless($user !== null, 401);
         $data['workspace_id'] = $user->workspace_id;
+        $data['author_id'] ??= $user->getKey();
 
         return $data;
     }

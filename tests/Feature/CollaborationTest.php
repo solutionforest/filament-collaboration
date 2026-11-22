@@ -9,6 +9,8 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use SolutionForest\FilamentCollaboration\Livewire\Presence;
+use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
 
 it('requires authentication for collaboration endpoints', function (): void {
     $document = Document::create(['title' => 'Test']);
@@ -152,7 +154,10 @@ it('reports allowed focused fields only for an edit page', function (): void {
         'session_id' => $session, 'document_id' => $document->id, 'page' => 'view', 'focused_field' => 'title',
     ])->assertUnprocessable();
     $this->postJson('/collaboration/presence', [
-        'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => 'arbitrary',
+        'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => 'seo_title',
+    ])->assertOk()->assertJsonPath('presence.0.focused_field', 'seo_title');
+    $this->postJson('/collaboration/presence', [
+        'session_id' => $session, 'document_id' => $document->id, 'page' => 'edit', 'focused_field' => str_repeat('x', 101),
     ])->assertUnprocessable();
 });
 
@@ -189,7 +194,8 @@ it('seeds sample article drafts without duplicating them on repeat runs', functi
     $this->seed(DatabaseSeeder::class);
     $this->assertDatabaseCount('documents', 3);
     $this->assertDatabaseCount('collaboration_updates', 3);
-    $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'review']);
+    $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'published']);
+    $this->assertDatabaseCount('document_relations', 1);
 });
 
 it('merges different article fields changed by two editors', function (): void {
@@ -330,11 +336,66 @@ it('shows the collaborative Filament rich editor on edit and accepts body focus'
     $this->actingAs($user);
     Livewire\Livewire::test(EditDocument::class, ['record' => $document->id])
         ->assertSee('data-collaborative-rich-editor', false)
-        ->assertSee('Live collaborative rich text', false);
+        ->assertSee('Live co-writing pad', false)
+        ->assertSee('SEO', false)
+        ->assertSee('Related posts', false);
     $this->postJson('/collaboration/presence', [
         'session_id' => (string) Str::uuid(),
         'document_id' => $document->id,
         'page' => 'edit',
         'focused_field' => 'body',
     ])->assertOk()->assertJsonPath('presence.0.focused_field', 'body');
+});
+
+it('publishes a public blog index and article page', function (): void {
+    $this->seed(DatabaseSeeder::class);
+    $this->get('/blog')->assertOk()->assertSee('Spring product update')->assertSee('Fieldnotes');
+    $this->get('/blog/spring-product-update')
+        ->assertOk()
+        ->assertSee('Spring product update | Fieldnotes', false)
+        ->assertSee('Welcome to the public Fieldnotes blog')
+        ->assertSee('Team planning');
+    $this->get('/blog/better-collaboration')->assertNotFound();
+});
+
+it('assigns the creating editor as author by default', function (): void {
+    $user = User::factory()->create(['name' => 'Casey']);
+    $this->actingAs($user);
+    Livewire\Livewire::test(CreateDocument::class)
+        ->fillForm(['title' => 'Authored piece', 'slug' => 'authored-piece', 'category' => 'News', 'status' => 'draft'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+    $document = Document::query()->where('slug', 'authored-piece')->firstOrFail();
+    expect($document->author_id)->toBe($user->id);
+});
+
+it('shows which blog field another editor is working on', function (): void {
+    $alice = User::factory()->create(['name' => 'Alice']);
+    $bob = User::factory()->create(['name' => 'Bob']);
+    $document = Document::create(['title' => 'Shared article']);
+    $room = PresenceStore::room($document);
+
+    $this->actingAs($alice);
+    $alicePresence = Livewire\Livewire::test(Presence::class, [
+        'room' => $room,
+        'mode' => 'editing',
+        'origin' => 'alice-tab',
+    ])->call('setField', 'seo_title');
+
+    $this->actingAs($bob);
+    Livewire\Livewire::test(Presence::class, [
+        'room' => $room,
+        'mode' => 'editing',
+        'origin' => 'bob-tab',
+    ])->assertSee('Alice → SEO title', false);
+
+    $this->actingAs($alice);
+    $alicePresence->call('setField', 'relatedPosts');
+
+    $this->actingAs($bob);
+    Livewire\Livewire::test(Presence::class, [
+        'room' => $room,
+        'mode' => 'editing',
+        'origin' => 'bob-tab-2',
+    ])->assertSee('Alice → Related posts', false);
 });

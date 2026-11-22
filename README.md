@@ -1,6 +1,6 @@
 # Filament collaboration
 
-Installable Filament collaboration package plus a Fieldnotes CMS demo. Built to match the plugin’s collaboration surface without depending on `third-party/collaboration-plugin`, then go further with a shared Yjs draft.
+Installable Filament collaboration package plus a Fieldnotes **blog CMS** demo. Built to match the plugin’s collaboration surface without depending on `third-party/collaboration-plugin`. Yjs is optional — only for live co-typing the same rich-text pad.
 
 ## Package
 
@@ -36,11 +36,13 @@ feature parity in this package:
 - Events: `ChangesMerged`, `ConflictDetected`, `ConflictResolved`
 - Tenant/workspace rooms via `PresenceStore::resolveRoomUsing()`
 
-Beyond the plugin: `CollaborativeRichEditor` is a Filament form field (TipTap + Yjs over HTTP) so rich text collaborates inside the form, not a separate bolted-on panel.
+Beyond the plugin: optional `CollaborativeRichEditor` (TipTap + Yjs over HTTP) for live co-writing. Ordinary blog fields (title, body HTML, SEO, related posts…) merge on save and show per-field presence without Yjs.
 
 See `packages/filament-collaboration/README.md`.
 
-## Demo (Fieldnotes CMS)
+## Demo (Fieldnotes blog CMS)
+
+Public site: `/blog` and `/blog/{slug}` (SEO meta, tags, related posts). CMS: Filament Articles with Article / SEO / Related posts / optional Live Yjs pad. Presence shows which editor is in which field (e.g. `Alice → SEO title`).
 
 ![The shared article editor](docs/media/shared-edit.png)
 
@@ -61,7 +63,8 @@ npm run build
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/admin` in two browser profiles as `alice@example.test` / `bob@example.test` (password `password`). Local disposable accounts only.
+- Public blog: `http://127.0.0.1:8000/blog`
+- CMS: `http://127.0.0.1:8000/admin` — open the same article as `alice@example.test` / `bob@example.test` (password `password`) in two profiles to see field-level presence. Local disposable accounts only.
 
 ### Checks
 
@@ -74,8 +77,8 @@ npm run build
 
 ## Limitations
 
-- Shared draft Yjs updates are still opaque bytes (no server-side Yjs validation).
-- Publish workflow, reliable offline, multi-database concurrency validation and security review remain open.
+- Optional live pad: Yjs updates are opaque bytes (no server-side Yjs validation). Core CMS collab does not need Yjs.
+- Reliable offline, multi-database concurrency validation and security review remain open.
 - the plugin extras not fully mirrored yet: spatie-translatable locale merge, leave beacon middleware matrix, and their full comparison edge-case suite.
 - Demo presence HTTP endpoint and package Livewire presence both run; unify further before a public release.
 - Keep the PR draft; use only local fake data.
