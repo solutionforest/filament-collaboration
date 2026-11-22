@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration;
 
 use Filament\Actions\EditAction;
+use Filament\Support\Assets\AlpineComponent;
+use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\View;
@@ -42,6 +44,13 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         Livewire::component('filament-collaboration-presence', Presence::class);
+
+        FilamentAsset::register([
+            AlpineComponent::make(
+                'collaborative-rich-editor',
+                __DIR__.'/../resources/dist/collaborative-rich-editor.js',
+            ),
+        ], 'solutionforest/filament-collaboration');
 
         EditAction::macro('collaborate', function (array $ignore = [], bool $presence = true): EditAction {
             return CollaborateAction::fromMacro($this, $ignore, $presence);

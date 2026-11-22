@@ -66,9 +66,21 @@ PresenceStore::resolveRoomUsing(
 );
 ```
 
+### Collaborative Filament rich editor
+
+```php
+use SolutionForest\FilamentCollaboration\Forms\Components\CollaborativeRichEditor;
+
+CollaborativeRichEditor::make('body')
+    ->label('Article body')
+    ->columnSpanFull();
+```
+
+This is a Filament form field (not a bolted-on panel). TipTap + Yjs sync over your app’s HTTP update endpoints while people type. Exclude it from merge-on-save with `getCollaborationIgnoredFields()` returning `['body']` — the CRDT log is authoritative until you add an explicit publish/HTML projection step.
+
 ### Beyond the plugin
 
-The package matches the plugin’s core collaboration surface (presence, merge-on-save, conflicts, modal edits, table column, save notices, events). Rich-text **shared drafts** (Yjs over HTTP polling in the Fieldnotes CMS demo) remain the product differentiator and are evolving into first-class package APIs next.
+The package matches the plugin’s core collaboration surface (presence, merge-on-save, conflicts, modal edits, table column, save notices, events) and adds a **CollaborativeRichEditor** field for live rich text.
 
 ## License
 

@@ -22,7 +22,7 @@ final class CollaborationController extends Controller
             'session_id' => ['required', 'uuid'],
             'document_id' => ['nullable', 'integer', 'min:1'],
             'page' => ['required', Rule::in(['list', 'create', 'view', 'edit'])],
-            'focused_field' => ['nullable', Rule::in(['title', 'draft'])],
+            'focused_field' => ['nullable', Rule::in(['title', 'draft', 'body'])],
         ]);
         $user = $request->user();
         abort_unless($user instanceof User, 401);

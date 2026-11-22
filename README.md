@@ -36,7 +36,7 @@ feature parity in this package:
 - Events: `ChangesMerged`, `ConflictDetected`, `ConflictResolved`
 - Tenant/workspace rooms via `PresenceStore::resolveRoomUsing()`
 
-Beyond the plugin: the demo still ships a Yjs/Tiptap **shared draft** over HTTP polling (independent of form save).
+Beyond the plugin: `CollaborativeRichEditor` is a Filament form field (TipTap + Yjs over HTTP) so rich text collaborates inside the form, not a separate bolted-on panel.
 
 See `packages/filament-collaboration/README.md`.
 

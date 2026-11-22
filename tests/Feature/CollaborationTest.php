@@ -323,3 +323,18 @@ it('keeps merged remote field values on a later save by the same editor', functi
     $second->fillForm(['excerpt' => 'Follow-up'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Revised', 'status' => 'review', 'excerpt' => 'Follow-up']);
 });
+
+it('shows the collaborative Filament rich editor on edit and accepts body focus', function (): void {
+    $user = User::factory()->create();
+    $document = Document::create(['title' => 'Rich body']);
+    $this->actingAs($user);
+    Livewire\Livewire::test(EditDocument::class, ['record' => $document->id])
+        ->assertSee('data-collaborative-rich-editor', false)
+        ->assertSee('Live collaborative rich text', false);
+    $this->postJson('/collaboration/presence', [
+        'session_id' => (string) Str::uuid(),
+        'document_id' => $document->id,
+        'page' => 'edit',
+        'focused_field' => 'body',
+    ])->assertOk()->assertJsonPath('presence.0.focused_field', 'body');
+});
