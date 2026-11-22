@@ -5,58 +5,52 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Concerns;
 
 use Filament\Actions\Action;
-use Filament\Forms\Components\Radio;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\On;
-use SolutionForest\FilamentCollaboration\Collaboration;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Documents\SharedField;
+use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Events\ChangesMerged;
 use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
 use SolutionForest\FilamentCollaboration\Events\ConflictResolved;
+use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
 use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
-use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
+use SolutionForest\FilamentCollaboration\Presence\Identity;
+use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
+use SolutionForest\FilamentCollaboration\Saving\LiveSave;
+use SolutionForest\FilamentCollaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Support\FormState;
+use SolutionForest\FilamentCollaboration\Support\SaveLock;
 
+/**
+ * Turns an `EditRecord` page into a shared document.
+ *
+ * Live fields are saved from the shared draft. The others, and every field of
+ * a browser that is not connected, are merged field by field when saving.
+ */
 trait InteractsWithCollaboration
 {
     use HasPresence;
+    use ResolvesConflicts;
+
+    /**
+     * What the browser has not been able to send yet, plus the fields it has
+     * bound. Written by the browser, so it is never trusted.
+     */
+    public string $collaborationSync = '';
 
     /** @var array<string, mixed> */
     #[Locked]
     public array $collaborationBase = [];
 
-    /** @var array<string, mixed> */
-    #[Locked]
-    public array $collaborationTheirs = [];
-
-    /** @var list<string> */
-    #[Locked]
-    public array $collaborationConflicts = [];
-
-    #[Locked]
-    public int $collaborationVersion = 0;
-
-    /** @var array{0: bool, 1: bool} */
-    #[Locked]
-    public array $collaborationSaveArguments = [true, true];
-
-    /** @var array<string, 'mine'|'theirs'> */
-    #[Locked]
-    public array $collaborationSettled = [];
-
-    /** @var array<string, string> */
-    #[Locked]
-    public array $collaborationTaken = [];
-
     #[Locked]
     public bool $collaborationMounted = false;
 
-    protected bool $collaborationResolving = false;
-
-    protected bool $collaborationMerged = false;
+    protected bool $collaborationHasSaved = false;
 
     public function mountInteractsWithCollaboration(): void
     {
@@ -65,16 +59,24 @@ trait InteractsWithCollaboration
         }
 
         $this->collaborationMounted = true;
-        $this->collaborationBase = $this->collaborationFields();
-        $this->collaborationVersion = (int) (Collaboration::store()->lastSave($this->getCollaborationRoom())['version'] ?? 0);
-    }
+        $this->collaborationBase = $this->getCollaborationFormValues();
 
-    protected function getCollaborationMode(): string
-    {
-        return 'editing';
+        if (! $this->isCollaborationLive()) {
+            return;
+        }
+
+        $room = $this->getCollaborationRoom();
+        $reconcile = fn () => $this->reconcileCollaborationDraft();
+
+        // A draft that does not exist yet is worth waiting for a save to finish.
+        if (! app(SaveLock::class)->attempt($room, $reconcile) && ! app(DocumentRepository::class)->exists($room)) {
+            rescue(fn () => app(SaveLock::class)->block($room, $reconcile));
+        }
     }
 
     /**
+     * Fields to keep out of both live editing and merging.
+     *
      * @return list<string>
      */
     protected function getCollaborationIgnoredFields(): array
@@ -82,316 +84,337 @@ trait InteractsWithCollaboration
         return [];
     }
 
+    protected function isCollaborationLive(): bool
+    {
+        // A locale switcher fills one form with different languages; those must not share a draft.
+        if (property_exists(static::class, 'activeLocale')) {
+            return false;
+        }
+
+        return CollaborationPlugin::find()?->hasLiveEditing($this->getRecord()) ?? false;
+    }
+
+    #[Exposed]
     public function save(bool $shouldRedirect = true, bool $shouldSendSavedNotification = true): void
     {
+        $this->authorizeAccess();
         $this->collaborationSaveArguments = [$shouldRedirect, $shouldSendSavedNotification];
 
         try {
-            Collaboration::store()->whileSaving($this->getCollaborationRoom(), function () use ($shouldRedirect, $shouldSendSavedNotification): void {
-                if (! $this->collaborationMergeBeforeSave()) {
-                    return;
-                }
-
-                parent::save($shouldRedirect, $shouldSendSavedNotification);
-            });
+            app(SaveLock::class)->block(
+                $this->getCollaborationRoom(),
+                fn () => $this->saveCollaboratively(fn () => parent::save($shouldRedirect, $shouldSendSavedNotification)),
+            );
         } catch (LockTimeoutException) {
             Notification::make()
                 ->title(__('filament-collaboration::collaboration.busy'))
                 ->warning()
                 ->send();
-        } finally {
-            $this->collaborationMerged = false;
         }
     }
 
-    protected function afterSave(): void
-    {
-        if (method_exists(parent::class, 'afterSave')) {
-            parent::afterSave();
-        }
-
-        $this->collaborationAfterSave();
-    }
-
-    public function collaborationAfterSave(): void
-    {
-        if (! $this->collaborationMerged && ! $this->collaborationResolving) {
-            return;
-        }
-
-        $room = $this->getCollaborationRoom();
-        $fields = ThreeWayMerge::changed($this->collaborationBase, $this->collaborationFields());
-        $name = $this->collaborationUserName();
-
-        Collaboration::store()->rememberSave($room, [
-            'name' => $name,
-            'fields' => $fields,
-            'origin' => $this->collaborationOrigin,
-        ]);
-
-        if ($this->collaborationTaken !== []) {
-            event(new ChangesMerged(
-                $this->getRecord(),
-                auth()->user(),
-                array_keys($this->collaborationTaken),
-                (string) reset($this->collaborationTaken),
-            ));
-        }
-
-        if ($this->collaborationSettled !== []) {
-            event(new ConflictResolved($this->getRecord(), auth()->user(), $this->collaborationSettled));
-        }
-
-        $this->collaborationBase = $this->collaborationFields();
-        $this->collaborationVersion = (int) (Collaboration::store()->lastSave($room)['version'] ?? $this->collaborationVersion + 1);
-        $this->collaborationTaken = [];
-        $this->collaborationSettled = [];
-        $this->collaborationTheirs = [];
-        $this->collaborationConflicts = [];
-    }
-
-    #[On('collaboration-pull')]
-    public function collaborationPullRequested(mixed $room = null): void
-    {
-        if ($room === PresenceStore::opaque($this->getCollaborationRoom())) {
-            $this->collaborationPull();
-        }
-    }
-
-    public function collaborationPull(): void
+    /**
+     * Brings in what others saved. Live fields are already up to date, so this
+     * concerns the fields that merge on save.
+     */
+    #[Exposed]
+    public function collaborationPull(bool $notify = false): void
     {
         $this->authorizeAccess();
 
-        $theirs = $this->collaborationTheirsFromRecord();
-        if ($theirs === null) {
-            $this->collaborationAcknowledge();
+        if ($this->isCollaborationLive()) {
+            app(SaveLock::class)->attempt($this->getCollaborationRoom(), fn () => $this->reconcileCollaborationDraft());
+        }
 
+        $theirs = $this->getCollaborationSavedValues();
+
+        if ($theirs === null) {
             return;
         }
 
-        $result = ThreeWayMerge::merge($this->collaborationBase, $this->collaborationFields(), $theirs);
-        $this->collaborationWrite(FormState::onlyKeys($result->data, $result->taken));
-        $this->collaborationBase = [
-            ...$theirs,
-            ...FormState::onlyKeys($this->collaborationBase, $result->conflicts),
-        ];
-        $this->collaborationAcknowledge(! $result->hasConflicts());
+        $live = $this->getReportedLiveFields();
+        $mine = $this->getCollaborationFormValues();
+        $result = ThreeWayMerge::merge(
+            array_diff_key($this->collaborationBase, $live),
+            array_diff_key($mine, $live),
+            array_diff_key($theirs, $live),
+        );
 
-        $body = null;
-        if ($result->hasConflicts()) {
-            $message = __('filament-collaboration::collaboration.pull.conflicts', ['fields' => $this->collaborationLabels($result->conflicts)]);
-            $body = is_string($message) ? $message : null;
-        } elseif ($result->taken !== []) {
-            $message = __('filament-collaboration::collaboration.pull.taken', ['fields' => $this->collaborationLabels($result->taken)]);
-            $body = is_string($message) ? $message : null;
+        $this->writeCollaborationValues(FormState::only($result->data, $result->taken));
+        $this->collaborationBase = [...$theirs, ...FormState::only($this->collaborationBase, $result->conflicts)];
+
+        if (! $notify) {
+            return;
         }
+
+        $body = match (true) {
+            $result->hasConflicts() => __('filament-collaboration::collaboration.pull.conflicts', ['fields' => $this->getCollaborationFieldList($result->conflicts)]),
+            $result->taken !== [] => __('filament-collaboration::collaboration.pull.taken', ['fields' => $this->getCollaborationFieldList($result->taken)]),
+            default => null,
+        };
 
         Notification::make()
             ->title(__('filament-collaboration::collaboration.pull.title'))
-            ->body($body)
+            ->body(is_string($body) ? $body : null)
             ->success()
             ->send();
     }
 
-    public function resolveCollaborationConflictAction(): Action
+    public function discardSharedDraftAction(): Action
     {
-        return Action::make('resolveCollaborationConflict')
-            ->modalIcon('heroicon-o-arrows-right-left')
-            ->modalIconColor('warning')
-            ->modalWidth('2xl')
-            ->modalHeading(fn (): string => __('filament-collaboration::collaboration.conflict.heading', ['name' => $this->collaborationTheirName()]))
-            ->modalDescription(fn (): string => trans_choice(
-                'filament-collaboration::collaboration.conflict.description',
-                count($this->collaborationConflicts),
-                ['name' => $this->collaborationTheirName()],
-            ))
-            ->schema(function (): array {
-                $mine = $this->collaborationFields();
+        return Action::make('discardSharedDraft')
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalIcon('heroicon-o-arrow-uturn-left')
+            ->modalHeading(__('filament-collaboration::collaboration.discard.heading'))
+            ->modalDescription(__('filament-collaboration::collaboration.discard.description'))
+            ->modalSubmitActionLabel(__('filament-collaboration::collaboration.discard.action'))
+            ->action(function (): void {
+                $this->authorizeAccess();
 
-                return array_map(fn (string $field): Radio => Radio::make('choices.'.FormState::key($field))
-                    ->label($this->collaborationLabel($field))
-                    ->options([
-                        'mine' => __('filament-collaboration::collaboration.conflict.mine'),
-                        'theirs' => __('filament-collaboration::collaboration.conflict.theirs', ['name' => $this->collaborationTheirName()]),
-                    ])
-                    ->descriptions([
-                        'mine' => FormState::display($mine[$field] ?? null),
-                        'theirs' => FormState::display($this->collaborationTheirs[$field] ?? null),
-                    ])
-                    ->required(), $this->collaborationConflicts);
-            })
-            ->action(function (array $data): void {
-                $choicesData = $data['choices'] ?? null;
-                if (! is_array($choicesData)) {
-                    return;
-                }
+                $room = $this->getCollaborationRoom();
+                $fields = array_map(strval(...), array_keys($this->getCollaborationLiveFields()));
 
-                $choices = [];
-                foreach ($this->collaborationConflicts as $field) {
-                    $choice = $choicesData[FormState::key($field)] ?? null;
-                    if ($choice !== 'mine' && $choice !== 'theirs') {
-                        return;
-                    }
-                    $choices[$field] = $choice;
-                }
-
-                $current = $this->collaborationTheirsFromRecord() ?? [];
-                foreach ($this->collaborationConflicts as $field) {
-                    if (! ThreeWayMerge::same($current[$field] ?? null, $this->collaborationTheirs[$field] ?? null, exact: true)) {
-                        throw ValidationException::withMessages([
-                            'choices.'.FormState::key($field) => __('filament-collaboration::collaboration.conflict.stale'),
-                        ]);
-                    }
-                }
-
-                foreach ($choices as $field => $choice) {
-                    $this->collaborationBase[$field] = $this->collaborationTheirs[$field] ?? null;
-                    if ($choice === 'theirs') {
-                        $this->collaborationWrite([$field => $this->collaborationTheirs[$field] ?? null]);
-                    }
-                }
-
-                $this->collaborationSettled = $choices;
-                $this->collaborationConflicts = [];
-                $this->collaborationTheirs = [];
-                $this->collaborationResolving = true;
-
-                try {
-                    $this->save(...$this->collaborationSaveArguments);
-                } finally {
-                    $this->collaborationResolving = false;
-                }
+                app(SaveLock::class)->block($room, fn () => app(DocumentRepository::class)->discard($room, $fields));
             });
     }
 
-    protected function collaborationMergeBeforeSave(): bool
+    // Filament calls this only once a save has succeeded and been committed.
+    protected function rememberData(): void
     {
-        if ($this->collaborationResolving) {
-            $this->collaborationMerged = true;
+        parent::rememberData();
 
-            return true;
-        }
+        $this->collaborationHasSaved = true;
+    }
 
-        $theirs = $this->collaborationTheirsFromRecord();
+    protected function saveCollaboratively(callable $save): void
+    {
+        $this->collaborationHasSaved = false;
+        $writable = $this->getCollaborationLiveFields();
+        $theirs = $this->getCollaborationSavedValues();
+
         if ($theirs === null) {
-            return true;
+            $save();
+
+            return;
         }
 
-        $mine = $this->collaborationFields();
-        $result = ThreeWayMerge::merge($this->collaborationBase, $mine, $theirs);
+        $room = $this->getCollaborationRoom();
+        $documents = app(DocumentRepository::class);
+        $live = new LiveSave;
+
+        if ($this->isCollaborationLive()) {
+            $documents->reconcile($room, $this->getSharedFields($theirs));
+            $live = LiveSave::prepare($documents, $room, $this->collaborationClient, $this->collaborationSync, $writable);
+        }
+
+        $mine = $this->getCollaborationFormValues();
+        $merging = array_flip($live->fields);
+        $result = ThreeWayMerge::merge(
+            array_diff_key($this->collaborationBase, $merging),
+            array_diff_key($mine, $merging),
+            array_diff_key($theirs, $merging),
+        );
+        $theirName = $this->getCollaborationTheirName();
 
         if ($result->taken !== []) {
-            $this->collaborationWrite(FormState::onlyKeys($result->data, $result->taken));
-            foreach ($result->taken as $field) {
-                $this->collaborationTaken[$field] = $this->collaborationTheirName();
-            }
+            $this->writeCollaborationValues(FormState::only($result->data, $result->taken));
         }
 
         if ($result->hasConflicts()) {
-            $this->collaborationConflicts = $result->conflicts;
-            $this->collaborationTheirs = FormState::onlyKeys($theirs, $result->conflicts);
-            event(new ConflictDetected($this->getRecord(), auth()->user(), $result->conflicts, $this->collaborationTheirName()));
-            $this->mountAction('resolveCollaborationConflict');
+            $this->askToResolveConflicts($result->conflicts, $theirs);
+            event(new ConflictDetected($this->getRecord(), Filament::auth()->user(), $result->conflicts, $theirName));
 
-            return false;
+            return;
         }
 
-        $this->collaborationMerged = true;
+        if ($live->hasSomeoneElsesUpload($theirs, Data::map(data_get($this, 'componentFileAttachments.data')))) {
+            Notification::make()
+                ->title(__('filament-collaboration::collaboration.foreign_upload'))
+                ->warning()
+                ->send();
 
+            return;
+        }
+
+        // Save the draft, then give the browser its own state back: replacing it
+        // would erase whatever was typed while this request was running.
+        $publishing = $live->valuesToPublish($mine, $theirs);
+        $typed = FormState::only($mine, array_map(strval(...), array_keys($publishing)));
+        $this->writeCollaborationValues($publishing);
+
+        try {
+            $save();
+        } finally {
+            $this->writeCollaborationValues($typed);
+        }
+
+        if (! $this->collaborationHasSaved) {
+            return;
+        }
+
+        $overwritten = [];
+
+        foreach (array_keys($writable) as $path) {
+            $path = (string) $path;
+
+            if (! isset($merging[$path]) && ! ThreeWayMerge::untouched($this->collaborationBase[$path] ?? null, $mine[$path] ?? null)) {
+                $overwritten[] = $path;
+            }
+        }
+
+        $saved = $this->getCollaborationSavedValues() ?? $theirs;
+
+        $documents->markSaved(
+            $room,
+            $this->isCollaborationLive() ? $this->getSharedFields($saved) : [],
+            $live->snapshot,
+            $live->fields,
+            $overwritten,
+            Identity::current()->name ?? __('filament-collaboration::collaboration.someone'),
+            $this->collaborationClient,
+        );
+
+        $this->collaborationBase = [...$this->getCollaborationFormValues(), ...FormState::only($saved, $live->fields)];
+
+        if ($result->taken !== []) {
+            event(new ChangesMerged($this->getRecord(), Filament::auth()->user(), $result->taken, $theirName));
+        }
+
+        if ($this->collaborationSettled !== []) {
+            event(new ConflictResolved($this->getRecord(), Filament::auth()->user(), $this->collaborationSettled));
+            $this->collaborationSettled = [];
+        }
+
+        if ($live->fields !== []) {
+            event(new SharedDraftSaved($this->getRecord(), Filament::auth()->user(), $live->fields));
+        }
+    }
+
+    protected function getCollaborationRoom(): string
+    {
+        return app(RoomResolver::class)->forRecord($this->getRecord());
+    }
+
+    /** @return array<string, FieldKind> */
+    protected function getCollaborationLiveFields(): array
+    {
+        return $this->isCollaborationLive()
+            ? CollaborationPlugin::get()->getFieldResolver()->writable($this->form, $this->getCollaborationIgnoredFields())
+            : [];
+    }
+
+    /** @return array<string, string> */
+    protected function getCollaborationLabels(): array
+    {
+        return CollaborationPlugin::get()->getFieldResolver()->labels($this->form);
+    }
+
+    /** @return list<string> */
+    protected function getCollaborationReactiveFields(): array
+    {
+        $reactive = [];
+
+        foreach (FormState::fields($this->form, withHidden: false) as $path => $field) {
+            if ($field->isLive()) {
+                $reactive[] = (string) $path;
+            }
+        }
+
+        return $reactive;
+    }
+
+    protected function canPullCollaborationChanges(): bool
+    {
         return true;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    protected function collaborationFields(): array
+    /** @return array<string, mixed> */
+    protected function getCollaborationFormValues(): array
     {
-        return FormState::only(
-            $this->form,
-            FormState::array($this->form->getRawState()),
-            $this->getCollaborationIgnoredFields(),
-        );
+        return FormState::values($this->form, $this->getCollaborationIgnoredFields());
     }
 
     /**
+     * What the form would contain if it were opened now. Override this if
+     * your page fills its form some other way.
+     *
      * @return array<string, mixed>|null
      */
-    protected function collaborationTheirsFromRecord(): ?array
+    protected function getCollaborationSavedValues(): ?array
     {
-        $current = $this->getRecord();
-        $fresh = $current::query()->whereKey($current->getKey())->first();
-        if (! $fresh instanceof Model) {
+        $record = $this->getRecord();
+        $fresh = $record->newQueryWithoutScopes()->whereKey($record->getKey())->first();
+
+        if ($fresh === null) {
             return null;
         }
 
-        $oldData = is_array($this->data) ? $this->data : [];
-        $oldRaw = FormState::array($this->form->getRawState());
-        $this->form->fill($fresh->attributesToArray());
-        $theirs = FormState::only(
-            $this->form,
-            FormState::array($this->form->getRawState()),
-            $this->getCollaborationIgnoredFields(),
-        );
-        $this->form->rawState($oldRaw);
-        $this->data = $oldData;
+        $record->setRawAttributes($fresh->getAttributes(), true);
+        $record->unsetRelations();
 
-        return $theirs;
+        $typed = $this->data;
+
+        try {
+            $this->form->fill($this->mutateFormDataBeforeFill($record->attributesToArray()));
+
+            return $this->getCollaborationFormValues();
+        } finally {
+            $this->data = $typed;
+        }
+    }
+
+    protected function reconcileCollaborationDraft(): void
+    {
+        $theirs = $this->getCollaborationSavedValues();
+
+        if ($theirs !== null) {
+            app(DocumentRepository::class)->reconcile($this->getCollaborationRoom(), $this->getSharedFields($theirs));
+        }
     }
 
     /**
      * @param  array<string, mixed>  $values
+     * @return list<SharedField>
      */
-    protected function collaborationWrite(array $values): void
+    protected function getSharedFields(array $values): array
     {
-        $state = FormState::write(FormState::array($this->form->getRawState()), $values);
-        $this->form->rawState($state);
-        $this->data = FormState::write(is_array($this->data) ? $this->data : [], $values);
+        $fields = [];
+        $kinds = CollaborationPlugin::get()->getFieldResolver()->shareable($this->form, $this->getCollaborationIgnoredFields());
+
+        foreach ($kinds as $path => $kind) {
+            $fields[] = new SharedField((string) $path, $kind, $values[$path] ?? null);
+        }
+
+        return $fields;
     }
 
-    protected function collaborationAcknowledge(bool $advanceVersion = true): void
+    /** @return array<string, FieldKind> */
+    protected function getReportedLiveFields(): array
     {
-        if ($advanceVersion) {
-            $this->collaborationVersion = (int) (Collaboration::store()->lastSave($this->getCollaborationRoom())['version'] ?? $this->collaborationVersion);
+        $bound = Data::strings(Data::decode($this->collaborationSync)['fields'] ?? null);
+
+        return array_intersect_key($this->getCollaborationLiveFields(), array_flip($bound));
+    }
+
+    /** @param array<string, mixed> $values */
+    protected function writeCollaborationValues(array $values): void
+    {
+        if ($values !== []) {
+            $this->data = FormState::write(Data::map($this->data), $values);
         }
     }
 
-    protected function collaborationUserName(): string
+    protected function getCollaborationTheirName(): string
     {
-        $user = auth()->user();
+        $update = app(DocumentRepository::class)->changesSince($this->getCollaborationRoom(), 0, 0, 0, []);
 
-        if ($user !== null && method_exists($user, 'getFilamentName')) {
-            $name = $user->getFilamentName();
-            if (is_string($name) && $name !== '') {
-                return $name;
-            }
-        }
-
-        $fallback = is_object($user) ? ($user->name ?? null) : null;
-
-        return is_string($fallback) && $fallback !== ''
-            ? $fallback
-            : __('filament-collaboration::collaboration.someone');
+        return $update->savedByName ?? __('filament-collaboration::collaboration.someone');
     }
 
-    protected function collaborationTheirName(): string
+    /** @param list<string> $paths */
+    protected function getCollaborationFieldList(array $paths): string
     {
-        $save = Collaboration::store()->lastSave($this->getCollaborationRoom());
-
-        return is_string($save['name'] ?? null) && $save['name'] !== ''
-            ? $save['name']
-            : __('filament-collaboration::collaboration.someone');
-    }
-
-    protected function collaborationLabel(string $field): string
-    {
-        return FormState::label($this->form, $field);
-    }
-
-    /**
-     * @param  list<string>  $fields
-     */
-    protected function collaborationLabels(array $fields): string
-    {
-        return implode(', ', array_map(fn (string $field): string => $this->collaborationLabel($field), $fields));
+        return implode(', ', array_map(fn (string $path): string => FormState::label($this->form, $path), $paths));
     }
 }

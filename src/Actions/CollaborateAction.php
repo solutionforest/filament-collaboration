@@ -7,187 +7,212 @@ namespace SolutionForest\FilamentCollaboration\Actions;
 use Closure;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
-use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use SolutionForest\FilamentCollaboration\Collaboration;
+use Livewire\Component;
+use LogicException;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
 use SolutionForest\FilamentCollaboration\Events\ChangesMerged;
 use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
 use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
-use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
+use SolutionForest\FilamentCollaboration\Presence\Identity;
+use SolutionForest\FilamentCollaboration\Rooms\RoomRenderer;
+use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
+use SolutionForest\FilamentCollaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Support\FormState;
+use SolutionForest\FilamentCollaboration\Support\PageInspector;
 
 /**
- * Modal edit support: `EditAction::make()->collaborate()`.
+ * Presence and merge on save for modals: `EditAction::make()->collaborate()`.
  *
- * Conflicts use a two-step submit: the first save stops with a notice showing
- * their values; submitting again keeps yours for those fields.
+ * A conflict stops the first submit and shows the saved values. Submitting
+ * again keeps yours, unless those values changed again in the meantime.
+ *
+ * Call it last, as it wraps the action's lifecycle hooks.
  */
 final class CollaborateAction
 {
-    public const STATE_KEY = '__collaboration';
+    private const STATE_KEY = '__collaboration';
 
-    /**
-     * @param  array<mixed>  $ignore
-     */
+    /** @param array<mixed> $ignore */
     public static function fromMacro(mixed $action, array $ignore = [], bool $presence = true): EditAction
     {
         if (! $action instanceof EditAction) {
-            throw new \LogicException('collaborate() may only be called on EditAction.');
+            throw new LogicException('collaborate() may only be called on an EditAction.');
         }
 
-        $ignoredFields = [];
-        foreach ($ignore as $field) {
-            if (is_string($field)) {
-                $ignoredFields[] = $field;
-            }
-        }
-
-        return self::configure($action, $ignoredFields, $presence);
+        return self::configure($action, Data::strings($ignore), $presence);
     }
 
-    /**
-     * @param  list<string>  $ignore
-     */
+    /** @param list<string> $ignore */
     public static function configure(EditAction $action, array $ignore = [], bool $presence = true): EditAction
     {
         $afterFormFilled = self::hook($action, 'afterFormFilled');
         $beforeFormValidated = self::hook($action, 'beforeFormValidated');
+        $after = self::hook($action, 'after');
 
-        $action->afterFormFilled(function (EditAction $action, Model $record) use ($afterFormFilled, $ignore): void {
-            if ($schema = self::modalSchema($action)) {
-                $raw = FormState::array($schema->getRawState());
-                $filled = FormState::only($schema, $raw, $ignore);
-                $schema->rawState([
-                    ...$raw,
-                    self::STATE_KEY => [
-                        'base' => $filled,
-                        'force_mine' => false,
-                    ],
-                ]);
+        // Otherwise a list page turns it into a link to the edit page.
+        $action->modal();
+
+        // The row stays locked from the merge until the update commits.
+        $action->databaseTransaction();
+
+        $action->afterFormFilled(function (EditAction $action) use ($afterFormFilled, $ignore): void {
+            if ($afterFormFilled !== null) {
+                $action->evaluate($afterFormFilled);
             }
 
-            if ($afterFormFilled) {
-                $action->evaluate($afterFormFilled);
+            if (($schema = self::schema($action)) !== null) {
+                self::remember($schema, ['base' => FormState::values($schema, $ignore), 'seen' => null]);
             }
         });
 
         $action->beforeFormValidated(function (EditAction $action, Model $record) use ($beforeFormValidated, $ignore): void {
-            if ($schema = self::modalSchema($action)) {
-                $raw = FormState::array($schema->getRawState());
-                $meta = FormState::array($raw[self::STATE_KEY] ?? []);
-                $base = FormState::array($meta['base'] ?? null);
-                $forceMine = ($meta['force_mine'] ?? false) === true;
-                $mine = FormState::only($schema, $raw, $ignore);
-
-                $room = PresenceStore::room($record);
-                try {
-                    Collaboration::store()->whileSaving($room, function () use ($record, $schema, $base, $mine, $ignore, $forceMine, $room): void {
-                        $fresh = $record::query()->whereKey($record->getKey())->first();
-                        if ($fresh === null) {
-                            return;
-                        }
-
-                        $clone = clone $schema;
-                        $clone->model($fresh)->fill($fresh->attributesToArray());
-                        $theirs = FormState::only($clone, FormState::array($clone->getRawState()), $ignore);
-                        $result = ThreeWayMerge::merge($base, $mine, $theirs);
-
-                        if ($result->hasConflicts() && ! $forceMine) {
-                            event(new ConflictDetected($record, auth()->user(), $result->conflicts, (string) (Collaboration::store()->lastSave($room)['name'] ?? __('filament-collaboration::collaboration.someone'))));
-                            Notification::make()
-                                ->title(__('filament-collaboration::collaboration.conflict.heading', [
-                                    'name' => Collaboration::store()->lastSave($room)['name'] ?? __('filament-collaboration::collaboration.someone'),
-                                ]))
-                                ->body(__('filament-collaboration::collaboration.conflict.description', [
-                                    'name' => Collaboration::store()->lastSave($room)['name'] ?? __('filament-collaboration::collaboration.someone'),
-                                ])."\n".collect($result->conflicts)
-                                    ->map(fn (string $field): string => FormState::label($schema, $field).': '.FormState::display($theirs[$field] ?? null))
-                                    ->implode("\n"))
-                                ->warning()
-                                ->persistent()
-                                ->send();
-
-                            $schema->rawState([
-                                ...FormState::write(FormState::array($schema->getRawState()), FormState::onlyKeys($result->data, $result->taken)),
-                                self::STATE_KEY => [
-                                    'base' => $base,
-                                    'force_mine' => true,
-                                    'conflicts' => $result->conflicts,
-                                ],
-                            ]);
-
-                            throw new Halt;
-                        }
-
-                        $merged = $forceMine
-                            ? $mine
-                            : $result->data;
-
-                        if ($result->taken !== [] && ! $forceMine) {
-                            event(new ChangesMerged(
-                                $record,
-                                auth()->user(),
-                                $result->taken,
-                                (string) (Collaboration::store()->lastSave($room)['name'] ?? __('filament-collaboration::collaboration.someone')),
-                            ));
-                        }
-
-                        $schema->rawState([
-                            ...FormState::write(FormState::array($schema->getRawState()), FormState::onlyKeys($merged, array_keys($mine))),
-                            self::STATE_KEY => [
-                                'base' => $merged,
-                                'force_mine' => false,
-                            ],
-                        ]);
-                    });
-                } catch (LockTimeoutException) {
-                    Notification::make()
-                        ->title(__('filament-collaboration::collaboration.busy'))
-                        ->warning()
-                        ->send();
-                    throw new Halt;
-                }
+            if (($schema = self::schema($action)) !== null) {
+                self::merge($action, $schema, $record, $ignore);
             }
 
-            if ($beforeFormValidated) {
+            if ($beforeFormValidated !== null) {
                 $action->evaluate($beforeFormValidated);
             }
         });
 
-        if ($presence) {
-            $action->modalContent(fn (Model $record): string => view('filament-collaboration::modal-presence', [
-                'people' => Collaboration::store()->people(PresenceStore::room($record)),
-            ])->render());
-        }
+        $action->after(function (EditAction $action, Model $record) use ($after): void {
+            app(DocumentRepository::class)->announceSave(
+                app(RoomResolver::class)->forRecord($record),
+                Identity::current()->name ?? __('filament-collaboration::collaboration.someone'),
+            );
 
-        $action->after(function (Model $record): void {
-            $room = PresenceStore::room($record);
-            Collaboration::store()->rememberSave($room, [
-                'name' => self::userName(),
-                'fields' => [],
-                'origin' => 'modal',
-            ]);
+            if ($after !== null) {
+                $action->evaluate($after);
+            }
         });
 
+        if ($presence) {
+            $action->modalContent(fn (EditAction $action, Model $record): ?View => self::room($action, $record));
+        }
+
         return $action;
+    }
+
+    /** @param list<string> $ignore */
+    private static function merge(EditAction $action, Schema $schema, Model $record, array $ignore): void
+    {
+        $fresh = $record->newQueryWithoutScopes()->whereKey($record->getKey())->lockForUpdate()->first();
+
+        if ($fresh === null) {
+            return;
+        }
+
+        $typed = Data::map($schema->getRawState());
+        $memory = Data::map($typed[self::STATE_KEY] ?? null);
+        $mine = FormState::values($schema, $ignore);
+
+        // Fill exactly as the action does, read it, and put back what was typed.
+        $action->record($fresh);
+        $action->mount(['form' => $schema, 'schema' => $schema]);
+        $theirs = FormState::values($schema, $ignore);
+        $schema->rawState($typed);
+
+        $result = ThreeWayMerge::merge(Data::map($memory['base'] ?? null), $mine, $theirs);
+        $name = app(DocumentRepository::class)
+            ->changesSince(app(RoomResolver::class)->forRecord($fresh), 0, 0, 0, [])
+            ->savedByName ?? __('filament-collaboration::collaboration.someone');
+
+        if ($result->taken !== []) {
+            $schema->rawState(FormState::write($typed, FormState::only($result->data, $result->taken)));
+        }
+
+        if ($result->hasConflicts()) {
+            $seen = sha1(Data::encode(ThreeWayMerge::normalize(FormState::only($theirs, $result->conflicts), exact: true)));
+
+            if (($memory['seen'] ?? null) !== $seen) {
+                // `base` is untouched: nothing has been saved, so the next submit merges from the same place.
+                self::remember($schema, [...$memory, 'seen' => $seen]);
+                event(new ConflictDetected($fresh, Filament::auth()->user(), $result->conflicts, $name));
+                self::warn($schema, $result->conflicts, $theirs, $name);
+
+                throw new Halt;
+            }
+        }
+
+        if ($result->taken !== []) {
+            event(new ChangesMerged($fresh, Filament::auth()->user(), $result->taken, $name));
+        }
+    }
+
+    /**
+     * @param  list<string>  $conflicts
+     * @param  array<string, mixed>  $theirs
+     */
+    private static function warn(Schema $schema, array $conflicts, array $theirs, string $name): void
+    {
+        $lines = [e(__('filament-collaboration::collaboration.conflict.modal', ['name' => $name]))];
+
+        foreach ($conflicts as $field) {
+            $lines[] = '<strong>'.e(FormState::label($schema, $field)).'</strong>: '.e(FormState::display($theirs[$field] ?? null));
+        }
+
+        Notification::make()
+            ->title(__('filament-collaboration::collaboration.conflict.heading', ['name' => $name]))
+            ->body(implode('<br>', $lines))
+            ->warning()
+            ->persistent()
+            ->send();
+    }
+
+    private static function room(EditAction $action, Model $record): ?View
+    {
+        $livewire = $action->getLivewire();
+        $schema = self::schema($action);
+        $plugin = CollaborationPlugin::find();
+
+        if ($schema === null || $plugin === null || ! $livewire instanceof Component) {
+            return null;
+        }
+
+        $resource = PageInspector::resource($livewire);
+
+        // A relation manager's records are not those of its page's resource.
+        if ($resource !== null && ! is_a($record, $resource::getModel())) {
+            $resource = null;
+        }
+
+        $statePath = Data::string($schema->getStatePath());
+        $user = Data::string(Filament::auth()->user()?->getAuthIdentifier());
+
+        return app(RoomRenderer::class)->render(
+            mode: PresenceMode::Editing,
+            // The same for every render of one open modal.
+            client: (int) hexdec(substr(hash('sha256', Data::string($livewire->getId()).$statePath.$user.Data::string($record->getKey())), 0, 7)) + 1,
+            record: $record,
+            resource: $resource,
+            statePath: $statePath,
+            labels: $plugin->getFieldResolver()->labels($schema),
+        );
+    }
+
+    /** @param array<string, mixed> $memory */
+    private static function remember(Schema $schema, array $memory): void
+    {
+        $schema->rawState([...Data::map($schema->getRawState()), self::STATE_KEY => $memory]);
     }
 
     private static function hook(EditAction $action, string $name): Closure|string|null
     {
         $value = (fn (): mixed => $this->{$name})->call($action);
 
-        if ($value instanceof Closure || is_string($value) || $value === null) {
-            return $value;
-        }
-
-        return null;
+        return $value instanceof Closure || is_string($value) ? $value : null;
     }
 
-    private static function modalSchema(EditAction $action): ?Schema
+    private static function schema(EditAction $action): ?Schema
     {
         $livewire = $action->getLivewire();
 
@@ -196,28 +221,7 @@ final class CollaborateAction
         }
 
         $name = $livewire->getMountedActionSchemaName();
-        if ($name === null) {
-            return null;
-        }
 
-        return $livewire->getSchema($name);
-    }
-
-    private static function userName(): string
-    {
-        $user = auth()->user();
-
-        if ($user !== null && method_exists($user, 'getFilamentName')) {
-            $name = $user->getFilamentName();
-            if (is_string($name) && $name !== '') {
-                return $name;
-            }
-        }
-
-        $fallback = is_object($user) ? ($user->name ?? null) : null;
-
-        return is_string($fallback) && $fallback !== ''
-            ? $fallback
-            : __('filament-collaboration::collaboration.someone');
+        return $name === null ? null : $livewire->getSchema($name);
     }
 }

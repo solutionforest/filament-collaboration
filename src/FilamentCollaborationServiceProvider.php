@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace SolutionForest\FilamentCollaboration;
 
+use Closure;
 use Filament\Actions\EditAction;
-use Filament\Support\Assets\AlpineComponent;
+use Filament\Forms\Components\Field;
+use Filament\Support\Assets\Css;
+use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
-use Filament\Support\Facades\FilamentView;
-use Filament\View\PanelsRenderHook;
-use Illuminate\Contracts\View\View;
-use Livewire\Livewire;
-use ReflectionMethod;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
-use SolutionForest\FilamentCollaboration\Concerns\HasPresence;
-use SolutionForest\FilamentCollaboration\Livewire\Presence;
-use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
+use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
+use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
+use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -34,46 +32,25 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
-        $store = config('filament-collaboration.cache_store');
-
-        $this->app->singleton(PresenceStore::class, fn (): PresenceStore => new PresenceStore(
-            is_string($store) ? $store : null,
-        ));
+        $this->app->bindIf(PresenceRepository::class, DatabasePresenceRepository::class);
     }
 
     public function packageBooted(): void
     {
-        Livewire::component('filament-collaboration-presence', Presence::class);
+        // Loaded, not published: a published copy would create the tables twice.
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         FilamentAsset::register([
-            AlpineComponent::make(
-                'collaborative-rich-editor',
-                __DIR__.'/../resources/dist/collaborative-rich-editor.js',
-            ),
+            Css::make('collaboration', __DIR__.'/../resources/dist/collaboration.css'),
+            Js::make('collaboration', __DIR__.'/../resources/dist/collaboration.js'),
         ], 'solutionforest/filament-collaboration');
 
         EditAction::macro('collaborate', function (array $ignore = [], bool $presence = true): EditAction {
             return CollaborateAction::fromMacro($this, $ignore, $presence);
         });
 
-        FilamentView::registerRenderHook(
-            PanelsRenderHook::PAGE_HEADER_ACTIONS_BEFORE,
-            function (): string {
-                $page = Livewire::current();
-
-                if (! is_object($page) || ! in_array(HasPresence::class, class_uses_recursive($page), true)) {
-                    return '';
-                }
-
-                if (! method_exists($page, 'renderCollaborationPresence')) {
-                    return '';
-                }
-
-                $method = new ReflectionMethod($page, 'renderCollaborationPresence');
-                $view = $method->invoke($page);
-
-                return $view instanceof View ? $view->render() : '';
-            },
-        );
+        Field::macro('collaborative', function (bool|Closure $condition = true): Field {
+            return FieldResolver::markField($this, $condition);
+        });
     }
 }
