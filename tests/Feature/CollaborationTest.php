@@ -112,7 +112,7 @@ it('rejects stale form saves rather than overwriting a newer title', function ()
     $first = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $second = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'First'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
-    $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)->assertActionMounted('resolveArticleConflict');
+    $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)->assertActionMounted('resolveCollaborationConflict');
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'First']);
 });
 
@@ -122,7 +122,7 @@ it('shows current presence beside its record in the resource table', function ()
     $this->actingAs($viewer)->postJson('/collaboration/presence', [
         'session_id' => (string) Str::uuid(), 'document_id' => $document->id, 'page' => 'view',
     ])->assertOk();
-    Livewire\Livewire::test(ListDocuments::class)->assertSee('Viewer (view)');
+    Livewire\Livewire::test(ListDocuments::class)->assertSee('Viewer (viewing)');
 });
 
 it('identifies the current user and keeps stable identities across tabs', function (): void {
@@ -180,7 +180,7 @@ it('saves article details and rejects stale edits to them', function (): void {
     $stale = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'Article', 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary'])
         ->call('save', shouldRedirect: false)->assertHasNoFormErrors();
-    $stale->fillForm(['title' => 'Article', 'status' => 'published'])->call('save', shouldRedirect: false)->assertActionMounted('resolveArticleConflict');
+    $stale->fillForm(['title' => 'Article', 'status' => 'published'])->call('save', shouldRedirect: false)->assertActionMounted('resolveCollaborationConflict');
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary']);
 });
 
@@ -217,7 +217,7 @@ it('blocks a conflicting save while preserving the latest title and local form d
         ->fillForm(['title' => 'Bob title'])->call('save', shouldRedirect: false);
     $this->actingAs($alice);
     $alicePage->fillForm(['title' => 'Alice title'])->call('save', shouldRedirect: false)
-        ->assertActionMounted('resolveArticleConflict')->assertSet('data.title', 'Alice title');
+        ->assertActionMounted('resolveCollaborationConflict')->assertSet('data.title', 'Alice title');
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Bob title']);
     $alicePage->setActionData(['choices' => ['title' => 'theirs']])->callMountedAction()->assertHasNoActionErrors();
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Bob title']);
@@ -266,7 +266,7 @@ it('shows article presence in the table', function (): void {
         'session_id' => (string) Str::uuid(), 'document_id' => $document->id, 'page' => 'edit',
     ])->assertOk();
     $this->actingAs($viewer);
-    Livewire\Livewire::test(ListDocuments::class)->assertSee('Editor (edit)');
+    Livewire\Livewire::test(ListDocuments::class)->assertSee('Editor (editing)');
 });
 
 it('does not apply a conflict choice if the saved value changes again', function (): void {
@@ -279,12 +279,12 @@ it('does not apply a conflict choice if the saved value changes again', function
     $bobPage = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $bobPage->fillForm(['title' => 'Bob one'])->call('save', shouldRedirect: false);
     $this->actingAs($alice);
-    $alicePage->fillForm(['title' => 'Alice'])->call('save', shouldRedirect: false)->assertActionMounted('resolveArticleConflict');
+    $alicePage->fillForm(['title' => 'Alice'])->call('save', shouldRedirect: false)->assertActionMounted('resolveCollaborationConflict');
     $this->actingAs($bob);
     $bobPage->fillForm(['title' => 'Bob two'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Bob two']);
     $this->actingAs($alice);
-    $alicePage->setActionData(['choices' => ['title' => 'mine']])->callMountedAction()->assertHasActionErrors(['choices.title']);
+    $alicePage->setActionData(['choices' => ['title' => 'mine']])->callMountedAction()->assertHasErrors(['choices.title']);
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Bob two']);
 });
 
@@ -296,7 +296,7 @@ it('can keep the local value after resolving an article conflict', function (): 
     $second = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'First'])->call('save', shouldRedirect: false);
     $second->fillForm(['title' => 'Second'])->call('save', shouldRedirect: false)
-        ->assertActionMounted('resolveArticleConflict')
+        ->assertActionMounted('resolveCollaborationConflict')
         ->setActionData(['choices' => ['title' => 'mine']])->callMountedAction()->assertHasNoActionErrors();
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Second']);
 });
@@ -308,7 +308,7 @@ it('accepts identical concurrent changes without showing a conflict', function (
     $first = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $second = Livewire\Livewire::test(EditDocument::class, ['record' => $document->id]);
     $first->fillForm(['title' => 'Same'])->call('save', shouldRedirect: false)->assertHasNoFormErrors();
-    $second->fillForm(['title' => 'Same'])->call('save', shouldRedirect: false)->assertActionNotMounted('resolveArticleConflict');
+    $second->fillForm(['title' => 'Same'])->call('save', shouldRedirect: false)->assertActionNotMounted('resolveCollaborationConflict');
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'title' => 'Same']);
 });
 

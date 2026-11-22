@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use SolutionForest\FilamentCollaboration\Collaboration;
+use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
 
 final class CollaborationController extends Controller
 {
@@ -52,6 +54,19 @@ final class CollaborationController extends Controller
             'focused_field' => $request->input('focused_field'),
             'seen_at' => now(),
         ]);
+        if (in_array($page, ['view', 'edit'], true)) {
+            $document = Document::query()->where('workspace_id', $user->workspace_id)->findOrFail($documentId);
+            $authId = $user->getAuthIdentifier();
+            abort_unless(is_int($authId) || is_string($authId), 500);
+            $focused = $request->input('focused_field');
+            Collaboration::store()->heartbeat(PresenceStore::room($document), $sessionId, [
+                'id' => $authId,
+                'name' => $user->name,
+                'mode' => $page === 'edit' ? 'editing' : 'viewing',
+                'field' => is_string($focused) ? $focused : null,
+                'origin' => 'http:'.$sessionId,
+            ]);
+        }
         $presence = DB::table('collaboration_presence')->join('users', 'users.id', '=', 'collaboration_presence.user_id')
             ->leftJoin('documents', 'documents.id', '=', 'collaboration_presence.document_id')
             ->where('users.workspace_id', $user->workspace_id)

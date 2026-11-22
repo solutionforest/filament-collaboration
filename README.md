@@ -1,20 +1,52 @@
-# Filament collaboration research prototype
+# Filament collaboration
 
-An experimental Laravel 13 / Filament 5 CMS-style application exploring article workflows, resource presence and a collaborative rich-text draft without WebSockets. Two users can open a document's edit page and see Yjs/Tiptap changes over HTTP polling. This is a **demo application, not an installable Filament plugin or production-ready package**.
+Installable Filament collaboration package plus a Fieldnotes CMS demo. Built to match the plugin’s collaboration surface without depending on `third-party/collaboration-plugin`, then go further with a shared Yjs draft.
+
+## Package
+
+Path package: `packages/filament-collaboration` (`solutionforest/filament-collaboration`).
+
+```php
+use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
+use SolutionForest\FilamentCollaboration\Concerns\HasPresence;
+use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
+use SolutionForest\FilamentCollaboration\Tables\PresenceColumn;
+
+class EditPost extends EditRecord
+{
+    use InteractsWithCollaboration;
+}
+
+class ViewPost extends ViewRecord
+{
+    use HasPresence;
+}
+
+// Table
+PresenceColumn::make('presence');
+CollaborateAction::configure(EditAction::make()); // or EditAction::make()->collaborate()
+```
+
+feature parity in this package:
+
+- Record presence (Livewire heartbeat + cache store) and field focus
+- Field-by-field three-way merge on save, conflict dialog, pull-their-changes notice
+- Modal edit merge (`collaborate()` / `CollaborateAction::configure`)
+- Table presence column
+- Events: `ChangesMerged`, `ConflictDetected`, `ConflictResolved`
+- Tenant/workspace rooms via `PresenceStore::resolveRoomUsing()`
+
+Beyond the plugin: the demo still ships a Yjs/Tiptap **shared draft** over HTTP polling (independent of form save).
+
+See `packages/filament-collaboration/README.md`.
+
+## Demo (Fieldnotes CMS)
 
 ![The shared article editor](docs/media/shared-edit.png)
 
 [Article list](docs/media/cms-articles.png) · [Conflict dialog](docs/media/conflict-dialog.png) · [Private summary preview](docs/media/cms-preview.png)
 
-[Mobile view](docs/media/mobile-edit.png)
-
-[Watch the short captioned demo](docs/media/tutorial.mp4) (silent, approximately 24 seconds). It shows Alice opening a document, typing, and Bob's edits appearing in the same draft; the second browser is not visible in the recording. The automated two-browser script is `scripts/browser-demo.mjs`.
-
-## Requirements
-
-PHP 8.4 with SQLite, Composer, Node.js 22 and npm. The demo uses SQLite, the database session driver and a database-backed cache. No WebSocket server or Redis is required for this local demo.
-
-## Run locally
+### Run locally
 
 ```sh
 composer install
@@ -29,15 +61,9 @@ npm run build
 php artisan serve
 ```
 
-Open `http://127.0.0.1:8000/admin` in two separate browser profiles. Sign in as `alice@example.test` and `bob@example.test` respectively, both with password `password`. These credentials are **only for a local disposable demo**. Open Articles, select Team planning and click Edit in both browsers. The seeded list also contains example news and story articles. Use the status filter and edit a category, summary or proposed slug to try a basic editorial workflow. Type into **Shared draft** on either page; changes should appear in the other after polling. The presence panel shows other people on the record, whether their edit or view page is open, and which demo field has focus. Use Copy document link to invite someone who already has access. The list also shows activity for each record; presence can take up to 45 seconds to clear. Creating a document opens its shareable edit page. A View page shows the shared draft read-only. Article details use a demo-specific three-way merge: changes to different fields merge on save, and conflicting changes to the same field prompt a choice. The shared draft is stored independently from these form fields.
+Open `http://127.0.0.1:8000/admin` in two browser profiles as `alice@example.test` / `bob@example.test` (password `password`). Local disposable accounts only.
 
-The seed creates the demo accounts and three sample articles. Never seed these accounts on a reachable production system. The demo assigns each user to a workspace and checks a document policy for draft access. Accounts created by the demo seeder belong to workspace 1.
-
-## How it works
-
-The panel injects a client on the Articles list, create, view, and edit pages. Article fields are compared against their opening values and the current database record before saving; an atomic revision check detects concurrent participating saves. A 10-second HTTP heartbeat stores a per-tab presence entry; entries older than 45 seconds are omitted from responses. The edit/view pages load a Yjs document by replaying its ordered update log. Tiptap binds to it and the client posts local updates and polls for remote ones every two seconds. This is a shared draft, saved separately from the normal Filament title field; changes to the draft are automatically stored as Yjs updates, not published to a model column.
-
-## Run checks
+### Checks
 
 ```sh
 ./vendor/bin/pest
@@ -46,12 +72,10 @@ The panel injects a client on the Articles list, create, view, and edit pages. A
 npm run build
 ```
 
-For the browser checks, seed a fresh local database, start `php artisan serve --host=127.0.0.1 --port=8765`, install Playwright Chromium (`npx playwright install chromium`), then run `node scripts/browser-demo.mjs`, `node scripts/browser-reconnect.mjs`, and `node scripts/browser-conflict.mjs`. This writes a screenshot and recording in `docs/media` and edits document #1.
+## Limitations
 
-## Limitations and next steps
-
-- Workspace isolation and the document policy are demo-specific, not a complete multi-tenant integration. The update endpoint accepts opaque Yjs bytes without validating the document format; abuse limits, authorization integration, untrusted-content handling and security review are required before deployment.
-- This is application code, not a reusable Composer plugin. Presence covers the demo resource and its table rows. Focus is shown for the demo title and shared draft only. Other resources, modal edits, custom pages, relation managers and user cursors are not integrated. A shared draft begins after a record is created; there is no pre-record collaborative creation flow.
-- The rich text is a standalone shared draft. The Preview summary action is authenticated and shows only saved metadata and summary; the Published status and proposed slug are demo labels and do not publish a page or expose the shared draft. There is no publish action, revision history or validation against a form. The article merge covers only the demo edit page and its five scalar fields. Other writers must advance the revision; query updates bypass Eloquent update events. Complex fields, relationships and all save paths require further design and testing.
-- Pending client updates are also held in session storage for reload and retry within the same browser tab. Closing the tab, clearing storage, storage quota errors, or opening a different browser can still lose pending changes. The server update log grows without bound; snapshots, compaction, retention, multi-database concurrency validation and load testing remain to be designed. Polling and presence are approximate; inactive or closed tabs disappear after the timeout.
-- Browser checks cover a simple two-user sequence, a same-tab reload with pending writes, and a same-field conflict choice. It does not prove simultaneous offline merges, operational robustness or production security. Compatibility is tested only against the locked dependency versions in this repository.
+- Shared draft Yjs updates are still opaque bytes (no server-side Yjs validation).
+- Publish workflow, reliable offline, multi-database concurrency validation and security review remain open.
+- the plugin extras not fully mirrored yet: spatie-translatable locale merge, leave beacon middleware matrix, and their full comparison edge-case suite.
+- Demo presence HTTP endpoint and package Livewire presence both run; unify further before a public release.
+- Keep the PR draft; use only local fake data.
