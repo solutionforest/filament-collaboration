@@ -38,15 +38,31 @@ feature parity in this package:
 
 Beyond the plugin: optional `CollaborativeRichEditor` (TipTap + Yjs over HTTP) for live co-writing. Ordinary blog fields (title, body HTML, SEO, related posts…) merge on save and show per-field presence without Yjs.
 
+Google-Docs-style UX:
+
+- Colour-coded avatar stack in the page header (with `+N` overflow)
+- Coloured field outlines + name tags for who is in which field
+- Blinking remote caret markers on occupied fields
+
 See `packages/filament-collaboration/README.md`.
 
 ## Demo (Fieldnotes blog CMS)
 
-Public site: `/blog` and `/blog/{slug}` (SEO meta, tags, related posts). CMS: Filament Articles with Article / SEO / Related posts / optional Live Yjs pad. Presence shows which editor is in which field (e.g. `Alice → SEO title`).
+Seed loads **100 editors** and **15 articles**. Open Spring product update as Alice to see a busy desk (`+91` overflow avatars, field highlights).
 
-![The shared article editor](docs/media/shared-edit.png)
+![100 editors on one article — avatar stack, field chips, coloured outlines](docs/media/presence-avatars.png)
 
-[Article list](docs/media/cms-articles.png) · [Conflict dialog](docs/media/conflict-dialog.png) · [Private summary preview](docs/media/cms-preview.png)
+![Article list with live presence](docs/media/cms-articles.png)
+
+![Field highlights + name tags while editing](docs/media/field-highlight.png)
+
+![Public blog index](docs/media/public-blog.png)
+
+![Public article page](docs/media/public-article.png)
+
+[Conflict dialog](docs/media/conflict-dialog.png) · [Private summary preview](docs/media/cms-preview.png) · [Mobile edit](docs/media/mobile-edit.png)
+
+Public site: `/blog` and `/blog/{slug}` (SEO meta, tags, related posts). CMS: Filament Articles with Article / SEO / Related posts / optional Live Yjs pad.
 
 ### Run locally
 
@@ -64,7 +80,8 @@ php artisan serve
 ```
 
 - Public blog: `http://127.0.0.1:8000/blog`
-- CMS: `http://127.0.0.1:8000/admin` — open the same article as `alice@example.test` / `bob@example.test` (password `password`) in two profiles to see field-level presence. Local disposable accounts only.
+- CMS: `http://127.0.0.1:8000/admin` — `alice@example.test` / `bob@example.test` (password `password`). Local disposable accounts only.
+- Optional screenshots: `node scripts/capture-screenshots.mjs` (with `php artisan serve` running)
 
 ### Checks
 
@@ -78,6 +95,7 @@ npm run build
 ## Limitations
 
 - Optional live pad: Yjs updates are opaque bytes (no server-side Yjs validation). Core CMS collab does not need Yjs.
+- Seeded presence expires with the package timeout (default 20s); re-open the edit page or re-seed to refresh a busy desk.
 - Reliable offline, multi-database concurrency validation and security review remain open.
 - the plugin extras not fully mirrored yet: spatie-translatable locale merge, leave beacon middleware matrix, and their full comparison edge-case suite.
 - Demo presence HTTP endpoint and package Livewire presence both run; unify further before a public release.

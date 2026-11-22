@@ -9,6 +9,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use SolutionForest\FilamentCollaboration\Collaboration;
 use SolutionForest\FilamentCollaboration\Livewire\Presence;
 use SolutionForest\FilamentCollaboration\Presence\PresenceStore;
 
@@ -192,10 +193,12 @@ it('saves article details and rejects stale edits to them', function (): void {
 it('seeds sample article drafts without duplicating them on repeat runs', function (): void {
     $this->seed(DatabaseSeeder::class);
     $this->seed(DatabaseSeeder::class);
-    $this->assertDatabaseCount('documents', 3);
+    $this->assertDatabaseCount('documents', 15);
+    $this->assertDatabaseCount('users', 100);
     $this->assertDatabaseCount('collaboration_updates', 3);
     $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'published']);
     $this->assertDatabaseCount('document_relations', 1);
+    $this->assertDatabaseCount('collaboration_presence', 100);
 });
 
 it('merges different article fields changed by two editors', function (): void {
@@ -398,4 +401,47 @@ it('shows which blog field another editor is working on', function (): void {
         'mode' => 'editing',
         'origin' => 'bob-tab-2',
     ])->assertSee('Alice → Related posts', false);
+});
+
+it('keeps presence usable with one hundred editors on the same article', function (): void {
+    $document = Document::create(['title' => 'Busy desk', 'slug' => 'busy-desk', 'status' => 'draft']);
+    $editors = User::factory()->count(100)->create();
+    $fields = ['title', 'seo_title', 'body_html', 'relatedPosts', 'excerpt'];
+    $last = null;
+
+    foreach ($editors as $index => $editor) {
+        $last = $this->actingAs($editor)->postJson('/collaboration/presence', [
+            'session_id' => (string) Str::uuid(),
+            'document_id' => $document->id,
+            'page' => 'edit',
+            'focused_field' => $fields[$index % count($fields)],
+        ])->assertOk();
+    }
+
+    expect($last)->not->toBeNull();
+    expect($last->json('presence'))->toHaveCount(100);
+
+    $viewer = $editors->last();
+    $room = PresenceStore::room($document);
+    foreach ($editors->take(99) as $editor) {
+        Collaboration::store()->heartbeat($room, 'load-'.$editor->id, [
+            'id' => $editor->id,
+            'name' => $editor->name,
+            'mode' => 'editing',
+            'field' => 'seo_title',
+            'origin' => 'load-'.$editor->id,
+        ]);
+    }
+
+    $this->actingAs($viewer);
+    Livewire\Livewire::test(Presence::class, [
+        'room' => $room,
+        'mode' => 'editing',
+        'origin' => 'viewer-tab',
+    ])
+        ->assertSee('fi-collaboration-avatar', false)
+        ->assertSee('fi-collaboration-avatar-overflow', false)
+        ->assertSee('+92', false)
+        ->assertSee('100 other people', false)
+        ->assertSee('→ SEO title', false);
 });

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 use SolutionForest\FilamentCollaboration\Collaboration;
+use SolutionForest\FilamentCollaboration\Support\PresenceColor;
 
 final class Presence extends Component
 {
@@ -24,7 +25,7 @@ final class Presence extends Component
 
     public string $sessionId = '';
 
-    /** @var list<array{id: string|int, name: string, avatar: ?string, field: ?string, mode: string}> */
+    /** @var list<array{id: string|int, name: string, avatar: ?string, field: ?string, mode: string, color: string}> */
     public array $people = [];
 
     public ?string $lastSaveName = null;
@@ -83,7 +84,7 @@ final class Presence extends Component
         ]);
 
         $selfId = is_string($id) ? $id : (string) $id;
-        $this->people = array_values(array_filter(
+        $present = array_values(array_filter(
             Collaboration::store()->people($this->room, $this->origin),
             fn (array $person): bool => (is_string($person['id']) ? $person['id'] : (string) $person['id']) !== $selfId
                 || $person['origin'] !== $this->origin,
@@ -92,13 +93,20 @@ final class Presence extends Component
         // Deduplicate other tabs of the same user for display.
         $seen = [];
         $display = [];
-        foreach ($this->people as $person) {
+        foreach ($present as $person) {
             $key = is_string($person['id']) ? $person['id'] : (string) $person['id'];
             if (isset($seen[$key])) {
                 continue;
             }
             $seen[$key] = true;
-            $display[] = $person;
+            $display[] = [
+                'id' => $person['id'],
+                'name' => $person['name'],
+                'avatar' => $person['avatar'],
+                'field' => $person['field'],
+                'mode' => $person['mode'],
+                'color' => PresenceColor::for($person['id']),
+            ];
         }
         $this->people = $display;
 
