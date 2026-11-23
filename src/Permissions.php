@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace SolutionForest\FilamentCollaboration;
 
+use Filament\Facades\Filament;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\Support\Data;
@@ -31,6 +34,29 @@ final class Permissions
         if ($room !== null) {
             app(RoomNotifier::class)->refresh($room);
         }
+    }
+
+    /**
+     * Whether a user may edit this record live. Policies opt in by defining a
+     * `collaborate` ability; without one, whoever may edit may collaborate.
+     * Those who may not still edit, and their changes merge on save.
+     */
+    public static function mayCollaborate(Model $record, ?Authenticatable $user = null): bool
+    {
+        $user ??= Filament::auth()->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        $gate = Gate::forUser($user);
+        $policy = $gate->getPolicyFor($record);
+
+        if (! $gate->has('collaborate') && ! (is_object($policy) && method_exists($policy, 'collaborate'))) {
+            return true;
+        }
+
+        return $gate->allows('collaborate', $record);
     }
 
     /** What a token issued now must still match. */

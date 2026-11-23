@@ -24,6 +24,7 @@ use SolutionForest\FilamentCollaboration\Documents\EditTrail;
 use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
 use SolutionForest\FilamentCollaboration\Enums\PresenceChange;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
+use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Presence\Participant;
 use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
@@ -102,6 +103,11 @@ final readonly class SyncController
         }
 
         $this->report($context, $identity, Data::list($input['problems'] ?? null));
+
+        // The policy's `collaborate` ability changed: render again, without live fields.
+        if ($context->fields !== [] && $access->record !== null && ! Permissions::mayCollaborate($access->record)) {
+            return new JsonResponse(['error' => 'expired'], 410);
+        }
 
         $resumed = $this->resume($context, $access->record, Data::map($input['resume'] ?? null));
         $epoch = Data::int($input['epoch'] ?? null);

@@ -139,11 +139,11 @@ Each push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What |
 | --- | --- |
-| Pest | 252 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus Filament 4.13.3; at least 95% line coverage |
+| Pest | 270 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus Filament 4.13.3; at least 95% line coverage |
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
-| Browsers | 39 scenarios in Chromium with polling and with Reverb, and in WebKit |
+| Browsers | 40 scenarios in Chromium with polling and with Reverb, and in WebKit |
 | Chaos | [nightly](.github/workflows/chaos.yml): four browsers pressing random keys must converge with no editor error |
 
 Run them yourself:
