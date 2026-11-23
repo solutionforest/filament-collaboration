@@ -10,11 +10,13 @@ use Filament\Forms\Components\Field;
 use Filament\Support\Assets\Css;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Broadcast;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
+use SolutionForest\FilamentCollaboration\Commands\PruneUploadsCommand;
 use SolutionForest\FilamentCollaboration\Commands\RefreshPermissionsCommand;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
@@ -34,7 +36,7 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews(static::$name)
             ->hasTranslations()
-            ->hasCommand(RefreshPermissionsCommand::class);
+            ->hasCommands([RefreshPermissionsCommand::class, PruneUploadsCommand::class]);
     }
 
     public function packageRegistered(): void
@@ -63,6 +65,13 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
     {
         // Loaded, not published: a published copy would create the tables twice.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Images inserted into drafts that were never saved. Runs wherever the scheduler does.
+        $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
+            if (config('filament-collaboration.prune_uploads_after') !== null) {
+                $schedule->command(PruneUploadsCommand::class)->daily()->withoutOverlapping()->onOneServer();
+            }
+        });
 
         FilamentAsset::register([
             Css::make('collaboration', __DIR__.'/../resources/dist/collaboration.css'),

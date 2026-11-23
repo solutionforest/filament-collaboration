@@ -154,7 +154,7 @@ TextInput::make('internal_notes')->collaborative(false); // merge on save only
 Select::make('tags')->relationship('tags', 'name')->multiple()->collaborative(); // see below
 ```
 
-Deployment settings are in `config/filament-collaboration.php`: database connection, cache store, presence timeout, token lifetime and rate limit. For PHPStan, include `vendor/solutionforest/filament-collaboration/extension.neon` so it knows about `collaborative()` and `collaborate()`.
+Deployment settings are in `config/filament-collaboration.php`: database connection, cache store, presence timeout, token lifetime, rate limit and upload pruning. For PHPStan, include `vendor/solutionforest/filament-collaboration/extension.neon` so it knows about `collaborative()` and `collaborate()`.
 
 ### Your own field types
 
@@ -196,6 +196,8 @@ Pages with a locale switcher (translatable content) merge on save, as do date pi
 Live fields share one draft per record, kept in the database, so it survives everybody leaving. Save validates and publishes the draft's live fields as they are at that moment, including what colleagues typed, and merges the other fields with what is stored. The header shows when the draft has unsaved changes, and anyone who can edit can discard them.
 
 A change made outside the draft, such as a modal, an import or a queued job, is merged into what people are typing. A save from a browser that was not live wins in the fields it changed.
+
+An image is stored as soon as it is inserted, so whoever saves keeps it. Once a save puts it in the record, it belongs to the record like any other upload. Discarding the draft deletes the images nobody saved. Images removed before saving are deleted by `php artisan filament-collaboration:prune-uploads`, which the package schedules daily for images older than `prune_uploads_after` hours (24); undo can bring an image back until then. Your scheduler must be running.
 
 ## How it works
 
@@ -260,7 +262,7 @@ Pushes make changes 6 to 20 times faster everywhere. A room where most people re
 ```bash
 cd demo
 composer install && npm install
-vendor/bin/pest                # 195 tests: the package and the demo
+vendor/bin/pest                # 198 tests: the package and the demo
 vendor/bin/phpstan analyse     # level 10, package included
 npm run test:e2e               # 38 scenarios in real browsers; BROWSER=webkit for Safari's engine
 TRANSPORT=reverb npm run test:e2e   # the same over a real Reverb server, plus 3 push scenarios
@@ -300,7 +302,6 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 - `registerChannel()` registers the broadcast channel on the default broadcaster at boot; call it again if you switch broadcaster at runtime.
 - Repeater and builder sub-fields take the latest value: two people typing in the same sub-field of the same item do not merge character by character. Lists holding uploads, rich text or nested lists, Markdown and code editors, and custom rich editor blocks merge on save.
 - Links pasted with a CSS class lose the class. Images pasted as base64 make that field merge on save.
-- An uploaded image is stored as soon as it is inserted, so it stays in storage even if the draft is then discarded.
 - It relies on two internals: Livewire's update queue (`queueUpdate`) and the rich editor's `getEditor()`. Both are covered by the browser tests on Filament 4.13.3, 4.17, 5.8.3 and 5.12. Laravel 12 is covered by the PHP tests only.
 
 ## License

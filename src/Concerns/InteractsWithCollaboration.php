@@ -10,11 +10,13 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Notifications\Notification;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\SharedField;
+use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Events\ChangesMerged;
 use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
@@ -189,6 +191,13 @@ trait InteractsWithCollaboration
             return null;
         }
 
+        $disk = $component->getFileAttachmentsDiskName();
+
+        // Only a stored file, not an id from a custom `saveUploadedFileAttachmentsUsing()`, can be cleaned up.
+        if (is_string($stored) && Storage::disk($disk)->exists($stored)) {
+            app(SharedUploads::class)->track($this->getCollaborationRoom(), $field, $disk, $stored);
+        }
+
         return ['id' => (string) $stored, 'src' => $component->getFileAttachmentUrl($stored)];
     }
 
@@ -208,6 +217,7 @@ trait InteractsWithCollaboration
                 $fields = array_map(strval(...), array_keys($this->getCollaborationLiveFields()));
 
                 app(SaveLock::class)->block($room, fn () => app(DocumentRepository::class)->discard($room, $fields));
+                app(SharedUploads::class)->discard($room);
             });
     }
 
@@ -306,6 +316,8 @@ trait InteractsWithCollaboration
             Identity::current()->name ?? __('filament-collaboration::collaboration.someone'),
             $this->collaborationClient,
         );
+
+        app(SharedUploads::class)->release($room);
 
         $this->collaborationBase = [...$this->getCollaborationFormValues(), ...FormState::only($saved, $live->fields)];
 
