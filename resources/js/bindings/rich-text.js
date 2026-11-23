@@ -133,6 +133,7 @@ export class RichTextBinding extends Binding {
 
             this.restoreSelection(transaction)
             view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
+            this.keepCaretTypable()
             this.sendWhole()
         } catch (error) {
             this.giveUp(error)
@@ -148,6 +149,22 @@ export class RichTextBinding extends Binding {
         if (!this.editor || this.editor.isDestroyed) return
 
         this.room.wire.__instance?.queueUpdate?.(this.path, this.editor.getJSON())
+    }
+
+    /**
+     * After somebody else's change, the caret must still be where text can be
+     * typed. Enter at a position between blocks makes ProseMirror throw.
+     */
+    keepCaretTypable() {
+        const Selection = window.FilamentRichEditor?.tiptap?.pmState?.Selection
+        const { state, view } = this.editor
+        const { $from, $to, empty } = state.selection
+
+        if (!Selection || state.selection.node || ($from.parent.inlineContent && $to.parent.inlineContent)) return
+
+        const near = Selection.near(empty ? $from : $to, -1)
+
+        if (!near.eq(state.selection)) view.dispatch(state.tr.setSelection(near).setMeta(REMOTE, true).setMeta('addToHistory', false))
     }
 
     restoreSelection(transaction) {
