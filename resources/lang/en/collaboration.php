@@ -47,6 +47,24 @@ return [
         'action' => 'Discard draft',
     ],
 
+    'panel' => [
+        'label' => 'Comments & history',
+        'heading' => 'Comments & history',
+        'close' => 'Close',
+        'comments' => 'Comments',
+        'history' => 'History',
+        'no_history' => 'Nothing has changed yet.',
+        'restore' => 'Restore the draft from :time',
+        'restore_confirm' => 'Restore the shared draft as it was at :time, for everybody? The draft as it is now is kept in the history.',
+        'restored' => 'Draft restored for everybody',
+        'reasons' => [
+            'edit' => 'Edited by :name',
+            'save' => 'Saved by :name',
+            'before' => 'Before :name restored',
+            'restore' => 'Restored by :name',
+        ],
+    ],
+
     'debug' => [
         'label' => 'Collaboration inspector',
         'heading' => 'Collaboration inspector',

@@ -47,6 +47,24 @@ return [
         'action' => '捨棄草稿',
     ],
 
+    'panel' => [
+        'label' => '留言與歷史',
+        'heading' => '留言與歷史',
+        'close' => '關閉',
+        'comments' => '留言',
+        'history' => '歷史',
+        'no_history' => '暫時未有變更。',
+        'restore' => '還原至 :time 的草稿',
+        'restore_confirm' => '為所有人把共享草稿還原至 :time 的狀態？現時的草稿會保留在歷史中。',
+        'restored' => '已為所有人還原草稿',
+        'reasons' => [
+            'edit' => ':name 編輯',
+            'save' => ':name 儲存',
+            'before' => ':name 還原前',
+            'restore' => ':name 還原',
+        ],
+    ],
+
     'debug' => [
         'label' => '協作檢查器',
         'heading' => '協作檢查器',

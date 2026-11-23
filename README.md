@@ -26,6 +26,7 @@
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
 | **Safe by default** | Every request is authorised again, every edit is validated, and fields a person cannot see never reach their browser. |
+| **Version history** | A slide-over lists the draft's versions, who changed what, and restores any of them for everybody. See [Version history](docs/guide.md#version-history). |
 | **Merge on save for the rest** | Fields that cannot be live get a field-by-field three-way merge with a conflict dialog. |
 
 ## Requirements

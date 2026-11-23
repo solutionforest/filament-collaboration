@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
+use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
 use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Support\Data;
@@ -35,6 +36,7 @@ final readonly class DeletedRecords
         private RoomNotifier $notifier,
         private PresenceRepository $presence,
         private SharedUploads $uploads,
+        private DraftVersions $versions,
     ) {}
 
     /**
@@ -146,6 +148,7 @@ final readonly class DeletedRecords
         foreach ($documents as $document) {
             $document = Data::map($document);
             $this->uploads->discard(Data::string($document['room'] ?? null));
+            $this->versions->forget(Data::string($document['room'] ?? null));
             Database::table('updates')->where('document_id', $document['id'] ?? null)->delete();
             Database::table('documents')->where('id', $document['id'] ?? null)->delete();
         }

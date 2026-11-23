@@ -196,6 +196,23 @@ app(EditTrail::class)->for($post);
 
 Each new row also dispatches `DraftEdited` (`record`, `by`, `field`, `minute`), to send wherever you like. The trail is kept until you delete it, for example with a scheduled `DB::table('filament_collaboration_edits')->where('minute', '<', now()->subYear()->getTimestamp())->delete()`.
 
+### Version history
+
+Add `CollaborationPanelAction` to the page's header actions. It opens a slide-over whose **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
+
+```php
+use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
+
+protected function getHeaderActions(): array
+{
+    return [
+        CollaborationPanelAction::make(),
+    ];
+}
+```
+
+A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
+
 ## 4. Presence in tables and modals
 
 **A column with the people on each record:**

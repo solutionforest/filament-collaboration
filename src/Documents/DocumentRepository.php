@@ -31,6 +31,7 @@ final class DocumentRepository
         private readonly PresenceRepository $presence,
         private readonly RoomNotifier $notifier,
         private readonly SharedUploads $uploads,
+        private readonly DraftVersions $versions,
     ) {}
 
     /** Records that a draft is one language of a record's room. */
@@ -208,6 +209,7 @@ final class DocumentRepository
             $draft->refreshDirty(...$touched);
             $draft->version++;
             $draft->savedBy = Data::encode(['name' => $name, 'client' => $client]);
+            $this->versions->capture($draft, 'save', $name, always: true);
 
             // Whoever overwrote a field without live editing changed it too.
             if ($by !== null) {
@@ -228,6 +230,44 @@ final class DocumentRepository
         $this->transaction($room, function (SharedDraft $draft) use ($name): void {
             $draft->version++;
             $draft->savedBy = Data::encode(['name' => $name, 'client' => Document::SERVER]);
+        });
+    }
+
+    /**
+     * Turns these fields of the draft back into a version's values, for
+     * everybody. The draft as it was is kept first, so a restore can be undone.
+     *
+     * @param  array<string, mixed>  $values
+     * @param  list<string>  $fields  the fields this user may write
+     * @return list<string> the fields that changed
+     */
+    public function restore(string $room, array $values, array $fields, string $name): array
+    {
+        return $this->transaction($room, function (SharedDraft $draft) use ($values, $fields, $name): array {
+            $this->versions->capture($draft, 'before', $name, always: true);
+
+            $operations = [];
+            $touched = [];
+
+            foreach ($fields as $field) {
+                if (! $draft->document->has($field) || ! array_key_exists($field, $values)) {
+                    continue;
+                }
+
+                $changes = $draft->document->changes($field, $values[$field]);
+
+                if ($changes !== []) {
+                    $draft->document->apply($changes);
+                    array_push($operations, ...$changes);
+                    $touched[] = $field;
+                }
+            }
+
+            $this->append($draft, Document::SERVER, $operations);
+            $draft->refreshDirty(...$touched);
+            $this->versions->capture($draft, 'restore', $name, always: true);
+
+            return $touched;
         });
     }
 
@@ -366,6 +406,8 @@ final class DocumentRepository
             if ($by !== null) {
                 $draft->contributed(Contributor::of($by), ...array_map(strval(...), array_keys($touched)));
             }
+
+            $this->versions->capture($draft, 'edit', $by === null ? null : Contributor::of($by)->name);
         }
 
         return array_map(strval(...), array_keys($touched));

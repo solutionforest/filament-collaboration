@@ -1123,6 +1123,29 @@ describe('seeing each other', () => {
         await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Edited in a modal'), 'the open editor was not updated')
     })
 
+    test('the history restores an earlier draft for everybody', async () => {
+        await together()
+
+        await field(alice, 'title').fill('Version one')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version one'), 'Bob did not get version one')
+        await save(alice)
+
+        await field(alice, 'title').fill('Version two')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version two'), 'Bob did not get version two')
+
+        await bob.getByRole('button', { name: 'Comments & history' }).click()
+
+        const history = bob.locator('[data-collaboration-history]')
+
+        await eventually(async () => assert.match(await history.innerText(), /Saved by Alice Chen[\s\S]*Edited by Alice Chen/), 'the history was empty')
+
+        bob.once('dialog', (dialog) => dialog.accept())
+        await history.getByRole('button', { name: /Restore the draft from/ }).last().click()
+
+        await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Version one'), 'Alice did not get the restored draft')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version one'), 'Bob did not get the restored draft')
+    })
+
     test('the inspector opens from the header', async () => {
         await app.edit(alice, 3)
         await alice.getByRole('button', { name: 'Collaboration inspector' }).click()

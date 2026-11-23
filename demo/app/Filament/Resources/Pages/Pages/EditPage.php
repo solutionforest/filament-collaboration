@@ -8,6 +8,7 @@ use App\Filament\Resources\Pages\PageResource;
 use Filament\Resources\Pages\EditRecord;
 use LaraZeus\SpatieTranslatable\Actions\LocaleSwitcher;
 use LaraZeus\SpatieTranslatable\Resources\Pages\EditRecord\Concerns\Translatable;
+use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
 use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
 
 /** Each language is its own shared draft: two people can edit English and Chinese at once. */
@@ -20,6 +21,6 @@ class EditPage extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [LocaleSwitcher::make(), $this->getSaveFormAction()->formId('form')];
+        return [LocaleSwitcher::make(), CollaborationPanelAction::make(), $this->getSaveFormAction()->formId('form')];
     }
 }

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace SolutionForest\FilamentCollaboration\Concerns;
 
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Notifications\Notification;
 use Filament\Support\Components\Attributes\Exposed;
+use Filament\Support\Components\Attributes\Unexposed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +22,7 @@ use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Crdt\Html;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
 use SolutionForest\FilamentCollaboration\Documents\EditTrail;
 use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
 use SolutionForest\FilamentCollaboration\Documents\SharedField;
@@ -267,6 +270,51 @@ trait InteractsWithCollaboration
         }
 
         return $stored;
+    }
+
+    /**
+     * The shared draft's earlier versions, for the comments and history panel.
+     *
+     * @return list<array{id: int, reason: string, name: string|null, at: CarbonImmutable, changed: list<string>}>
+     */
+    #[Unexposed]
+    public function getCollaborationVersions(): array
+    {
+        return app(DraftVersions::class)->list($this->getCollaborationRoom(), $this->getCollaborationLabels());
+    }
+
+    /** @return array<string, string> the visible fields' labels */
+    #[Unexposed]
+    public function getCollaborationFieldLabels(): array
+    {
+        return $this->getCollaborationLabels();
+    }
+
+    #[Unexposed]
+    public function canRestoreCollaborationVersions(): bool
+    {
+        return $this->isCollaborationLive() && $this->getCollaborationLiveFields() !== [];
+    }
+
+    /** Puts the shared draft back as it was in a version, for everybody, in the fields this user may edit. */
+    #[Exposed]
+    public function restoreCollaborationVersion(int $id): void
+    {
+        $this->authorizeAccess();
+
+        $room = $this->getCollaborationRoom();
+        $values = app(DraftVersions::class)->values($room, $id);
+
+        if ($values === null || ! $this->canRestoreCollaborationVersions()) {
+            return;
+        }
+
+        $fields = array_map(strval(...), array_keys($this->getCollaborationLiveFields()));
+        $name = Identity::current()->name ?? __('filament-collaboration::collaboration.someone');
+
+        app(SaveLock::class)->block($room, fn () => app(DocumentRepository::class)->restore($room, $values, $fields, $name));
+
+        Notification::make()->title(__('filament-collaboration::collaboration.panel.restored'))->success()->send();
     }
 
     public function discardSharedDraftAction(): Action
