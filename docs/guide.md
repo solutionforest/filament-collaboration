@@ -113,6 +113,16 @@ When a field that is not live was changed by two people, Save shows a **conflict
 
 ![Who is here, and the draft's state](media/people-panel.png)
 
+### When a record is deleted
+
+Everybody still on it is told at once, by name: "Bob deleted this record". Their form stays on screen, read-only, with **Copy my text**, so nothing typed is lost.
+
+- With **soft deletes**, the shared draft is kept, and people the policy allows to `restore` get a **Restore** button that brings the record back with the draft.
+- When a record is **gone for good** (no soft deletes, or force-deleted), its draft, edit history and unsaved images are deleted with it.
+- Someone who could no longer reach the record anyway, say after moving to another team, is only told they no longer have access.
+
+This works for deletions anywhere in your app that go through Eloquent, not only Filament's delete action. Query-builder deletes (`Post::where(...)->delete()`) fire no model events: call `app(DeletedRecords::class)->deleted($post)` for those, if people may be editing them.
+
 **React to saves and merges** with Laravel events, all in `SolutionForest\FilamentCollaboration\Events`:
 
 | Event | When | Has |

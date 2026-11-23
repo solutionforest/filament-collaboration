@@ -143,7 +143,7 @@ button.fi-collab-stack {
     background: #d97706;
 }
 
-.fi-collab-status:is([data-status='offline'], [data-status='stopped'], [data-status='denied']) .fi-collab-status-dot {
+.fi-collab-status:is([data-status='offline'], [data-status='stopped'], [data-status='denied'], [data-status='deleted']) .fi-collab-status-dot {
     background: #dc2626;
 }
 
@@ -162,6 +162,21 @@ button.fi-collab-stack {
 .dark .fi-collab-notice {
     background: rgb(16 185 129 / 14%);
     color: #a7f3d0;
+}
+
+.fi-collab-notice-danger {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.dark .fi-collab-notice-danger {
+    background: rgb(239 68 68 / 16%);
+    color: #fecaca;
+}
+
+/* A deleted record's form: kept, so its text can be copied, but not editable. */
+form[inert] {
+    opacity: 0.6;
 }
 
 .fi-collab-link {

@@ -22,6 +22,7 @@ use SolutionForest\FilamentCollaboration\Enums\PresenceChange;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Presence\Participant;
+use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
 use SolutionForest\FilamentCollaboration\Rooms\RoomAuthorizer;
 use SolutionForest\FilamentCollaboration\Rooms\RoomContext;
 use SolutionForest\FilamentCollaboration\Support\Data;
@@ -40,6 +41,7 @@ final readonly class SyncController
         private DocumentRepository $documents,
         private PresenceRepository $presence,
         private RoomNotifier $notifier,
+        private DeletedRecords $deletions,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -71,15 +73,26 @@ final readonly class SyncController
             return new JsonResponse(['error' => 'forbidden'], 403);
         }
 
-        if ($context->hasExpired()) {
-            return new JsonResponse(['error' => 'expired'], 410);
-        }
-
-        $access = $this->authorizer->authorize($context);
+        $access = $context->hasExpired() ? null : $this->authorizer->authorize($context);
         $identity = Identity::current();
 
-        if (! $access->isGranted || $identity === null) {
-            // The same answer whether the record is missing or is somebody else's.
+        if ($access === null || ! $access->isGranted || $identity === null) {
+            // The token proves this user could open the record, so they may learn it was deleted.
+            $deleted = $this->deletions->lookup($context);
+
+            if ($deleted !== null) {
+                if ($access !== null && ($input['restore'] ?? false) === true && $this->deletions->restore($context)) {
+                    return new JsonResponse(['restored' => true]);
+                }
+
+                return new JsonResponse(['error' => 'deleted', 'name' => $deleted['name'], 'restorable' => $deleted['restorable']], 404);
+            }
+
+            if ($access === null) {
+                return new JsonResponse(['error' => 'expired'], 410);
+            }
+
+            // The same answer whether the record is gone from this user's reach or is somebody else's.
             return new JsonResponse(['error' => 'not_found'], 404);
         }
 

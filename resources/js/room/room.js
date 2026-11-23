@@ -97,6 +97,8 @@ export class Room {
         this.status = 'connecting'
         /** @type {string | null} the field with this user's caret */
         this.field = null
+        /** @type {{name: string | null, restorable: boolean, copied?: boolean} | null} set once the record is deleted */
+        this.deleted = null
         this.lastActive = Date.now()
         this.failures = 0
         this.roundTrip = 0
@@ -381,7 +383,7 @@ export class Room {
     }
 
     syncSoon(delay = this.interval()) {
-        if (this.destroyed || this.status === 'denied') return
+        if (this.destroyed || this.status === 'denied' || this.status === 'deleted') return
 
         const at = Date.now() + delay
 
@@ -596,6 +598,12 @@ export class Room {
             return 1500
         }
 
+        if (status === 404 && error.code === 'deleted') {
+            this.recordDeleted({ name: error.body?.name ?? null, restorable: error.body?.restorable === true })
+
+            return null
+        }
+
         // Only our own refusal is final. A proxy's or a deploy's 403 or 404 is worth retrying.
         if ((status === 403 && error.code === 'forbidden') || (status === 404 && error.code === 'not_found')) {
             this.stop('denied')
@@ -623,6 +631,50 @@ export class Room {
         this.outbox.reset()
         this.publish()
         this.setStatus(status)
+    }
+
+    /**
+     * Somebody deleted the record. The form stays, read-only, so nothing
+     * typed is lost: it can be copied, or the record restored if it can be.
+     *
+     * @param {{name: string | null, restorable: boolean}} deleted
+     */
+    recordDeleted(deleted) {
+        this.deleted = deleted
+        this.stop('deleted')
+        this.form()?.setAttribute('inert', '')
+        this.overlay.schedule()
+    }
+
+    /** The form this room edits. */
+    form() {
+        return this.dom.root.querySelector('form')
+    }
+
+    /** Copies every field's current value, as plain text with its label. */
+    async copyText() {
+        const { statePath, fields, labels } = this.config
+        const text = Object.keys(fields)
+            .map((field) => {
+                const value = plainText(this.wire?.$get(`${statePath}.${field}`, false))
+
+                return value ? `${labels[field] ?? field}\n${value}` : ''
+            })
+            .filter(Boolean)
+            .join('\n\n')
+
+        await navigator.clipboard.writeText(text)
+
+        if (this.deleted) this.deleted.copied = true
+
+        this.bar.render()
+    }
+
+    /** Restores a soft-deleted record, then shows it again. */
+    async restore() {
+        const answer = await this.transport.send(this.config, { token: this.config.token, restore: true }).catch(() => null)
+
+        if (answer?.restored) window.location.reload()
     }
 
     /** @param {string} field */
@@ -741,4 +793,29 @@ export class Room {
         this.bar.destroy()
         this.overlay.destroy()
     }
+}
+
+/**
+ * A field's value as text a person can paste: rich content as its words,
+ * lists as their values.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function plainText(value) {
+    if (value === null || value === undefined) return ''
+    if (typeof value !== 'object') return String(value)
+    if (Array.isArray(value)) return value.map(plainText).filter(Boolean).join(', ')
+
+    const node = /** @type {Partial<RichNode>} */ (value)
+
+    if (typeof node.type === 'string' && (Array.isArray(node.content) || typeof node.text === 'string')) {
+        if (typeof node.text === 'string') return node.text
+
+        const separator = ['doc', 'bulletList', 'orderedList', 'blockquote'].includes(node.type) ? '\n' : ''
+
+        return (node.content ?? []).map(plainText).join(separator)
+    }
+
+    return Object.values(value).map(plainText).filter(Boolean).join('\n')
 }

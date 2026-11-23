@@ -798,6 +798,44 @@ describe('saving', () => {
     })
 })
 
+describe('a deleted record', () => {
+    test('the others are told who deleted it, can copy their text, and can restore it', async () => {
+        const id = await together()
+        const known = app.problems.length
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' (mine)')
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / \(mine\)$/), 'typing did not arrive')
+
+        await bob.evaluate(() => {
+            const page = document.querySelector('.fi-page').closest('[wire\\:id]')
+
+            window.Livewire.find(page.getAttribute('wire:id')).mountAction('delete')
+        })
+        await bob.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Delete' }).click()
+
+        const notice = alice.locator('.fi-collab-notice-danger')
+
+        await eventually(async () => assert.match(await notice.innerText(), /Bob .* deleted this record/), 'Alice was not told', 12000)
+        assert.equal(await alice.locator('.fi-page form').first().getAttribute('inert'), '', 'the form can still be edited')
+
+        if (process.env.BROWSER !== 'webkit') {
+            await alice.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+            await notice.getByRole('button', { name: 'Copy my text' }).click()
+            await eventually(async () => assert.match(await alice.evaluate(() => navigator.clipboard.readText()), /Title\n.* \(mine\)/), 'the text was not copied')
+        }
+
+        await notice.getByRole('button', { name: 'Restore' }).click()
+        await eventually(async () => {
+            assert.equal(app.article(id).deleted_at, null)
+            assert.match(await field(alice, 'title').inputValue(), / \(mine\)$/)
+        }, 'the record was not restored with its draft', 15000)
+
+        // Syncing a deleted record answers 404, which is how the browsers learn of it.
+        app.problems.splice(known, app.problems.length - known, ...app.problems.slice(known).filter((problem) => !/HTTP 404 .*_collaboration\/sync/.test(problem)))
+    })
+})
+
 describe('seeing each other', () => {
     test('avatar, field outline, caret and name follow the other editor', async () => {
         await together()
