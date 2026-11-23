@@ -12,6 +12,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use LogicException;
 use ReflectionFunction;
@@ -33,8 +34,11 @@ final readonly class FieldResolver
     /** @param list<FieldType> $types the first match wins */
     public function __construct(private array $types) {}
 
-    /** Backs the `collaborative()` method on every field. */
-    public static function markField(mixed $field, bool|Closure $condition): Field
+    /**
+     * Backs the `collaborative()` method on every field. A string is a Gate
+     * ability: the field is shared, but only those it allows edit it live.
+     */
+    public static function markField(mixed $field, bool|Closure|string $condition): Field
     {
         if (! $field instanceof Field) {
             throw new LogicException('collaborative() may only be called on a field.');
@@ -93,7 +97,7 @@ final readonly class FieldResolver
         $kinds = [];
 
         foreach (FormState::fields($schema, $ignored, withHidden: false) as $path => $field) {
-            if ($field->isDisabled() || ! self::isSaved($field)) {
+            if ($field->isDisabled() || ! self::isSaved($field) || ! self::mayEditLive($field)) {
                 continue;
             }
 
@@ -208,11 +212,26 @@ final readonly class FieldResolver
         return $field->isDehydrated() || ($field instanceof Select && $field->hasRelationship());
     }
 
+    /** `->collaborative('ability')`: whether the Gate lets this user edit the field live. */
+    private static function mayEditLive(Field $field): bool
+    {
+        $ability = $field->getMeta(self::META_KEY);
+
+        if (! is_string($ability)) {
+            return true;
+        }
+
+        $record = $field->getRecord();
+
+        return Gate::allows($ability, $record ?? $field->getModel());
+    }
+
     private function kindOf(Field $field): ?FieldKind
     {
         $condition = $field->getMeta(self::META_KEY);
 
-        if ($condition !== null && ! (bool) $field->evaluate($condition)) {
+        // A Gate ability decides per person, in `writable()`; the draft holds the field for everybody.
+        if ($condition !== null && ! is_string($condition) && ! (bool) $field->evaluate($condition)) {
             return null;
         }
 

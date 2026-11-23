@@ -91,7 +91,7 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
             app(DeletedRecords::class)->handle($event, $payload);
         });
 
-        Field::macro('collaborative', function (bool|Closure $condition = true): Field {
+        Field::macro('collaborative', function (bool|Closure|string $condition = true): Field {
             return FieldResolver::markField($this, $condition);
         });
     }

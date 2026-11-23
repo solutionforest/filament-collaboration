@@ -85,6 +85,14 @@ Nothing in your form changes. The package reads the form you already have and de
 TextInput::make('internal_notes')->collaborative(false);
 ```
 
+**Let only some people edit a field live**, with a Gate ability. The field is shared with everybody; those the Gate refuses still edit it, and their change merges on save:
+
+```php
+TextInput::make('seo_title')->collaborative('edit-seo');
+```
+
+Prefer this to a closure such as `fn () => Gate::allows(...)`: a closure decides whether the field is in the draft at all, which must be the same for everybody.
+
 **Turn a relationship field on.** Many-to-many fields are saved through the relationship, so they are off by default. Mark them to share the chosen ids:
 
 ```php
@@ -316,6 +324,20 @@ includes:
 **What is validated.** A browser may only change fields its user can edit, only with its own operation ids, and only with allow-listed rich content: attributes like `onclick`, `javascript:` links or custom block HTML never reach another browser. A picked field only accepts the options its user was offered. Field names and carets are only sent to people who can see that field.
 
 **Know this before enabling it.** A shared draft is shared: when you save, you publish what colleagues put in the fields you can edit, validated by your form. Free-text fields have no allow-list, so if only some people may change a field at all, give the others `->disabled()` or `->collaborative(false)`.
+
+**Who may edit live.** Whoever may edit a record may collaborate on it, unless your policy says otherwise with a `collaborate` ability. Those it refuses still edit the record, see who is there, and merge on save; they just do not type into the shared draft:
+
+```php
+class PostPolicy
+{
+    public function collaborate(User $user, Post $post): bool
+    {
+        return ! $user->is_reviewer;
+    }
+}
+```
+
+`Gate::define('collaborate', ...)` works too. It is checked on every sync, so withdrawing it takes effect on the next request: the page renders again without live fields. `Permissions::mayCollaborate($post)` asks the same question in your own code.
 
 **After changing roles or field access**, tell open tabs to fetch a new token:
 

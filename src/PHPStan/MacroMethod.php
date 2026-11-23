@@ -108,7 +108,7 @@ final readonly class MacroMethod implements MethodReflection
     private function parameters(): array
     {
         if ($this->name === 'collaborative') {
-            return [new MacroParameter('condition', TypeCombinator::union(new BooleanType, new ClosureType))];
+            return [new MacroParameter('condition', TypeCombinator::union(new BooleanType, new ClosureType, new StringType))];
         }
 
         return [

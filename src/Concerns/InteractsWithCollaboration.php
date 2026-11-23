@@ -24,6 +24,7 @@ use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
 use SolutionForest\FilamentCollaboration\Events\ConflictResolved;
 use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
 use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
+use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\Saving\LiveSave;
@@ -96,7 +97,8 @@ trait InteractsWithCollaboration
             return false;
         }
 
-        return CollaborationPlugin::find()?->hasLiveEditing($this->getRecord()) ?? false;
+        return (CollaborationPlugin::find()?->hasLiveEditing($this->getRecord()) ?? false)
+            && Permissions::mayCollaborate($this->getRecord());
     }
 
     #[Exposed]
