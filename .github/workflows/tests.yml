@@ -27,10 +27,10 @@ jobs:
         laravel: ['12', '13']
         filament: ['5']
         include:
-          # The oldest Filament the package supports. Its attributes differ, so PHPStan runs on Filament 5 only.
+          # The oldest Filament the package supports. It predates the `#[Exposed]` attributes (5.11), so PHPStan runs on the latest only.
           - php: '8.3'
             laravel: '12'
-            filament: '4.13.3'
+            filament: '5.8.3'
     defaults:
       run:
         working-directory: demo
