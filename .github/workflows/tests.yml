@@ -10,10 +10,15 @@ concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
 
+# Composer downloads from GitHub as this repository, not anonymously, which is rate limited.
+env:
+  COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+
 jobs:
   php:
     name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · Filament ${{ matrix.filament }}
-    runs-on: ubuntu-latest
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -37,8 +42,6 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: pdo_sqlite, intl
           coverage: pcov
-          # The tests run in demo/, but the package's code is one level up.
-          ini-values: pcov.directory=${{ github.workspace }}
 
       - name: Install Laravel ${{ matrix.laravel }} and Filament ${{ matrix.filament }}
         run: |
@@ -48,7 +51,8 @@ jobs:
       - run: cp .env.example .env && php artisan key:generate --no-interaction
 
       - name: Pest, with at least 95% coverage
-        run: vendor/bin/pest --coverage --min=95
+        # The tests run in demo/, but the package's code is one level up.
+        run: php -d pcov.directory=.. vendor/bin/pest --coverage --min=95
 
       - name: PHPStan, level 10
         if: matrix.filament == '5'
@@ -60,7 +64,8 @@ jobs:
 
   javascript:
     name: JavaScript · lint, types, tests
-    runs-on: ubuntu-latest
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +85,8 @@ jobs:
 
   browser:
     name: Browsers · ${{ matrix.browser }} · ${{ matrix.transport }}
-    runs-on: ubuntu-latest
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 30
     strategy:
       fail-fast: false

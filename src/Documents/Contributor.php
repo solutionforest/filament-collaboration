@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Documents;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Support\Data;
 
@@ -52,7 +53,7 @@ final readonly class Contributor
     public function user(): ?Authenticatable
     {
         $type = $this->type;
-        $user = is_a($type, \Illuminate\Database\Eloquent\Model::class, true) ? $type::query()->find($this->id) : null;
+        $user = is_a($type, Model::class, true) ? $type::query()->find($this->id) : null;
 
         return $user instanceof Authenticatable ? $user : null;
     }
