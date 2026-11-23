@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
+use SolutionForest\FilamentCollaboration\Comments\RecordComments;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
 use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
@@ -37,6 +38,7 @@ final readonly class DeletedRecords
         private PresenceRepository $presence,
         private SharedUploads $uploads,
         private DraftVersions $versions,
+        private RecordComments $comments,
     ) {}
 
     /**
@@ -63,11 +65,16 @@ final readonly class DeletedRecords
         }
 
         // Every deleted model passes here; only those with a room do anything.
+        $isSoft = self::isSoftDeleting($record);
+
         if (! Database::table('documents')->where('room', $room)->orWhere('parent_room', $room)->exists() && $this->presence->inRoom($room) === []) {
+            // Nobody is on it and there is no draft, but there can be comments.
+            if (! $isSoft) {
+                $record->getConnection()->afterCommit(fn () => $this->comments->forget($room));
+            }
+
             return;
         }
-
-        $isSoft = self::isSoftDeleting($record);
 
         self::cache()->put(self::KEY.$room, ['name' => Identity::current()?->name, 'soft' => $isSoft], self::REMEMBER_FOR);
 
@@ -143,6 +150,7 @@ final readonly class DeletedRecords
     {
         // The record's draft and each of its languages', with the images only they had;
         // the record's own images are the application's to delete.
+        $this->comments->forget($room);
         $documents = Database::table('documents')->where('room', $room)->orWhere('parent_room', $room)->get(['id', 'room']);
 
         foreach ($documents as $document) {

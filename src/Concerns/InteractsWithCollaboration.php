@@ -50,6 +50,7 @@ use SolutionForest\FilamentCollaboration\Support\SaveLock;
  */
 trait InteractsWithCollaboration
 {
+    use HasComments;
     use HasPresence;
     use ResolvesConflicts;
 

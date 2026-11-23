@@ -47,6 +47,20 @@ return [
         'action' => '捨棄草稿',
     ],
 
+    'comments' => [
+        'none' => '暫時未有留言。',
+        'placeholder' => '寫下留言，輸入 @ 提及其他人。',
+        'on' => '關於',
+        'whole_record' => '整份記錄',
+        'post' => '留言',
+        'resolve' => '標示為已解決',
+        'reopen' => '重新開啟',
+        'resolved' => ':name 已標示為解決',
+        'resolved_heading' => '已解決（:count）',
+        'mentioned' => ':name 在「:record」提及你',
+        'view' => '查看',
+    ],
+
     'panel' => [
         'label' => '留言與歷史',
         'heading' => '留言與歷史',

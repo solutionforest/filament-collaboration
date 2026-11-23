@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Models\User;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -14,6 +15,7 @@ use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -32,6 +34,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->brandName('Fieldnotes CMS')
             ->login()
+            ->databaseNotifications()
             ->plugin(
                 CollaborationPlugin::make()
                     // The demo separates workspaces by a column rather than Filament tenancy.
@@ -39,7 +42,9 @@ class AdminPanelProvider extends PanelProvider
                     ->debug(fn (): bool => app()->environment('local'))
                     ->reportEditorErrors(fn (): bool => app()->environment('local'))
                     // Pushed over Reverb when it is configured; polling otherwise.
-                    ->broadcasting(fn (): bool => config('broadcasting.default') === 'reverb'),
+                    ->broadcasting(fn (): bool => config('broadcasting.default') === 'reverb')
+                    // Colleagues in the same workspace can be @mentioned in comments, and get a notification.
+                    ->mentionable(fn (): Builder => User::query()->where('workspace_id', auth()->user()?->workspace_id)),
             )
             ->plugin(SpatieTranslatablePlugin::make()->defaultLocales(['en', 'zh_HK'])->persist())
             ->colors([
