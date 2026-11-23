@@ -765,7 +765,17 @@ describe('saving', () => {
         await together()
 
         const renewed = new Set()
-        const watch = (name) => (response) => response.url().includes('_collaboration/sync') && response.status() === 410 && renewed.add(name)
+        const resumed = new Set()
+        // A request already in flight can be refused too, so wait for a sync that works again after it.
+        const watch = (name) => (response) => {
+            if (!response.url().includes('_collaboration/sync')) return
+            if (response.status() === 410) {
+                renewed.add(name)
+                resumed.delete(name)
+            } else if (response.ok() && renewed.has(name)) {
+                resumed.add(name)
+            }
+        }
         const watchers = [[alice, watch('alice')], [bob, watch('bob')]]
         const known = app.problems.length
 
@@ -778,6 +788,7 @@ describe('saving', () => {
 
         // Both renew; with Reverb, Bob only asks at his next heartbeat, up to 8 seconds later.
         await eventually(async () => assert.deepEqual([...renewed].sort(), ['alice', 'bob']), 'the old token was still accepted', 15000)
+        await eventually(async () => assert.deepEqual([...resumed].sort(), ['alice', 'bob']), 'a renewed token was not used', 15000)
 
         for (const [page, handler] of watchers) page.off('response', handler)
         app.problems.length = known
@@ -1201,8 +1212,12 @@ describe('websockets', { skip: process.env.TRANSPORT !== 'reverb' && 'set TRANSP
 })
 
 test('there were no browser errors or failed requests', () => {
-    // WebKit reports a fetch cancelled by leaving the page as an error.
-    const problems = app.problems.filter((problem) => !/Fetch API cannot load http:\/\/127\.0\.0\.1:\d+\/\S+ due to access control checks/.test(problem))
+    // WebKit reports a fetch cancelled by leaving the page as an error, and Livewire leaves that rejection unhandled.
+    const problems = app.problems.filter(
+        (problem) =>
+            !/Fetch API cannot load http:\/\/127\.0\.0\.1:\d+\/\S+ due to access control checks/.test(problem) &&
+            !/^\w+: Unhandled Promise Rejection: TypeError: Load failed\n\s+at sendRequest \(\S+\/livewire\.js/.test(problem),
+    )
 
     assert.deepEqual(problems, [])
 })
