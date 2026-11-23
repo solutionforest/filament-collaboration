@@ -307,7 +307,7 @@ trait InteractsWithCollaboration
 
         $saved = $this->getCollaborationSavedValues() ?? $theirs;
 
-        $documents->markSaved(
+        $contributors = $documents->markSaved(
             $room,
             $this->isCollaborationLive() ? $this->getSharedFields($saved) : [],
             $live->snapshot,
@@ -315,6 +315,7 @@ trait InteractsWithCollaboration
             $overwritten,
             Identity::current()->name ?? __('filament-collaboration::collaboration.someone'),
             $this->collaborationClient,
+            Filament::auth()->user(),
         );
 
         app(SharedUploads::class)->release($room);
@@ -330,8 +331,8 @@ trait InteractsWithCollaboration
             $this->collaborationSettled = [];
         }
 
-        if ($live->fields !== []) {
-            event(new SharedDraftSaved($this->getRecord(), Filament::auth()->user(), $live->fields));
+        if ($live->fields !== [] || $contributors !== []) {
+            event(new SharedDraftSaved($this->getRecord(), Filament::auth()->user(), $live->fields, $contributors));
         }
     }
 

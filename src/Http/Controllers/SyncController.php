@@ -103,7 +103,7 @@ final readonly class SyncController
 
         try {
             if ($context->mode === PresenceMode::Editing && $context->fields !== []) {
-                $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed);
+                $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed, Filament::auth()->user());
             }
         } catch (InvalidOperation $exception) {
             return new JsonResponse(['error' => 'rejected', 'message' => $exception->getMessage()], 409);
@@ -229,6 +229,7 @@ final readonly class SyncController
                 Data::list($resume['batches'] ?? null),
                 array_intersect_key($context->fields, $earlier->fields),
                 $context->allowed,
+                Filament::auth()->user(),
             );
         } catch (InvalidOperation) {
             return false;

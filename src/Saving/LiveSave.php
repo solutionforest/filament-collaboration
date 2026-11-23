@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SolutionForest\FilamentCollaboration\Saving;
 
+use Filament\Facades\Filament;
 use SolutionForest\FilamentCollaboration\Crdt\Document;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
@@ -37,7 +38,7 @@ final readonly class LiveSave
             return new self;
         }
 
-        $snapshot = $documents->snapshot($room, $client, Data::int($sync['epoch'] ?? null), Data::list($sync['batches'] ?? null), $writable, $allowed);
+        $snapshot = $documents->snapshot($room, $client, Data::int($sync['epoch'] ?? null), Data::list($sync['batches'] ?? null), $writable, $allowed, Filament::auth()->user());
 
         if ($snapshot === null) {
             return new self;

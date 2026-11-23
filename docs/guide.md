@@ -127,10 +127,38 @@ This works for deletions anywhere in your app that go through Eloquent, not only
 
 | Event | When | Has |
 | --- | --- | --- |
-| `SharedDraftSaved` | a save published the shared draft | `record`, `user`, `fields` |
+| `SharedDraftSaved` | a save published the shared draft | `record`, `user`, `fields`, `contributors` |
 | `ChangesMerged` | a save took someone else's changes in fields this user did not touch | `record`, `user`, `fields`, `theirName` |
 | `ConflictDetected` | a save stopped to ask which value to keep | `record`, `user`, `fields`, `theirName` |
 | `ConflictResolved` | the user chose in the conflict dialog | `record`, `user`, `choices` |
+
+### Auditing who changed what
+
+A save publishes what colleagues typed too, so an audit that only records who pressed Save credits them with everybody's work. `SharedDraftSaved` says who changed each field since it was last saved:
+
+```php
+use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
+
+Event::listen(function (SharedDraftSaved $event): void {
+    $event->user;               // who pressed Save
+    $event->contributorNames(); // ['title' => ['Alice Chen', 'Bob Martinez'], 'excerpt' => ['Bob Martinez']]
+    $event->contributors();     // each person once, as Contributor: type, id, name, at, user()
+});
+```
+
+With [`spatie/laravel-activitylog`](https://github.com/spatie/laravel-activitylog):
+
+```php
+Event::listen(function (SharedDraftSaved $event): void {
+    activity()
+        ->performedOn($event->record)
+        ->causedBy($event->user)
+        ->withProperties(['contributors' => $event->contributorNames()])
+        ->log('saved the shared draft');
+});
+```
+
+With [`owen-it/laravel-auditing`](https://github.com/owen-it/laravel-auditing), add the names to the audit the save creates, in the model's `transformAudit()`, or record a custom audit from the same listener.
 
 ## 4. Presence in tables and modals
 
