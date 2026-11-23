@@ -39,8 +39,17 @@ final class RoomNotifier
      * @param  list<array{sequence: int, operations: list<array<string, mixed>>}>  $updates
      * @param  list<string>  $dirty
      */
-    public function documentChanged(string $room, int $epoch, array $updates, array $dirty): void
+    public function documentChanged(string $room, int $epoch, array $updates, array $dirty, ?string $parent = null): void
     {
+        // One language's draft in a translated record's room: its tabs fetch it, the others ignore it.
+        if ($parent !== null) {
+            $this->collect($parent, static function (RoomChanges $changes): void {
+                $changes->hasDocumentChanged = true;
+            });
+
+            return;
+        }
+
         $this->collect($room, static function (RoomChanges $changes) use ($epoch, $updates, $dirty): void {
             $changes->epoch = $epoch;
             array_push($changes->updates, ...$updates);

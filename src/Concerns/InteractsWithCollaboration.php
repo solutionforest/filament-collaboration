@@ -32,6 +32,7 @@ use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
 use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
 use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
+use SolutionForest\FilamentCollaboration\Rooms\RoomContext;
 use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\Saving\LiveSave;
 use SolutionForest\FilamentCollaboration\Support\Data;
@@ -62,6 +63,10 @@ trait InteractsWithCollaboration
     #[Locked]
     public bool $collaborationMounted = false;
 
+    /** The language whose draft this page is on, on a page with a locale switcher. */
+    #[Locked]
+    public ?string $collaborationLocale = null;
+
     protected bool $collaborationHasSaved = false;
 
     public function mountInteractsWithCollaboration(): void
@@ -71,6 +76,20 @@ trait InteractsWithCollaboration
         }
 
         $this->collaborationMounted = true;
+        $this->openCollaborationDraft();
+    }
+
+    /** Switching language moves the page to that language's draft. */
+    public function renderingInteractsWithCollaboration(): void
+    {
+        if ($this->collaborationMounted && $this->getCollaborationLocale() !== $this->collaborationLocale) {
+            $this->openCollaborationDraft();
+        }
+    }
+
+    protected function openCollaborationDraft(): void
+    {
+        $this->collaborationLocale = $this->getCollaborationLocale();
         $this->collaborationBase = $this->getCollaborationFormValues();
 
         if (! $this->isCollaborationLive()) {
@@ -98,11 +117,6 @@ trait InteractsWithCollaboration
 
     protected function isCollaborationLive(): bool
     {
-        // A locale switcher fills one form with different languages; those must not share a draft.
-        if (property_exists(static::class, 'activeLocale')) {
-            return false;
-        }
-
         return (CollaborationPlugin::find()?->hasLiveEditing($this->getRecord()) ?? false)
             && Permissions::mayCollaborate($this->getRecord());
     }
@@ -338,6 +352,7 @@ trait InteractsWithCollaboration
         $publishing = $this->fromSharedValues($live->valuesToPublish($this->toSharedValues($mine), $this->toSharedValues($theirs)), $theirs);
         $typed = FormState::only($mine, array_map(strval(...), array_keys($publishing)));
         $this->writeCollaborationValues($publishing);
+        $this->forgetOtherLanguagesLiveFields($writable);
 
         try {
             $save();
@@ -399,9 +414,39 @@ trait InteractsWithCollaboration
         }
     }
 
+    /** The shared draft's room: with a locale switcher, one draft per language. */
     protected function getCollaborationRoom(): string
     {
-        return app(RoomResolver::class)->forRecord($this->getRecord());
+        return RoomContext::draftFor(app(RoomResolver::class)->forRecord($this->getRecord()), $this->getCollaborationLocale());
+    }
+
+    /**
+     * A locale switcher keeps what this page last had in each other language,
+     * and saves it too. A live field's other languages are in their own shared
+     * drafts, so saving this page's old copy would undo colleagues' work there.
+     *
+     * @param  array<string, FieldKind>  $live
+     */
+    protected function forgetOtherLanguagesLiveFields(array $live): void
+    {
+        $record = $this->getRecord();
+
+        if (! property_exists($this, 'otherLocaleData') || ! is_array($this->otherLocaleData) || ! method_exists($record, 'getTranslation')) {
+            return;
+        }
+
+        // What is stored stays stored: those languages' drafts are saved from their own pages.
+        foreach ($this->otherLocaleData as $locale => $data) {
+            if (! is_array($data)) {
+                continue;
+            }
+
+            foreach (array_keys(array_intersect_key($data, $live)) as $field) {
+                $data[$field] = $record->getTranslation((string) $field, (string) $locale, false);
+            }
+
+            $this->otherLocaleData[$locale] = $data;
+        }
     }
 
     /** @return array<string, FieldKind> */
@@ -490,9 +535,18 @@ trait InteractsWithCollaboration
         $record->unsetRelations();
 
         $typed = $this->data;
+        $attributes = $record->attributesToArray();
+        $locale = $this->getCollaborationLocale();
+
+        // Translated attributes in the language being edited, as the locale switcher fills them.
+        if ($locale !== null && method_exists($record, 'getTranslatableAttributes') && method_exists($record, 'getTranslation')) {
+            foreach (Data::strings($record->getTranslatableAttributes()) as $attribute) {
+                $attributes[$attribute] = $record->getTranslation($attribute, $locale, false);
+            }
+        }
 
         try {
-            $this->form->fill($this->mutateFormDataBeforeFill($record->attributesToArray()));
+            $this->form->fill($this->mutateFormDataBeforeFill($attributes));
 
             return $this->getCollaborationFormValues();
         } finally {
@@ -506,6 +560,7 @@ trait InteractsWithCollaboration
 
         if ($theirs !== null) {
             app(DocumentRepository::class)->reconcile($this->getCollaborationRoom(), $this->getSharedFields($theirs));
+            app(DocumentRepository::class)->link($this->getCollaborationRoom(), app(RoomResolver::class)->forRecord($this->getRecord()));
         }
     }
 

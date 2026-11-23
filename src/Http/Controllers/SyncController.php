@@ -114,7 +114,7 @@ final readonly class SyncController
 
         try {
             if ($context->mode === PresenceMode::Editing && $context->fields !== []) {
-                $changed = $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed, $user = Filament::auth()->user());
+                $changed = $this->documents->receive($context->draft(), $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed, $user = Filament::auth()->user());
                 $this->audit($context, $access->record, $user, $changed);
             }
         } catch (InvalidOperation $exception) {
@@ -150,7 +150,7 @@ final readonly class SyncController
         $update = $context->key === null
             ? new DraftUpdate
             : $this->documents->changesSince(
-                $context->room,
+                $context->draft(),
                 $context->client,
                 $epoch,
                 Data::int($input['since'] ?? null, -1),
@@ -243,7 +243,7 @@ final readonly class SyncController
 
         try {
             $changed = $this->documents->receive(
-                $context->room,
+                $context->draft(),
                 $earlier->client,
                 Data::int($resume['epoch'] ?? null),
                 Data::list($resume['batches'] ?? null),

@@ -19,6 +19,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use LaraZeus\SpatieTranslatable\SpatieTranslatablePlugin;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 
 class AdminPanelProvider extends PanelProvider
@@ -40,6 +41,7 @@ class AdminPanelProvider extends PanelProvider
                     // Pushed over Reverb when it is configured; polling otherwise.
                     ->broadcasting(fn (): bool => config('broadcasting.default') === 'reverb'),
             )
+            ->plugin(SpatieTranslatablePlugin::make()->defaultLocales(['en', 'zh_HK'])->persist())
             ->colors([
                 'primary' => Color::Amber,
             ])

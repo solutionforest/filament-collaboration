@@ -29,7 +29,15 @@ function scan() {
 
         if (moved) rooms.delete(moved[0])
 
-        const room = known?.room ?? moved?.[1].room
+        // Switching language on a translated page: another draft, so another room in this tab.
+        if (known && known.room.config.draft !== config.draft) {
+            known.room.destroy()
+            rooms.delete(el)
+        }
+
+        const reusable = known && rooms.has(el) ? known : null
+        const movedRoom = moved && moved[1].room.config.draft === config.draft ? moved[1].room : (moved?.[1].room.destroy(), null)
+        const room = reusable?.room ?? movedRoom
         const component = el.closest('[wire\\:id]')
 
         // Livewire starts after this script; a room needs its component's state.

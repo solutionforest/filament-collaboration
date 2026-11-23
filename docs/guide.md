@@ -114,7 +114,9 @@ A field the package does not know, such as a third-party editor, merges on save.
 - **Lock it while somebody is in it**, so two people never change it at once: `->lockWhileEditing()` on the field, or `CollaborationPlugin::make()->lockWhileEditing()` for every field that cannot be live (`->lockWhileEditing(false)` exempts one). The field is read-only for the others until that person leaves it or goes idle.
 - **Share its whole value live** with `->collaborative()`: the latest change wins, through Livewire state, so most editors update for everybody without any code. For merging by character and carets, write an [adapter](#adapters-for-other-editors).
 
-Pages with a locale switcher (translatable content) and date pickers with a personal timezone always merge on save, because their state differs per person.
+**Translated pages** (a locale switcher, such as `lara-zeus/spatie-translatable`'s) are live too, with one shared draft per language. Everybody on the record is in one room and sees each other, while English typing stays in the English draft and Chinese in the Chinese one. Switching language moves your page to that language's draft, including colleagues' unsaved typing there. Saving publishes the language you are on; the others keep what is stored, and their drafts are saved from their own language.
+
+Date pickers with a personal timezone always merge on save, because their state differs per person.
 
 ## 3. Saving, drafts and conflicts
 

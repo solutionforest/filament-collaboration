@@ -33,6 +33,14 @@ final class DocumentRepository
         private readonly SharedUploads $uploads,
     ) {}
 
+    /** Records that a draft is one language of a record's room. */
+    public function link(string $draft, string $room): void
+    {
+        if ($draft !== $room) {
+            Database::table('documents')->where('room', $draft)->whereNull('parent_room')->update(['parent_room' => $room]);
+        }
+    }
+
     public function exists(string $room): bool
     {
         return Database::table('documents')->where('room', $room)->exists();
@@ -480,7 +488,7 @@ final class DocumentRepository
 
         // After the commit, so whoever is told can already read the change.
         if ($changed !== null) {
-            $this->notifier->documentChanged($room, $changed->epoch, $changed->appended, $changed->dirty);
+            $this->notifier->documentChanged($room, $changed->epoch, $changed->appended, $changed->dirty, $changed->parentRoom);
         }
 
         return $result;

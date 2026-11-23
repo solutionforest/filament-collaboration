@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Document;
+use App\Models\Page;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -10,6 +11,19 @@ use Illuminate\Support\Facades\Hash;
 /** Editors and articles only. Presence is never seeded: it comes from real sessions. */
 class DatabaseSeeder extends Seeder
 {
+    /** Translated pages, for editing two languages at once. */
+    private function pages(): void
+    {
+        Page::query()->updateOrCreate(['slug' => 'about'], [
+            'title' => ['en' => 'About Fieldnotes', 'zh_HK' => '關於 Fieldnotes'],
+            'summary' => ['en' => 'Who we are and what we write about.', 'zh_HK' => '我們是誰，寫些甚麼。'],
+        ]);
+        Page::query()->updateOrCreate(['slug' => 'contact'], [
+            'title' => ['en' => 'Contact us', 'zh_HK' => '聯絡我們'],
+            'summary' => ['en' => 'Write to the newsroom.', 'zh_HK' => '寫信給編輯部。'],
+        ]);
+    }
+
     private const FIRST_NAMES = ['Ava', 'Noah', 'Mia', 'Leo', 'Zoe', 'Kai', 'Ivy', 'Omar', 'Luna', 'Ezra', 'Nina', 'Hugo', 'Vera', 'Jude', 'Chloe', 'Finn', 'Nora', 'Theo', 'Ruby', 'Ari'];
 
     private const LAST_NAMES = ['Wong', 'Patel', 'Kim', 'Rossi', 'Silva', 'Cohen', 'Park', 'Diaz', 'Singh', 'Berg', 'Walsh', 'Sato', 'Novak', 'Costa', 'Ali', 'Lau', 'Yip', 'Moreau', 'Haddad'];
@@ -31,6 +45,8 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->pages();
+
         $password = Hash::make('password');
         $editors = [];
 

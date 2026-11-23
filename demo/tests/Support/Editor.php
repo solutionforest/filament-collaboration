@@ -35,6 +35,13 @@ class Editor
             ? DocumentResource::getUrl($page)
             : DocumentResource::getUrl($page, ['record' => $article]);
 
+        return self::openUrl($test, $user, $url);
+    }
+
+    /** Any page with a room, such as a translated page in one language. */
+    public static function openUrl(TestCase $test, User $user, string $url): self
+    {
+        $editor = new self($test, $user);
         $html = (string) $test->actingAs($user)->get($url)->assertOk()->getContent();
 
         if (preg_match('/data-collaboration="([^"]+)"/', $html, $match) !== 1) {

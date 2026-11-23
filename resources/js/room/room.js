@@ -51,6 +51,9 @@ export class Room {
     /** @type {Timer | undefined} */
     renderTimer
     syncing = false
+    /** The `data-collaboration` this room last checked, and whether it named another draft. */
+    source = ''
+    stale = false
     /** @type {AbortController | undefined} */
     events
     /** @type {string | undefined} what `collaborationSync` was last set to */
@@ -263,9 +266,29 @@ export class Room {
     }
 
     collect() {
-        if (this.stopped || !this.document) return
+        if (this.stopped || !this.document || this.isStale()) return
 
         this.bindings.forEach((binding) => binding.collect())
+    }
+
+    /**
+     * The page moved to another draft, such as another language, and its
+     * form already holds that draft's values: they must not reach this one.
+     */
+    isStale() {
+        const source = this.el.dataset.collaboration ?? ''
+
+        if (source === this.source) return this.stale
+
+        this.source = source
+
+        try {
+            this.stale = JSON.parse(source).draft !== this.config.draft
+        } catch {
+            this.stale = false
+        }
+
+        return this.stale
     }
 
     /**
@@ -276,7 +299,7 @@ export class Room {
      * @param {any} caret see `Document.changes()`
      */
     change(field, value, caret = null) {
-        if (this.stopped || !this.document) return
+        if (this.stopped || !this.document || this.isStale()) return
 
         const operations = this.document.changes(field, value, this.config.client, caret)
 

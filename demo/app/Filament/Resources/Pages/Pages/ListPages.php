@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Filament\Resources\Pages\Pages;
+
+use App\Filament\Resources\Pages\PageResource;
+use Filament\Resources\Pages\ListRecords;
+use LaraZeus\SpatieTranslatable\Actions\LocaleSwitcher;
+use LaraZeus\SpatieTranslatable\Resources\Pages\ListRecords\Concerns\Translatable;
+use SolutionForest\FilamentCollaboration\Concerns\HasPresence;
+
+class ListPages extends ListRecords
+{
+    use HasPresence;
+    use Translatable;
+
+    protected static string $resource = PageResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [LocaleSwitcher::make()];
+    }
+}

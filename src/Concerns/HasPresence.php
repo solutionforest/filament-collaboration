@@ -47,6 +47,7 @@ trait HasPresence
             locks: $this->getCollaborationLocks(),
             adapters: $this->getCollaborationAdapters(),
             uploads: $this->getCollaborationUploads(),
+            locale: $this->getCollaborationLocale(),
         );
 
         return $view?->render() ?? '';
@@ -113,6 +114,14 @@ trait HasPresence
     protected function getCollaborationUploads(): array
     {
         return [];
+    }
+
+    /** The language being edited, on a page with a locale switcher. */
+    protected function getCollaborationLocale(): ?string
+    {
+        $locale = property_exists($this, 'activeLocale') ? $this->activeLocale : null;
+
+        return is_string($locale) && $locale !== '' ? $locale : null;
     }
 
     protected function canPullCollaborationChanges(): bool

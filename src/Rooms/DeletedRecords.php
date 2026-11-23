@@ -61,7 +61,7 @@ final readonly class DeletedRecords
         }
 
         // Every deleted model passes here; only those with a room do anything.
-        if (! Database::table('documents')->where('room', $room)->exists() && $this->presence->inRoom($room) === []) {
+        if (! Database::table('documents')->where('room', $room)->orWhere('parent_room', $room)->exists() && $this->presence->inRoom($room) === []) {
             return;
         }
 
@@ -139,14 +139,15 @@ final readonly class DeletedRecords
 
     private function forget(string $room): void
     {
-        // Images that only the draft had; the record's own are the application's to delete.
-        $this->uploads->discard($room);
+        // The record's draft and each of its languages', with the images only they had;
+        // the record's own images are the application's to delete.
+        $documents = Database::table('documents')->where('room', $room)->orWhere('parent_room', $room)->get(['id', 'room']);
 
-        $document = Database::table('documents')->where('room', $room)->value('id');
-
-        if ($document !== null) {
-            Database::table('updates')->where('document_id', $document)->delete();
-            Database::table('documents')->where('id', $document)->delete();
+        foreach ($documents as $document) {
+            $document = Data::map($document);
+            $this->uploads->discard(Data::string($document['room'] ?? null));
+            Database::table('updates')->where('document_id', $document['id'] ?? null)->delete();
+            Database::table('documents')->where('id', $document['id'] ?? null)->delete();
         }
     }
 

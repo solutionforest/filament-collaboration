@@ -913,6 +913,43 @@ describe('live uploads', () => {
     })
 })
 
+describe('translated pages', () => {
+    const switchTo = (page, locale) =>
+        page.evaluate((locale) => {
+            const id = document.querySelector('.fi-page').closest('[wire\\:id]').getAttribute('wire:id')
+
+            return window.Livewire.find(id).$set('activeLocale', locale)
+        }, locale)
+    const waitLive = (page) =>
+        page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length && room.fields.every(([, , state]) => state.startsWith('live'))), undefined, { timeout: 20000 })
+
+    test('two languages are edited at once, each in its own draft, by people who see each other', async () => {
+        for (const page of [alice, bob]) {
+            await page.goto(`${app.base}/admin/pages/1/edit`)
+            await waitLive(page)
+        }
+
+        await switchTo(bob, 'zh_HK')
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), /[\u4e00-\u9fff]/), 'Bob is not on Chinese')
+        await waitLive(bob)
+
+        await eventually(async () => assert.ok(await alice.locator('.fi-collab-stack .fi-collab-avatar').count()), 'Alice does not see Bob')
+
+        await caret(bob, field(bob, 'title'), -1)
+        await bob.keyboard.type('（草稿）')
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' (draft)')
+
+        await bob.waitForTimeout(1500)
+        assert.doesNotMatch(await field(alice, 'title').inputValue(), /草稿/, 'Chinese typing reached the English draft')
+        assert.doesNotMatch(await field(bob, 'title').inputValue(), /draft/, 'English typing reached the Chinese draft')
+
+        // Alice switches to Chinese, and finds Bob's unsaved typing.
+        await switchTo(alice, 'zh_HK')
+        await eventually(async () => assert.match(await field(alice, 'title').inputValue(), /（草稿）$/), 'Alice did not get the Chinese draft', 15000)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()
