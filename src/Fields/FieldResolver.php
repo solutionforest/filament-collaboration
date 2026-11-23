@@ -19,6 +19,7 @@ use ReflectionFunction;
 use ReflectionNamedType;
 use ReflectionObject;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
 use SolutionForest\FilamentCollaboration\Support\FormState;
@@ -30,6 +31,8 @@ final readonly class FieldResolver
     public const META_KEY = 'collaborative';
 
     public const LOCK_META_KEY = 'collaborationLock';
+
+    public const ADAPTER_META_KEY = 'collaborationAdapter';
 
     private const MAX_OPTIONS = 500;
 
@@ -47,6 +50,53 @@ final readonly class FieldResolver
         }
 
         return $field->meta(self::META_KEY, $condition);
+    }
+
+    /**
+     * `->collaborative(adapter: 'tinymce', as: FieldKind::RichText)`: edit this
+     * field through a JavaScript adapter.
+     */
+    public static function markAdapter(Field $field, string $adapter, FieldKind $kind): Field
+    {
+        return $field->meta(self::ADAPTER_META_KEY, [$adapter, $kind]);
+    }
+
+    /**
+     * The JavaScript adapter each live field is edited through, if any.
+     *
+     * @param  array<string, FieldKind>  $live
+     * @return array<string, string>
+     */
+    public function adapters(Schema $schema, array $live): array
+    {
+        $adapters = [];
+
+        foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
+            $path = (string) $path;
+
+            if (isset($live[$path]) && ($adapter = $this->adapterOf($field)) !== null) {
+                $adapters[$path] = $adapter;
+            }
+        }
+
+        return $adapters;
+    }
+
+    private function adapterOf(Field $field): ?string
+    {
+        $marked = $field->getMeta(self::ADAPTER_META_KEY);
+
+        if (is_array($marked) && is_string($marked[0] ?? null)) {
+            return $marked[0];
+        }
+
+        foreach ($this->types as $type) {
+            if ($type->supports($field)) {
+                return $type instanceof UsesAdapter ? $type->getAdapter($field) : null;
+            }
+        }
+
+        return null;
     }
 
     /** Backs the `lockWhileEditing()` method on every field. */
@@ -267,6 +317,12 @@ final readonly class FieldResolver
         // A Gate ability decides per person, in `writable()`; the draft holds the field for everybody.
         if ($condition !== null && ! is_string($condition) && ! (bool) $field->evaluate($condition)) {
             return null;
+        }
+
+        $marked = $field->getMeta(self::ADAPTER_META_KEY);
+
+        if (is_array($marked) && ($marked[1] ?? null) instanceof FieldKind) {
+            return $marked[1];
         }
 
         foreach ($this->types as $type) {

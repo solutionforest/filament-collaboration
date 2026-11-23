@@ -1,5 +1,7 @@
 import '../css/collaboration.css'
 import { Room } from './room/room.js'
+import { registerAdapter } from './adapters/registry.js'
+import { registerFilamentAdapters } from './adapters/filament.js'
 import { renderInspector } from './ui/inspector.js'
 
 /** @type {Map<HTMLElement, {source: string, room: Room}>} */
@@ -58,7 +60,13 @@ function boot() {
 
     window.filamentCollaboration = {
         inspect: () => [...rooms.values()].map(({ room }) => room.inspect()),
+        registerAdapter,
     }
+
+    registerFilamentAdapters(registerAdapter)
+
+    // For adapters loaded before this script: they wait for this event.
+    window.dispatchEvent(new CustomEvent('filament-collaboration:init', { detail: window.filamentCollaboration }))
 
     setInterval(scan, 250)
     document.addEventListener('livewire:navigated', scan)

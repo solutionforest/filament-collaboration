@@ -397,6 +397,66 @@ CollaborationPlugin::make()->fieldTypes([new StarRatingType]);
 
 For a picker, `ValueType::make([StarRating::class])` does the same without a class of your own.
 
+### Adapters for other editors
+
+A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions. Filament's `MarkdownEditor` and `CodeEditor` are live through the adapters it ships, in `resources/js/adapters/filament.js`.
+
+**1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:
+
+```php
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\FilamentCollaboration\Fields\Types\AdapterType;
+
+CollaborationPlugin::registerFieldTypes(
+    AdapterType::make([TinyEditor::class], adapter: 'tinymce', kind: FieldKind::RichText),
+);
+```
+
+An app can also name the adapter on one field: `TinyEditor::make('body')->collaborative(adapter: 'tinymce', as: FieldKind::RichText)`.
+
+| Kind | Adapter `format` | Merges |
+| --- | --- | --- |
+| `FieldKind::Text` | `text`: a string | by character |
+| `FieldKind::RichText` | `html`: an HTML string | by character, block and mark; see [HTML editors](#html-editors) |
+| `FieldKind::Value` | `value`: any JSON | the latest change wins |
+
+**2. Register the adapter**, in JavaScript loaded on the panel:
+
+```js
+function register({ registerAdapter }) {
+    registerAdapter('my-editor', {
+        format: 'text',
+        attach({ element, changed, moved }) {
+            const editor = MyEditor.instanceIn(element) // however your editor is found
+
+            if (!editor) return null // not ready yet: asked again shortly
+
+            editor.on('change', changed)
+            editor.on('selectionchange', moved)
+
+            return {
+                read: () => editor.getText(),
+                write: (text) => editor.setText(text), // better: change only what differs; see minimalChange()
+                selection: () => editor.getSelection(), // { anchor, head }, UTF-16 offsets into read()
+                setSelection: ({ anchor, head }) => editor.select(anchor, head),
+                caretRect: (offset) => editor.coordsAt(offset), // a DOMRect, for other people's carets
+                isFocused: () => editor.hasFocus(),
+                destroy: () => editor.off('change', changed),
+            }
+        },
+    })
+}
+
+window.filamentCollaboration
+    ? register(window.filamentCollaboration)
+    : window.addEventListener('filament-collaboration:init', (event) => register(event.detail), { once: true })
+```
+
+Only `read` and `write` are required; without the selection methods, edits still merge but carets are not kept or shown. Write only what differs, so the editor keeps its own undo history: `minimalChange(old, next)` in `resources/js/adapters/registry.js` gives the range to replace.
+
+If the adapter is missing, or throws, the field simply merges on save as before.
+
 **Your own presence storage.** Presence is stored in the database by default. Bind your own implementation of `Contracts\PresenceRepository`, for example on Redis, in a service provider.
 
 ## 10. Debugging

@@ -45,6 +45,7 @@ trait HasPresence
             canPull: $this->canPullCollaborationChanges(),
             allowed: $this->getCollaborationAllowedValues(),
             locks: $this->getCollaborationLocks(),
+            adapters: $this->getCollaborationAdapters(),
         );
 
         return $view?->render() ?? '';
@@ -97,6 +98,12 @@ trait HasPresence
 
     /** @return list<string> */
     protected function getCollaborationLocks(): array
+    {
+        return [];
+    }
+
+    /** @return array<string, string> */
+    protected function getCollaborationAdapters(): array
     {
         return [];
     }

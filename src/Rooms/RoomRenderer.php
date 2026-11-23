@@ -28,6 +28,7 @@ final readonly class RoomRenderer
      * @param  list<string>  $reactive  live fields that rerender the form when they change
      * @param  array<string, list<string>>  $allowed
      * @param  list<string>  $locks  fields that are read-only for others while somebody is in them
+     * @param  array<string, string>  $adapters  the JavaScript adapter each live field is edited through
      */
     public function render(
         PresenceMode $mode,
@@ -42,6 +43,7 @@ final readonly class RoomRenderer
         bool $canPull = false,
         array $allowed = [],
         array $locks = [],
+        array $adapters = [],
     ): ?View {
         $plugin = CollaborationPlugin::find();
         $panel = Filament::getCurrentOrDefaultPanel();
@@ -89,6 +91,7 @@ final readonly class RoomRenderer
                 'fields' => (object) array_map(static fn (FieldKind $kind): string => $kind->value, $fields),
                 'labels' => (object) $labels,
                 'locks' => array_values(array_intersect($locks, array_keys($labels))),
+                'adapters' => (object) array_intersect_key($adapters, $fields),
                 'reactive' => $reactive,
                 'canPull' => $canPull,
                 'interval' => $plugin->getPollingInterval(),

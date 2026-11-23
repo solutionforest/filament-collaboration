@@ -6,7 +6,10 @@ use App\Models\Document;
 use App\Models\User;
 use Filament\Forms\Components\Builder as BlockBuilder;
 use Filament\Forms\Components\Builder\Block;
+use Filament\Forms\Components\CodeEditor;
+use Filament\Forms\Components\CodeEditor\Enums\Language;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\MarkdownEditor;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -73,6 +76,13 @@ class DocumentForm
                                 ])
                                 ->addActionLabel('Add to sidebar'),
                         ]),
+                    Section::make('More editors')
+                        ->description("Filament's Markdown and code editors, live through the adapters the package ships.")
+                        ->schema([
+                            MarkdownEditor::make('newsletter_markdown')->label('Newsletter blurb (Markdown)'),
+                            CodeEditor::make('embed_code')->label('Custom embed (HTML)')->language(Language::Html),
+                        ])
+                        ->collapsible(),
                     Section::make('SEO')
                         ->schema([
                             TextInput::make('seo_title')->label('Meta title')->maxLength(70)

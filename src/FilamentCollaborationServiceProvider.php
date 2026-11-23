@@ -20,6 +20,7 @@ use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Commands\PruneUploadsCommand;
 use SolutionForest\FilamentCollaboration\Commands\RefreshPermissionsCommand;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
+use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
@@ -91,8 +92,10 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
             app(DeletedRecords::class)->handle($event, $payload);
         });
 
-        Field::macro('collaborative', function (bool|Closure|string $condition = true): Field {
-            return FieldResolver::markField($this, $condition);
+        Field::macro('collaborative', function (bool|Closure|string $condition = true, ?string $adapter = null, FieldKind $as = FieldKind::Text): Field {
+            $field = FieldResolver::markField($this, $condition);
+
+            return $adapter === null ? $field : FieldResolver::markAdapter($field, $adapter, $as);
         });
 
         Field::macro('lockWhileEditing', function (bool $condition = true): Field {
