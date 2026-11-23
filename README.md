@@ -185,7 +185,7 @@ Presence storage is behind `Contracts\PresenceRepository`; bind your own, for ex
 | `TextInput` (text, search, tel, url), `Textarea` | characters |
 | `RichEditor` without custom blocks, mentions or plugins | characters, blocks and formatting |
 | `Select`, `Toggle`, `Checkbox`, `CheckboxList`, `Radio`, `ToggleButtons`, `TagsInput`, `DateTimePicker`, `ColorPicker`, `Slider`, masked, email and number inputs | latest value |
-| `Repeater` and `Builder` whose items hold simple fields | items: adding, removing and moving merge; each sub-field takes the latest value |
+| `Repeater` and `Builder` whose items hold simple fields | items: adding, removing and moving merge; text inputs and textareas inside items merge by character, with carets; other sub-fields take the latest value |
 | Many-to-many selects and checkbox lists | merge on save, unless marked `collaborative()` |
 | Passwords, uploads, repeaters holding uploads, rich text or nested repeaters, Markdown and code editors, hidden and disabled fields | merge on save |
 
@@ -262,9 +262,9 @@ Pushes make changes 6 to 20 times faster everywhere. A room where most people re
 ```bash
 cd demo
 composer install && npm install
-vendor/bin/pest                # 198 tests: the package and the demo
+vendor/bin/pest                # 208 tests: the package and the demo
 vendor/bin/phpstan analyse     # level 10, package included
-npm run test:e2e               # 38 scenarios in real browsers; BROWSER=webkit for Safari's engine
+npm run test:e2e               # 39 scenarios in real browsers; BROWSER=webkit for Safari's engine
 TRANSPORT=reverb npm run test:e2e   # the same over a real Reverb server, plus 3 push scenarios
 npm run test:chaos -- 10 42    # four browsers pressing random keys; every round must converge, with no recovery needed
 npm run test:load -- 100 45    # editors, seconds; TRANSPORT=reverb and ACTIVE=0.1 also apply
@@ -300,7 +300,7 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 - Without broadcasting, changes arrive by polling, every 0.4 s by default.
 - Pushed messages are limited to 9 KB, Reverb's default being 10 KB. A larger change, such as a long paste, is announced instead and fetched over HTTP.
 - `registerChannel()` registers the broadcast channel on the default broadcaster at boot; call it again if you switch broadcaster at runtime.
-- Repeater and builder sub-fields take the latest value: two people typing in the same sub-field of the same item do not merge character by character. Lists holding uploads, rich text or nested lists, Markdown and code editors, and custom rich editor blocks merge on save.
+- Inside repeater and builder items, only text inputs and textareas merge by character; other sub-fields take the latest value. Undo in those inputs is the browser's own, not limited to your typing. Lists holding uploads, rich text or nested lists, Markdown and code editors, and custom rich editor blocks merge on save.
 - Links pasted with a CSS class lose the class. Images pasted as base64 make that field merge on save.
 - It relies on two internals: Livewire's update queue (`queueUpdate`) and the rich editor's `getEditor()`. Both are covered by the browser tests on Filament 4.13.3, 4.17, 5.8.3 and 5.12. Laravel 12 is covered by the PHP tests only.
 

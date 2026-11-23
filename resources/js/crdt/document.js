@@ -62,7 +62,7 @@ export class Document {
                 : [{ o: 'set', f: name, id: [this.clock + 1, client], v: normalizeValue(value) }]
         }
 
-        if (field.kind === 'items') return field.list.changes(name, value ?? {}, this.clock, client)
+        if (field.kind === 'items') return field.list.changes(name, value ?? {}, this.clock, client, caret)
 
         let old = field.sequence.tokens()
         let next
@@ -96,9 +96,11 @@ export class Document {
             if (!field) continue
 
             if (field.kind === 'items') {
+                const sequence = o !== 'put' && operation.p !== undefined ? field.list.text(operation.i, operation.p) : field.list.order
+
                 if (o === 'put') field.list.put(operation.i, operation.p, v, id)
-                else if (o === 'ins') field.list.order.insert(id, operation.after, v)
-                else if (o === 'del') ids.forEach((range) => field.list.order.delete(range))
+                else if (o === 'ins') sequence.insert(id, operation.after, v)
+                else if (o === 'del') ids.forEach((range) => sequence.delete(range))
             } else if (o === 'set') {
                 if (isAfter(id, field.at)) {
                     field.value = v

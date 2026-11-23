@@ -10,8 +10,10 @@ use SolutionForest\FilamentCollaboration\Support\Data;
  * A repeater or builder: an ordered set of items, each a set of sub-fields.
  *
  * The order is a `Sequence` of item keys, so adding, removing and moving
- * items merge like text. Each sub-field is a `Register`: the latest edit wins.
- * A simple repeater's single sub-field has the path "".
+ * items merge like text. A text sub-field, one of `$texts`, is a `Sequence`
+ * of characters too, so typing in it merges like a text input. Any other
+ * sub-field is a `Register`: the latest edit wins. A simple repeater's single
+ * sub-field has the path "".
  *
  * Keep in step with `resources/js/crdt/item-list.js`.
  */
@@ -19,10 +21,16 @@ final class ItemList
 {
     public const MAX_DEPTH = 6;
 
-    /** @param array<string, array<string, Register>> $values */
+    public const MAX_TEXT = 65_535;
+
+    /**
+     * @param  array<string, array<string, Register|Sequence>>  $values
+     * @param  list<string>  $texts  the sub-field paths that merge by character
+     */
     public function __construct(
         public Sequence $order = new Sequence,
         private array $values = [],
+        public readonly array $texts = [],
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -31,21 +39,46 @@ final class ItemList
         $values = [];
 
         foreach (Data::map($data['m'] ?? null) as $key => $paths) {
-            foreach (Data::map($paths) as $path => $register) {
-                $values[$key][$path] = Register::from(Data::map($register));
+            foreach (Data::map($paths) as $path => $slot) {
+                $slot = Data::map($slot);
+                $values[$key][$path] = array_key_exists('r', $slot) ? Sequence::from($slot['r']) : Register::from($slot);
             }
         }
 
-        return new self(Sequence::from($data['r'] ?? null), $values);
+        return new self(Sequence::from($data['r'] ?? null), $values, Data::strings($data['t'] ?? null));
     }
 
     public function __clone()
     {
         $this->order = clone $this->order;
         $this->values = array_map(
-            static fn (array $paths): array => array_map(static fn (Register $register): Register => clone $register, $paths),
+            static fn (array $paths): array => array_map(static fn (Register|Sequence $slot): Register|Sequence => clone $slot, $paths),
             $this->values,
         );
+    }
+
+    public function isText(string $path): bool
+    {
+        return in_array($path, $this->texts, true);
+    }
+
+    /** A text sub-field's characters, created on first use. */
+    public function text(string $key, string $path): Sequence
+    {
+        $slot = $this->values[$key][$path] ??= new Sequence;
+
+        if (! $slot instanceof Sequence) {
+            throw new InvalidOperation('The sub-field does not hold text.');
+        }
+
+        return $slot;
+    }
+
+    public function textLength(string $key, string $path): int
+    {
+        $slot = $this->values[$key][$path] ?? null;
+
+        return $slot instanceof Sequence ? $slot->length() : 0;
     }
 
     /** @return list<string> visible item keys, each once */
@@ -77,8 +110,13 @@ final class ItemList
 
     public function put(string $key, string $path, mixed $value, Id $at): void
     {
-        $this->values[$key][$path] ??= new Register;
-        $this->values[$key][$path]->set($value, $at);
+        $slot = $this->values[$key][$path] ??= new Register;
+
+        if (! $slot instanceof Register) {
+            throw new InvalidOperation('A text sub-field is edited by character.');
+        }
+
+        $slot->set($value, $at);
     }
 
     /** @return array<string, mixed> */
@@ -88,12 +126,20 @@ final class ItemList
 
         foreach ($this->keys() as $key) {
             $items[$key] = self::unflatten(array_map(
-                static fn (Register $register): mixed => $register->value,
+                static fn (Register|Sequence $slot): mixed => $slot instanceof Register ? $slot->value : self::textValue($slot),
                 $this->values[$key] ?? [],
             ));
         }
 
         return $items;
+    }
+
+    /** Empty text is no value, as an empty input is in Filament. */
+    private static function textValue(Sequence $sequence): ?string
+    {
+        $text = $sequence->text();
+
+        return $text === '' ? null : $text;
     }
 
     /** @return list<array{list<array{string, mixed}>}> content without keys, which differ between page loads */
@@ -143,12 +189,7 @@ final class ItemList
 
         $new = array_map(static fn (string $key): Token => new Token(['i' => $key]), array_map(strval(...), array_keys($items)));
         $operations = Diff::operations($field, $old, $new, $clock, $client);
-
-        foreach ($operations as $operation) {
-            if (isset($operation['id'])) {
-                $clock = max($clock, Id::from($operation['id'])->clock);
-            }
-        }
+        $clock = self::clockAfter($operations, $clock);
 
         foreach ($items as $key => $item) {
             $key = (string) $key;
@@ -159,11 +200,26 @@ final class ItemList
             }
 
             foreach ($leaves as $path => $value) {
-                $value = Register::normalize($value);
-                $current = Register::normalize(($this->values[$key][$path] ?? null)?->value);
+                $path = (string) $path;
+                $slot = $this->values[$key][$path] ?? null;
 
-                if ($current !== $value) {
-                    $operations[] = ['o' => 'put', 'f' => $field, 'i' => $key, 'p' => (string) $path, 'id' => [++$clock, $client], 'v' => $value];
+                if ($slot instanceof Sequence || ($slot === null && $this->isText($path))) {
+                    $text = self::textOf($value);
+                    $characters = array_map(static fn (string $character): Token => new Token($character), $text === '' ? [] : mb_str_split($text, 1, 'UTF-8'));
+                    $edits = array_map(
+                        static fn (array $operation): array => [...$operation, 'i' => $key, 'p' => $path],
+                        Diff::operations($field, $slot?->tokens() ?? [], $characters, $clock, $client),
+                    );
+                    $clock = self::clockAfter($edits, $clock);
+                    array_push($operations, ...$edits);
+
+                    continue;
+                }
+
+                $value = Register::normalize($value);
+
+                if (Register::normalize($slot?->value) !== $value) {
+                    $operations[] = ['o' => 'put', 'f' => $field, 'i' => $key, 'p' => $path, 'id' => [++$clock, $client], 'v' => $value];
                 }
             }
         }
@@ -171,16 +227,41 @@ final class ItemList
         return $operations;
     }
 
+    /** What a text sub-field holds, whatever the form sent. */
+    public static function textOf(mixed $value): string
+    {
+        return is_scalar($value) && ! is_bool($value) ? str_replace(["\r\n", "\r"], "\n", (string) $value) : '';
+    }
+
+    /** @param list<array<string, mixed>> $operations */
+    private static function clockAfter(array $operations, int $clock): int
+    {
+        foreach ($operations as $operation) {
+            if (isset($operation['id'])) {
+                $value = $operation['v'] ?? null;
+                $span = ($operation['o'] ?? null) === 'ins' && is_string($value) ? mb_strlen($value, 'UTF-8') : 1;
+                $clock = max($clock, Id::from($operation['id'])->clock + $span - 1);
+            }
+        }
+
+        return $clock;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        $state = [
             'r' => $this->order->toArray(),
             'm' => array_map(
-                static fn (array $paths): array => array_map(static fn (Register $register): array => $register->toArray(), $paths),
+                static fn (array $paths): array => array_map(
+                    static fn (Register|Sequence $slot): array => $slot instanceof Register ? $slot->toArray() : ['r' => $slot->toArray()],
+                    $paths,
+                ),
                 $this->values,
             ),
         ];
+
+        return $this->texts === [] ? $state : [...$state, 't' => $this->texts];
     }
 
     /**

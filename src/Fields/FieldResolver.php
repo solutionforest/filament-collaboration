@@ -63,6 +63,26 @@ final readonly class FieldResolver
     }
 
     /**
+     * Each shared list's sub-fields that merge by character.
+     *
+     * @param  array<string, FieldKind>  $kinds  from `shareable()`
+     * @param  list<string>  $ignored
+     * @return array<string, list<string>>
+     */
+    public function texts(Schema $schema, array $kinds, array $ignored = []): array
+    {
+        $texts = [];
+
+        foreach (FormState::fields($schema, $ignored) as $path => $field) {
+            if (($kinds[(string) $path] ?? null) === FieldKind::Items) {
+                $texts[(string) $path] = ItemsType::textPaths($field);
+            }
+        }
+
+        return $texts;
+    }
+
+    /**
      * What this user may read and write in the draft: only what they can edit.
      *
      * @param  list<string>  $ignored

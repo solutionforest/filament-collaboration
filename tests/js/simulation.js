@@ -9,7 +9,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
     const random = () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646
     const pick = (items) => items[Math.floor(random() * items.length)]
 
-    const initial = { clock: 0, fields: { title: { k: 'text', r: [] }, body: { k: 'rich', r: [] }, status: { k: 'value', v: null, at: [0, 0] }, items: { k: 'items', r: [], m: {} } } }
+    const initial = { clock: 0, fields: { title: { k: 'text', r: [] }, body: { k: 'rich', r: [] }, status: { k: 'value', v: null, at: [0, 0] }, items: { k: 'items', r: [], m: {}, t: ['title'] } } }
     const server = new Document(initial)
     const log = []
     const batches = []
@@ -99,7 +99,13 @@ function mutateItems(items, random, pick) {
     else {
         const [, item] = pick(entries)
 
-        if (action === 3) item.title = pick(['a', 'b', 'c', null, '🙂'])
+        if (action === 3 && random() < 0.6) {
+            // Typing in a text sub-field.
+            const characters = Array.from(item.title ?? '')
+
+            characters.splice(Math.floor(random() * (characters.length + 1)), random() < 0.3 ? 1 : 0, ...(random() < 0.8 ? Array.from(pick(['a', 'bc', ' ', '協作', '🙂'])) : []))
+            item.title = characters.join('') || null
+        } else if (action === 3) item.title = pick(['a', 'b', 'c', null, '🙂', 7])
         else item.done = !item.done
     }
 

@@ -12,6 +12,7 @@ use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\MarkdownEditor;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
@@ -43,40 +44,84 @@ class ItemsType implements FieldType
      */
     public static function paths(Field $field): ?array
     {
+        $fields = self::subFields($field);
+
+        return $fields === null ? null : array_values(array_unique(array_keys($fields)));
+    }
+
+    /**
+     * The sub-field paths that merge by character, as a text input or textarea
+     * outside a list would. A path that is text in one block and not in
+     * another takes the latest value instead.
+     *
+     * @return list<string>
+     */
+    public static function textPaths(Field $field): array
+    {
+        $texts = [];
+        $values = [];
+
+        foreach (self::subFieldList($field) ?? [] as [$path, $subField]) {
+            $isText = $subField instanceof Textarea || ($subField !== null && (new TextInputType)->getKind($subField) === FieldKind::Text);
+
+            if ($isText) {
+                $texts[$path] = true;
+            } else {
+                $values[$path] = true;
+            }
+        }
+
+        return array_map(strval(...), array_keys(array_diff_key($texts, $values)));
+    }
+
+    /** @return array<string, Field|null>|null */
+    private static function subFields(Field $field): ?array
+    {
+        $list = self::subFieldList($field);
+
+        return $list === null ? null : array_column($list, 1, 0);
+    }
+
+    /** @return list<array{string, Field|null}>|null the block type has no field of its own */
+    private static function subFieldList(Field $field): ?array
+    {
         if ($field instanceof Repeater) {
-            if ($field->getSimpleField() !== null) {
-                return self::isShareable($field->getSimpleField()) ? [''] : null;
+            $simple = $field->getSimpleField();
+
+            if ($simple !== null) {
+                return self::isShareable($simple) ? [['', $simple]] : null;
             }
 
-            return self::childPaths($field->getChildComponents(), '');
+            return self::childFields($field->getChildComponents(), '');
         }
 
         if (! $field instanceof Builder) {
             return null;
         }
 
-        $paths = ['type'];
+        $fields = [];
 
         foreach ($field->getBlocks() as $block) {
-            $blockPaths = self::childPaths($block->getChildComponents(), 'data.');
+            $blockFields = self::childFields($block->getChildComponents(), 'data.');
 
-            if ($blockPaths === null) {
+            if ($blockFields === null) {
                 return null;
             }
 
-            array_push($paths, ...$blockPaths);
+            array_push($fields, ...$blockFields);
         }
 
-        return array_values(array_unique($paths));
+        // The block type is picked, never typed.
+        return [['type', null], ...$fields];
     }
 
     /**
      * @param  array<mixed>  $components
-     * @return list<string>|null
+     * @return list<array{string, Field}>|null
      */
-    private static function childPaths(array $components, string $prefix): ?array
+    private static function childFields(array $components, string $prefix): ?array
     {
-        $paths = [];
+        $fields = [];
 
         foreach ($components as $component) {
             if ($component instanceof Field) {
@@ -84,7 +129,7 @@ class ItemsType implements FieldType
                     return null;
                 }
 
-                $paths[] = $prefix.$component->getStatePath(isAbsolute: false);
+                $fields[] = [$prefix.$component->getStatePath(isAbsolute: false), $component];
 
                 continue;
             }
@@ -95,16 +140,16 @@ class ItemsType implements FieldType
 
             // A layout component, such as a grid or a group with its own state path.
             $nested = $component->getStatePath(isAbsolute: false);
-            $childPaths = self::childPaths($component->getChildComponents(), $prefix.(blank($nested) ? '' : $nested.'.'));
+            $childFields = self::childFields($component->getChildComponents(), $prefix.(blank($nested) ? '' : $nested.'.'));
 
-            if ($childPaths === null) {
+            if ($childFields === null) {
                 return null;
             }
 
-            array_push($paths, ...$childPaths);
+            array_push($fields, ...$childFields);
         }
 
-        return $paths === [] ? null : $paths;
+        return $fields === [] ? null : $fields;
     }
 
     private static function isShareable(Field $field): bool

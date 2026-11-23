@@ -278,12 +278,22 @@ final readonly class SyncController
         }
 
         try {
-            return [
+            $clean = [
                 'anchor' => $cursor['anchor'] === null ? null : Id::from($cursor['anchor'])->toArray(),
                 'head' => $cursor['head'] === null ? null : Id::from($cursor['head'])->toArray(),
             ];
         } catch (InvalidOperation) {
             return null;
         }
+
+        // In a list: which item's sub-field the caret is in.
+        $item = $cursor['item'] ?? null;
+        $path = $cursor['path'] ?? null;
+
+        if (is_string($item) && is_string($path) && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $item) === 1 && preg_match('/^[A-Za-z0-9_.-]{0,255}$/D', $path) === 1) {
+            $clean += ['item' => $item, 'path' => $path];
+        }
+
+        return $clean;
     }
 }

@@ -70,11 +70,19 @@ final class DocumentRepository
                 $hash = Fingerprint::value($field->kind, $field->value);
 
                 if ($draft->document->kind($name) !== $field->kind) {
-                    $draft->document->create($name, $field->kind);
-                    $draft->saved->create($name, $field->kind);
+                    $draft->document->create($name, $field->kind, $field->texts);
+                    $draft->saved->create($name, $field->kind, $field->texts);
                     $seed = $draft->document->changes($name, $field->value);
                     $draft->document->apply($seed);
                     $draft->saved->apply($seed);
+                    $hasStructureChanged = true;
+                } elseif ($draft->document->texts($name) !== $field->texts) {
+                    // The list's text sub-fields changed with a deploy: rebuild it, keeping unsaved edits.
+                    $drafted = $draft->document->value($name);
+                    $draft->saved->create($name, $field->kind, $field->texts);
+                    $draft->saved->apply($draft->saved->changes($name, $field->value, $draft->document->clock()));
+                    $draft->document->adopt($draft->saved, $name);
+                    $draft->document->apply($draft->document->changes($name, $drafted));
                     $hasStructureChanged = true;
                 } elseif (($draft->savedHashes[$name] ?? null) === $hash) {
                     continue;
