@@ -34,7 +34,8 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->brandName('Fieldnotes CMS')
             ->login()
-            ->databaseNotifications()
+            // Rendered with the page: a lazy load cut short by leaving the page is reported as an error.
+            ->databaseNotifications(isLazy: false)
             ->plugin(
                 CollaborationPlugin::make()
                     // The demo separates workspaces by a column rather than Filament tenancy.
