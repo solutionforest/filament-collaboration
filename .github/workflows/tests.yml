@@ -14,7 +14,6 @@ jobs:
   php:
     name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · Filament ${{ matrix.filament }}
     runs-on: self-hosted
-    container: ubuntu:24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -31,11 +30,6 @@ jobs:
       run:
         working-directory: demo
     steps:
-      # A clean Ubuntu container on our runner: setup-php and Playwright install what they need as root.
-      - name: Prepare the container
-        working-directory: .
-        run: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git sudo unzip ca-certificates gnupg lsb-release >/dev/null
-
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
@@ -66,14 +60,8 @@ jobs:
   javascript:
     name: JavaScript · lint, types, tests
     runs-on: self-hosted
-    container: ubuntu:24.04
     timeout-minutes: 10
     steps:
-      # A clean Ubuntu container on our runner: setup-php and Playwright install what they need as root.
-      - name: Prepare the container
-        working-directory: .
-        run: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git sudo unzip ca-certificates gnupg lsb-release >/dev/null
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -92,7 +80,6 @@ jobs:
   browser:
     name: Browsers · ${{ matrix.browser }} · ${{ matrix.transport }}
     runs-on: self-hosted
-    container: ubuntu:24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -106,11 +93,6 @@ jobs:
       run:
         working-directory: demo
     steps:
-      # A clean Ubuntu container on our runner: setup-php and Playwright install what they need as root.
-      - name: Prepare the container
-        working-directory: .
-        run: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git sudo unzip ca-certificates gnupg lsb-release >/dev/null
-
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2

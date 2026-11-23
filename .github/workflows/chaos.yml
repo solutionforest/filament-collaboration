@@ -14,17 +14,11 @@ on:
 jobs:
   chaos:
     runs-on: self-hosted
-    container: ubuntu:24.04
     timeout-minutes: 60
     defaults:
       run:
         working-directory: demo
     steps:
-      # A clean Ubuntu container on our runner: setup-php and Playwright install what they need as root.
-      - name: Prepare the container
-        working-directory: .
-        run: apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl git sudo unzip ca-certificates gnupg lsb-release >/dev/null
-
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
