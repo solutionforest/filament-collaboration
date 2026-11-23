@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { createServer } from 'node:net'
+import { createConnection, createServer } from 'node:net'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
@@ -68,6 +68,22 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         options.push('-d', 'opcache.enable=1', '-d', 'opcache.validate_timestamps=0', '-d', 'opcache.max_accelerated_files=30000', '-d', 'opcache.memory_consumption=256')
     }
 
+    // TRANSPORT=reverb pushes changes over a real Reverb server instead of polling.
+    const reverb = process.env.TRANSPORT === 'reverb' ? await freePort() : null
+
+    if (reverb) {
+        Object.assign(env, {
+            BROADCAST_CONNECTION: 'reverb',
+            REVERB_APP_ID: 'browser-tests',
+            REVERB_APP_KEY: 'browser-tests-key',
+            REVERB_APP_SECRET: 'browser-tests-secret',
+            REVERB_HOST: '127.0.0.1',
+            REVERB_PORT: String(reverb),
+            REVERB_SERVER_PORT: String(reverb),
+            REVERB_SCHEME: 'http',
+        })
+    }
+
     execFileSync('php', ['artisan', 'migrate', '--seed', '--force'], { cwd: demo, env, stdio: 'ignore' })
 
     if (optimized) {
@@ -83,12 +99,22 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         { cwd: path.join(demo, 'public'), env, stdio: 'ignore', detached: true },
     )
 
-    const stopServer = () => {
+    const websockets = reverb
+        ? spawn('php', ['artisan', 'reverb:start', '--host=127.0.0.1', `--port=${reverb}`], { cwd: demo, env, stdio: 'ignore', detached: true })
+        : null
+
+    const kill = (child) => {
         try {
-            process.kill(-server.pid)
+            process.kill(-child.pid)
         } catch {
             // Already stopped.
         }
+    }
+
+    const stopReverb = () => websockets && kill(websockets)
+    const stopServer = () => {
+        kill(server)
+        stopReverb()
     }
 
     process.once('exit', stopServer)
@@ -97,6 +123,19 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => process.exit(1))
 
     const base = env.APP_URL
+
+    for (let attempt = 0; reverb && attempt < 120; attempt++) {
+        const open = await new Promise((resolve) => {
+            const socket = createConnection(reverb, '127.0.0.1', () => resolve(socket.end() && true))
+
+            socket.on('error', () => resolve(false))
+        })
+
+        if (open) break
+        if (attempt === 119) throw new Error('Reverb did not start.')
+
+        await new Promise((resolve) => setTimeout(resolve, 250))
+    }
 
     for (let attempt = 0; attempt < 120; attempt++) {
         if (await fetch(`${base}/up`).then((response) => response.ok, () => false)) break
@@ -182,5 +221,5 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
 
     const article = (id = 3) => db.prepare('select * from documents where id = ?').get(id)
 
-    return { base, browser, article, db, edit, problems, sessions, signIn, stop }
+    return { base, browser, article, db, edit, env, problems, reverb, sessions, signIn, stop, stopReverb }
 }
