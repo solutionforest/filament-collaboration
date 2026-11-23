@@ -4,6 +4,10 @@ namespace App\Filament\Resources\Documents\Schemas;
 
 use App\Models\Document;
 use App\Models\User;
+use Demo\CkEditor\CkEditor;
+use Demo\Quill\QuillEditor;
+use Demo\TinyMce\TinyMceEditor;
+use Demo\Trix\TrixEditor;
 use Filament\Forms\Components\Builder as BlockBuilder;
 use Filament\Forms\Components\Builder\Block;
 use Filament\Forms\Components\CodeEditor;
@@ -81,6 +85,15 @@ class DocumentForm
                         ->schema([
                             MarkdownEditor::make('newsletter_markdown')->label('Newsletter blurb (Markdown)'),
                             CodeEditor::make('embed_code')->label('Custom embed (HTML)')->language(Language::Html),
+                        ])
+                        ->collapsible(),
+                    Section::make('Third-party editors')
+                        ->description('Fields from the demo packages in packages/: each registers a JavaScript adapter, and is live like the rich editor.')
+                        ->schema([
+                            TinyMceEditor::make('tinymce_html')->label('TinyMCE'),
+                            CkEditor::make('ckeditor_html')->label('CKEditor 5'),
+                            QuillEditor::make('quill_html')->label('Quill'),
+                            TrixEditor::make('trix_html')->label('Trix'),
                         ])
                         ->collapsible(),
                     Section::make('SEO')

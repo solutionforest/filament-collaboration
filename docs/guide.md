@@ -457,6 +457,42 @@ Only `read` and `write` are required; without the selection methods, edits still
 
 If the adapter is missing, or throws, the field simply merges on save as before.
 
+### HTML editors
+
+TinyMCE, CKEditor, Quill, Trix and most WYSIWYG editors hold HTML. Merging HTML by character could break its tags, so an adapter with `format: 'html'` hands over HTML, and the package turns it into the same document the built-in rich editor shares: paragraphs, headings, bold, italic, underline, strike, code, links, lists, quotes, tables, images and line breaks. Those merge by character, block and mark, with carets; anything else in the HTML is kept as its text. On save, the field gets HTML back.
+
+Carets are positions in that document. `filamentCollaboration.html` maps them to and from the editor's DOM, so an HTML adapter is mostly glue:
+
+```js
+registerAdapter('tinymce', {
+    format: 'html',
+    attach({ element, changed, moved }) {
+        const editor = element.querySelector('.my-tinymce')?.editor // however you keep it
+
+        if (!editor?.initialized) return null
+
+        const html = window.filamentCollaboration.html
+        const body = () => editor.getBody()
+
+        editor.on('input change undo redo', changed)
+        editor.on('SelectionChange', moved)
+
+        return {
+            read: () => editor.getContent(),
+            write: (value) => editor.setContent(value),
+            selection: () => html.selectionIn(body(), editor.getDoc().getSelection()),
+            setSelection: (positions) => editor.selection.setRng(html.select(body(), positions)),
+            caretRect: (position) => html.caretRectAt(body(), position),
+            isFocused: () => editor.hasFocus(),
+        }
+    },
+})
+```
+
+Register its PHP side with `FieldKind::RichText`. Keep the editor object off Alpine's reactive data (for example on the element): editors such as CKEditor and Quill break behind its proxy.
+
+**Working examples** are in `demo/packages/`: a TinyMCE, a CKEditor 5, a Quill and a Trix field, each a small Filament package with its adapter in `resources/js/editor.js` and its registration in the service provider. The demo's article form uses all four, and the browser tests type in each from two browsers at once. Rebuild them with `npm run build:editors` in `demo/`. TinyMCE and CKEditor 5 are GPL-licensed when used without a commercial licence key.
+
 **Your own presence storage.** Presence is stored in the database by default. Bind your own implementation of `Contracts\PresenceRepository`, for example on Redis, in a service provider.
 
 ## 10. Debugging

@@ -1,5 +1,7 @@
 import { canonical, toIndex, toOffset, wellFormed } from '../crdt/id.js'
 import { normalizeValue } from '../crdt/document.js'
+import { toDocument, toTokens } from '../crdt/rich-text.js'
+import { documentToHtml, htmlToDocument } from '../adapters/html.js'
 import { plain } from '../dom.js'
 import { adapters } from '../adapters/registry.js'
 import { Binding } from './binding.js'
@@ -23,6 +25,8 @@ export class AdapterBinding extends Binding {
     /** @type {{anchor: Id | null, head: Id | null} | null} */
     anchors = null
     warned = false
+    /** True while writing: the editor's own change events then are ours. */
+    writing = false
 
     get name() {
         return this.room.config.adapters?.[this.field] ?? ''
@@ -96,7 +100,15 @@ export class AdapterBinding extends Binding {
 
     /** @param {unknown} value */
     normalize(value) {
-        return this.format === 'text' ? normalizeText(value) : normalizeValue(plain(value))
+        if (this.format === 'text') return normalizeText(value)
+        if (this.format !== 'html') return normalizeValue(plain(value))
+
+        // HTML, or a document already: in the form the draft holds it.
+        try {
+            return toDocument(toTokens(typeof value === 'string' ? htmlToDocument(value) : /** @type {RichNode | null} */ (value)))
+        } catch {
+            return toDocument(toTokens({ type: 'doc', content: [{ type: 'paragraph' }] }))
+        }
     }
 
     /** The caret, as an index the draft understands. */
@@ -113,7 +125,7 @@ export class AdapterBinding extends Binding {
     }
 
     collect() {
-        if (!this.handle || this.isBusy) return
+        if (!this.handle || this.isBusy || this.writing) return
 
         const value = this.read()
         const signature = canonical(value)
@@ -144,12 +156,16 @@ export class AdapterBinding extends Binding {
             return
         }
 
+        this.writing = true
+
         try {
-            handle.write(value)
+            handle.write(this.format === 'html' ? documentToHtml(this.normalize(value)) : value)
         } catch (error) {
             this.warn(error)
 
             return
+        } finally {
+            this.writing = false
         }
 
         this.seen = canonical(this.read())

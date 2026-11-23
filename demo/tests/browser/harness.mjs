@@ -85,6 +85,8 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     }
 
     execFileSync('php', ['artisan', 'migrate', '--seed', '--force'], { cwd: demo, env, stdio: 'ignore' })
+    // More articles than there are scenarios, each a copy of a seeded one.
+    execFileSync('php', ['tests/browser/articles.php', '80'], { cwd: demo, env, stdio: 'ignore' })
 
     if (optimized) {
         for (const command of ['config:cache', 'route:cache', 'event:cache']) {

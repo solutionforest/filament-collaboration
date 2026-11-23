@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Models\Document;
 use App\Models\User;
 use Filament\Forms\Components\Field;
@@ -23,7 +24,7 @@ it("makes Filament's Markdown and code editors live through the adapters it ship
     $editor = Editor::open($this, User::factory()->create(), Document::create(['title' => 'Adapters']));
 
     expect($editor->config['fields'])->toMatchArray(['newsletter_markdown' => 'text', 'embed_code' => 'text'])
-        ->and($editor->config['adapters'])->toBe(['newsletter_markdown' => 'filament-markdown-editor', 'embed_code' => 'filament-code-editor']);
+        ->and($editor->config['adapters'])->toMatchArray(['newsletter_markdown' => 'filament-markdown-editor', 'embed_code' => 'filament-code-editor']);
 
     $editor->sync();
     $editor->type('newsletter_markdown', '**Hello**')->sync()->assertOk();
@@ -47,4 +48,49 @@ it('lets an app name the adapter for a field itself', function (): void {
 
     expect($resolver->shareable($schema))->toBe(['notes' => FieldKind::Text, 'body' => FieldKind::RichText])
         ->and($resolver->adapters($schema, $resolver->shareable($schema)))->toBe(['notes' => 'my-editor', 'body' => 'my-html-editor']);
+});
+
+it('shares an HTML editor from a package as a rich document, and saves it back as HTML', function (): void {
+    $user = User::factory()->create();
+    $article = Document::create(['title' => 'HTML', 'tinymce_html' => '<p>Hello <strong>team</strong></p>']);
+    $editor = Editor::open($this, $user, $article);
+
+    expect($editor->config['fields'])->toMatchArray(['tinymce_html' => 'rich', 'ckeditor_html' => 'rich', 'quill_html' => 'rich', 'trix_html' => 'rich'])
+        ->and($editor->config['adapters'])->toMatchArray(['tinymce_html' => 'demo-tinymce', 'trix_html' => 'demo-trix']);
+
+    $editor->sync();
+
+    expect($editor->value('tinymce_html'))->toEqual(['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [
+        ['type' => 'text', 'text' => 'Hello '],
+        ['type' => 'text', 'text' => 'team', 'marks' => [['type' => 'bold']]],
+    ]]]]);
+
+    $this->actingAs($user);
+    $page = Livewire::test(EditDocument::class, ['record' => $article->id]);
+    $editor->config['client'] = $page->get('collaborationClient');
+    $editor->type('tinymce_html', ['type' => 'doc', 'content' => [
+        ['type' => 'heading', 'attrs' => ['level' => 2], 'content' => [['type' => 'text', 'text' => 'Hello']]],
+        ['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'team']]]]]]],
+    ]]);
+
+    $page->set('collaborationSync', $editor->syncState())->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+
+    expect($article->fresh()->tinymce_html)->toBe('<h2>Hello</h2><ul><li>team</li></ul>');
+});
+
+it('keeps stored HTML exactly as it was when the draft did not change it', function (): void {
+    $user = User::factory()->create();
+    $stored = "<p>Hello&nbsp;<strong>team</strong></p>\n";
+    $article = Document::create(['title' => 'HTML', 'quill_html' => $stored]);
+    $editor = Editor::open($this, $user, $article);
+    $this->actingAs($user);
+    $page = Livewire::test(EditDocument::class, ['record' => $article->id]);
+    $editor->config['client'] = $page->get('collaborationClient');
+    $editor->sync();
+    $editor->type('title', 'HTML!');
+
+    $page->set('collaborationSync', $editor->syncState())->call('save', shouldRedirect: false)->assertHasNoFormErrors();
+
+    expect($article->fresh()->quill_html)->toBe($stored)
+        ->and($article->fresh()->title)->toBe('HTML!');
 });

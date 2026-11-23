@@ -72,9 +72,9 @@ Pushes make changes 6 to 20 times faster. A room where most people read gets far
 
 | Command | Where | What |
 | --- | --- | --- |
-| `vendor/bin/pest` | `demo/` | 270 tests: the package's unit tests and the demo's feature tests |
+| `vendor/bin/pest` | `demo/` | 281 tests: the package's unit tests and the demo's feature tests |
 | `vendor/bin/phpstan analyse` | `demo/` | level 10, on the package and the demo |
-| `npm run test:e2e` | `demo/` | 40 scenarios in real browsers; `BROWSER=webkit`, `TRANSPORT=reverb` |
+| `npm run test:e2e` | `demo/` | 47 scenarios in real browsers; `BROWSER=webkit`, `TRANSPORT=reverb` |
 | `npm run test:chaos -- 10 42` | `demo/` | four browsers pressing random keys; every round must converge |
 | `npm run test:load -- 100 45` | `demo/` | editors and seconds; `TRANSPORT=reverb` and `ACTIVE=0.1` also apply |
 | `npm run test:latency` | `demo/` | key press to another screen |

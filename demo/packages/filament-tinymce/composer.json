@@ -1,0 +1,25 @@
+{
+    "name": "demo/filament-tinymce",
+    "description": "A TinyMCE form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "filament/forms": "^5.8.3"
+    },
+    "suggest": {
+        "solutionforest/filament-collaboration": "Makes the field live, with carets"
+    },
+    "autoload": {
+        "psr-4": {
+            "Demo\\TinyMce\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Demo\\TinyMce\\TinyMceServiceProvider"
+            ]
+        }
+    }
+}

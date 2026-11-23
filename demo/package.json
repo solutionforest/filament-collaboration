@@ -6,19 +6,24 @@
         "build": "vite build && npm --prefix .. run build",
         "build:package": "npm --prefix .. run build",
         "dev": "vite",
-        "test:e2e": "node --no-warnings --test --test-concurrency=1 --test-timeout=540000 tests/browser/collaboration.e2e.mjs",
+        "test:e2e": "node --no-warnings --test --test-concurrency=1 --test-timeout=1500000 tests/browser/collaboration.e2e.mjs",
         "test:load": "node --no-warnings tests/browser/load.mjs",
         "media": "node --no-warnings scripts/capture-media.mjs",
         "tutorial": "node --no-warnings scripts/record-tutorial.mjs",
         "test:latency": "node --no-warnings tests/browser/latency.mjs",
-        "test:chaos": "node --no-warnings tests/browser/chaos.mjs"
+        "test:chaos": "node --no-warnings tests/browser/chaos.mjs",
+        "build:editors": "for p in tinymce ckeditor quill trix; do PACKAGE=filament-$p vite build -c packages/vite.config.js || exit 1; done"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
+        "ckeditor5": "^49.1.0",
         "concurrently": "^10.0.3",
         "laravel-vite-plugin": "^3.1",
         "playwright": "^1.65.1",
+        "quill": "^2.0.3",
         "tailwindcss": "^4.0.0",
+        "tinymce": "^7.9.3",
+        "trix": "^2.1.19",
         "vite": "^8.0.0"
     },
     "optionalDependencies": {

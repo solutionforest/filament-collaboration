@@ -15,12 +15,23 @@
         "laravel/reverb": "^1.14",
         "laravel/tinker": "^3.0",
         "solutionforest/filament-collaboration": "*@dev",
-        "spatie/laravel-package-tools": "^1.92"
+        "spatie/laravel-package-tools": "^1.92",
+        "demo/filament-tinymce": "@dev",
+        "demo/filament-ckeditor": "@dev",
+        "demo/filament-quill": "@dev",
+        "demo/filament-trix": "@dev"
     },
     "repositories": [
         {
             "type": "path",
             "url": "..",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/*",
             "options": {
                 "symlink": true
             }

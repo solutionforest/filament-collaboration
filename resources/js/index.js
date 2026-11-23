@@ -1,6 +1,7 @@
 import '../css/collaboration.css'
 import { Room } from './room/room.js'
-import { registerAdapter } from './adapters/registry.js'
+import * as html from './adapters/html.js'
+import { minimalChange, registerAdapter } from './adapters/registry.js'
 import { registerFilamentAdapters } from './adapters/filament.js'
 import { renderInspector } from './ui/inspector.js'
 
@@ -61,6 +62,9 @@ function boot() {
     window.filamentCollaboration = {
         inspect: () => [...rooms.values()].map(({ room }) => room.inspect()),
         registerAdapter,
+        // For adapters: change only what differs, and map HTML editors' carets.
+        minimalChange,
+        html,
     }
 
     registerFilamentAdapters(registerAdapter)
