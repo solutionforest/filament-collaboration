@@ -43,7 +43,7 @@ it('replays sessions recorded by the browser implementation to the same result',
         $numbers = [];
 
         foreach (KINDS as $field => $kind) {
-            $document->create($field, $kind);
+            $document->create($field, $kind, $field === 'items' ? ['title'] : []);
         }
 
         foreach ($case['batches'] as ['client' => $client, 'operations' => $operations]) {
@@ -208,4 +208,48 @@ it('refuses a forged item operation', function (array $operation): void {
     'a sub-field the form does not have' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000001', 'p' => 'is_admin', 'v' => true]],
     'an item that does not exist' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000002', 'p' => 'title', 'v' => 'x']],
     'an object as a value' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000001', 'p' => 'title', 'v' => ['a' => 1]]],
+]);
+
+const ITEM = '00000000-0000-4000-8000-000000000001';
+
+function textItems(): Document
+{
+    $document = new Document;
+    $document->create('items', FieldKind::Items, ['title']);
+    $document->apply($document->changes('items', [ITEM => ['title' => 'the fox', 'done' => false]]));
+
+    return $document;
+}
+
+it('merges typing in one text sub-field of one item, in either arrival order', function (): void {
+    $base = textItems();
+    $alice = (clone $base)->changes('items', [ITEM => ['title' => 'the quick fox', 'done' => false]], client: 1);
+    $bob = (clone $base)->changes('items', [ITEM => ['title' => 'the fox jumps', 'done' => true]], client: 2);
+
+    $one = clone $base;
+    $one->receive(1, 1, $alice, KINDS, ITEM_PATHS);
+    $one->receive(2, 1, $bob, KINDS, ITEM_PATHS);
+
+    $two = clone $base;
+    $two->receive(2, 1, $bob, KINDS, ITEM_PATHS);
+    $two->receive(1, 1, $alice, KINDS, ITEM_PATHS);
+
+    expect($one->value('items'))->toBe([ITEM => ['title' => 'the quick fox jumps', 'done' => true]])
+        ->and($two->value('items'))->toBe($one->value('items'))
+        ->and(Document::from($one->toArray())->value('items'))->toBe($one->value('items'))
+        ->and(Document::from($one->toArray())->texts('items'))->toBe(['title']);
+});
+
+it('refuses a forged text sub-field operation', function (array $operation): void {
+    $document = textItems();
+    $operation['id'] = [$document->clock() + 1, 7];
+
+    expect(fn () => $document->receive(7, 1, [['f' => 'items', 'i' => ITEM, ...$operation]], KINDS, ITEM_PATHS))->toThrow(InvalidOperation::class);
+})->with([
+    'a whole value for a text sub-field' => [['o' => 'put', 'p' => 'title', 'v' => 'replaced']],
+    'typing in a sub-field that is not text' => [['o' => 'ins', 'p' => 'done', 'after' => null, 'v' => 'x']],
+    'a sub-field the form does not have' => [['o' => 'ins', 'p' => 'is_admin', 'after' => null, 'v' => 'x']],
+    'an item as text' => [['o' => 'ins', 'p' => 'title', 'after' => null, 'v' => ['i' => 'x']]],
+    'empty text' => [['o' => 'ins', 'p' => 'title', 'after' => null, 'v' => '']],
+    'formatting' => [['o' => 'fmt', 'p' => 'title', 'ids' => [[1, 0, 1]], 'k' => 'm:bold', 'v' => '1']],
 ]);

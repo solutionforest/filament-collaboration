@@ -4,11 +4,11 @@ import { Document } from '../../resources/js/crdt/document.js'
 import { toDocument, toTokens } from '../../resources/js/crdt/rich-text.js'
 import { paragraph, simulate } from './simulation.js'
 
-const pair = (kind, value) => {
-    const base = new Document({ fields: { field: { k: kind, r: [], m: {} } } })
+const pair = (kind, value, texts = []) => {
+    const base = new Document({ fields: { field: { k: kind, r: [], m: {}, t: texts } } })
     const seed = base.changes('field', value, 0)
     const replicas = [1, 2].map(() => {
-        const replica = new Document({ fields: { field: { k: kind, r: [], m: {} } } })
+        const replica = new Document({ fields: { field: { k: kind, r: [], m: {}, t: texts } } })
 
         replica.apply(seed)
 
@@ -167,4 +167,23 @@ test('the same items loaded again under new keys change nothing', () => {
     const [alice] = pair('items', { [itemKey(1)]: { title: 'One' } })
 
     assert.deepEqual(alice.changes('field', { [itemKey(9)]: { title: 'One' } }, 1), [])
+})
+
+test('two people typing in one text sub-field of one item both keep their typing', () => {
+    const base = { [itemKey(1)]: { title: 'the fox', done: false } }
+    const result = concurrently(
+        pair('items', base, ['title']),
+        { value: { [itemKey(1)]: { title: 'the quick fox', done: false } }, caret: { key: itemKey(1), path: 'title', index: 10 } },
+        { value: { [itemKey(1)]: { title: 'the fox jumps', done: true } } },
+    )
+
+    assert.deepEqual(result, { [itemKey(1)]: { title: 'the quick fox jumps', done: true } })
+})
+
+test('a text sub-field typed in by the server and a browser alike', () => {
+    const [alice] = pair('items', { [itemKey(1)]: { title: 'One' } }, ['title'])
+    const operations = alice.changes('field', { [itemKey(1)]: { title: 'One!' } }, 1)
+
+    assert.deepEqual(operations.map(({ o, i, p, v }) => [o, i, p, v]), [['ins', itemKey(1), 'title', '!']])
+    assert.deepEqual(alice.changes('field', { [itemKey(1)]: { title: '' } }, 1).map(({ o, p }) => [o, p]), [['del', 'title']])
 })

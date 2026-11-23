@@ -1,4 +1,4 @@
-import { canonical, isAfter } from './id.js'
+import { canonical, characters, isAfter } from './id.js'
 import { diff } from './diff.js'
 import { Sequence } from './sequence.js'
 
@@ -45,16 +45,53 @@ export function unflatten(leaves) {
     return value
 }
 
+/** What a text sub-field holds, whatever the form sent. Mirrors `ItemList::textOf()`. */
+export const textOf = (value) =>
+    (typeof value === 'string' || typeof value === 'number') ? String(value).replace(/\r\n?/g, '\n') : ''
+
+const clockAfter = (operations, clock) => {
+    for (const { o, id, v } of operations) {
+        if (id) clock = Math.max(clock, id[0] + (o === 'ins' && typeof v === 'string' ? characters(v).length : 1) - 1)
+    }
+
+    return clock
+}
+
 export class ItemList {
     constructor(data = {}, normalize = (value) => value) {
         this.normalize = normalize
+        this.texts = data.t ?? []
         this.order = new Sequence(data.r ?? [])
         this.values = new Map(
             Object.entries(data.m ?? {}).map(([key, paths]) => [
                 key,
-                new Map(Object.entries(paths).map(([path, register]) => [path, { value: register.v, at: register.at ?? [0, 0] }])),
+                new Map(
+                    Object.entries(paths).map(([path, slot]) => [
+                        path,
+                        'r' in slot ? { sequence: new Sequence(slot.r) } : { value: slot.v, at: slot.at ?? [0, 0] },
+                    ]),
+                ),
             ]),
         )
+    }
+
+    isText(path) {
+        return this.texts.includes(path)
+    }
+
+    /** A text sub-field's characters, or null if it has none yet. */
+    sequence(key, path) {
+        return this.values.get(key)?.get(path)?.sequence ?? null
+    }
+
+    text(key, path) {
+        if (!this.values.has(key)) this.values.set(key, new Map())
+
+        const slots = this.values.get(key)
+
+        if (!slots.has(path)) slots.set(path, { sequence: new Sequence() })
+
+        return slots.get(path).sequence
     }
 
     keys() {
@@ -72,6 +109,7 @@ export class ItemList {
 
         const register = this.values.get(key).get(path)
 
+        if (register?.sequence) return
         if (!register || isAfter(at, register.at)) this.values.get(key).set(path, { value, at })
     }
 
@@ -79,7 +117,11 @@ export class ItemList {
         const items = {}
 
         for (const key of this.keys()) {
-            items[key] = unflatten(Object.fromEntries([...(this.values.get(key) ?? new Map())].map(([path, register]) => [path, register.value])))
+            items[key] = unflatten(
+                Object.fromEntries(
+                    [...(this.values.get(key) ?? new Map())].map(([path, slot]) => [path, slot.sequence ? slot.sequence.text() || null : slot.value]),
+                ),
+            )
         }
 
         return items
@@ -95,7 +137,8 @@ export class ItemList {
         )
     }
 
-    changes(field, items, clock, client) {
+    /** @param {{key: string, path: string, index: number}|null} caretOf where the caret is, to place an ambiguous edit */
+    changes(field, items, clock, client, caretOf = null) {
         items = this.adoptKeys(items)
 
         const seen = new Set()
@@ -112,7 +155,7 @@ export class ItemList {
         const next = Object.keys(items).map((key) => ({ value: { i: key }, formatting: {} }))
         const operations = diff(field, old, next, clock, client)
 
-        for (const operation of operations) if (operation.id) clock = Math.max(clock, operation.id[0])
+        clock = clockAfter(operations, clock)
 
         for (const [key, item] of Object.entries(items)) {
             const leaves = flatten(item)
@@ -120,9 +163,22 @@ export class ItemList {
             for (const path of this.values.get(key)?.keys() ?? []) if (!(path in leaves)) leaves[path] = null
 
             for (const [path, raw] of Object.entries(leaves)) {
+                const slot = this.values.get(key)?.get(path)
+
+                if (slot?.sequence || (!slot && this.isText(path))) {
+                    const typed = characters(textOf(raw)).map((character) => ({ value: character, formatting: {} }))
+                    const caret = caretOf?.key === key && caretOf.path === path ? caretOf.index : null
+                    const edits = diff(field, slot?.sequence.tokens() ?? [], typed, clock, client, caret).map((operation) => ({ ...operation, i: key, p: path }))
+
+                    clock = clockAfter(edits, clock)
+                    operations.push(...edits)
+
+                    continue
+                }
+
                 const value = this.normalize(raw)
 
-                if (canonical(this.normalize(this.values.get(key)?.get(path)?.value ?? null)) !== canonical(value)) {
+                if (canonical(this.normalize(slot?.value ?? null)) !== canonical(value)) {
                     operations.push({ o: 'put', f: field, i: key, p: path, id: [++clock, client], v: value })
                 }
             }

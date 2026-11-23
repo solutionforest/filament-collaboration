@@ -88,14 +88,23 @@ final class Document
         return array_map(strval(...), array_keys($this->fields));
     }
 
-    public function create(string $field, FieldKind $kind): void
+    /** @param list<string> $texts a list's sub-fields that merge by character */
+    public function create(string $field, FieldKind $kind, array $texts = []): void
     {
         $this->kinds[$field] = $kind;
         $this->fields[$field] = match ($kind) {
             FieldKind::Value => new Register,
-            FieldKind::Items => new ItemList,
+            FieldKind::Items => new ItemList(texts: $texts),
             default => new Sequence,
         };
+    }
+
+    /** @return list<string> a list's sub-fields that merge by character */
+    public function texts(string $field): array
+    {
+        $state = $this->fields[$field] ?? null;
+
+        return $state instanceof ItemList ? $state->texts : [];
     }
 
     public function value(string $field): mixed
@@ -285,6 +294,8 @@ final class Document
             $state->set($operation['v'] ?? null, Id::from($operation['id'] ?? null));
         } elseif ($state instanceof ItemList && $type === 'put') {
             $state->put(Data::string($operation['i'] ?? null), Data::string($operation['p'] ?? null), $operation['v'] ?? null, Id::from($operation['id'] ?? null));
+        } elseif ($state instanceof ItemList && isset($operation['p'])) {
+            $this->applyToSequence($state->text(Data::string($operation['i'] ?? null), Data::string($operation['p'])), $type, $operation);
         } elseif ($state instanceof ItemList) {
             $this->applyToSequence($state->order, $type, $operation);
         } elseif ($type === 'ins') {
@@ -325,10 +336,12 @@ final class Document
     private function applyToSequence(Sequence $sequence, string $type, array $operation): void
     {
         if ($type === 'ins') {
+            $value = $operation['v'] ?? null;
+
             $sequence->insert(
                 Id::from($operation['id'] ?? null),
                 isset($operation['after']) ? Id::from($operation['after']) : null,
-                Data::map($operation['v'] ?? null),
+                is_string($value) ? $value : Data::map($value),
                 [],
             );
 
@@ -366,12 +379,12 @@ final class Document
             $clean['ids'] = $this->validateRanges($operation['ids'] ?? null);
         }
 
-        if ($type === 'del' && $kind !== FieldKind::Value) {
-            return $clean;
-        }
-
         if ($kind === FieldKind::Items) {
             return $this->validateItemOperation($clean, $operation, $client, $lastClock, $allowed[$field] ?? []);
+        }
+
+        if ($type === 'del' && $kind !== FieldKind::Value) {
+            return $clean;
         }
 
         $id = Id::from($operation['id'] ?? null);
@@ -467,20 +480,29 @@ final class Document
      */
     private function validateItemOperation(array $clean, array $operation, int $client, int $lastClock, array $paths): array
     {
+        $list = $this->fields[Data::string($clean['f'])] ?? null;
+        $type = $clean['o'];
+        $value = $operation['v'] ?? null;
+
+        if (! $list instanceof ItemList) {
+            throw new InvalidOperation('The field is not a list.');
+        }
+
+        if (isset($operation['p']) && $type !== 'put') {
+            return $this->validateItemText($list, $clean, $operation, $client, $lastClock, $paths);
+        }
+
+        if ($type === 'del') {
+            return $clean;
+        }
+
         $id = Id::from($operation['id'] ?? null);
 
         if ($id->client !== $client || $id->clock <= $lastClock || $id->clock > $this->clock + self::MAX_ITEMS) {
             throw new InvalidOperation('The operation id is not valid for this editor.');
         }
 
-        $list = $this->fields[Data::string($clean['f'])] ?? null;
-        $type = $clean['o'];
-        $value = $operation['v'] ?? null;
         $clean['id'] = $id->toArray();
-
-        if (! $list instanceof ItemList) {
-            throw new InvalidOperation('The field is not a list.');
-        }
 
         if ($type === 'ins') {
             $key = is_array($value) && array_keys($value) === ['i'] ? $value['i'] : null;
@@ -512,7 +534,7 @@ final class Document
         $key = $operation['i'] ?? null;
         $path = $operation['p'] ?? null;
 
-        if (! is_string($key) || ! $list->hasKey($key) || ! is_string($path) || ! in_array($path, $paths, true)) {
+        if (! is_string($key) || ! $list->hasKey($key) || ! is_string($path) || ! in_array($path, $paths, true) || $list->isText($path)) {
             throw new InvalidOperation('The item or sub-field is not valid.');
         }
 
@@ -521,6 +543,56 @@ final class Document
         }
 
         return [...$clean, 'i' => $key, 'p' => $path, 'v' => $value];
+    }
+
+    /**
+     * Typing in a list's text sub-field.
+     *
+     * @param  array<string, mixed>  $clean
+     * @param  array<string, mixed>  $operation
+     * @param  list<string>  $paths
+     * @return array<string, mixed>
+     */
+    private function validateItemText(ItemList $list, array $clean, array $operation, int $client, int $lastClock, array $paths): array
+    {
+        $key = $operation['i'] ?? null;
+        $path = $operation['p'] ?? null;
+
+        if (! is_string($key) || ! $list->hasKey($key) || ! is_string($path) || ! in_array($path, $paths, true) || ! $list->isText($path)) {
+            throw new InvalidOperation('The item or sub-field is not valid.');
+        }
+
+        $clean += ['i' => $key, 'p' => $path];
+
+        if ($clean['o'] === 'del') {
+            return $clean;
+        }
+
+        if ($clean['o'] !== 'ins') {
+            throw new InvalidOperation('The operation does not suit this field.');
+        }
+
+        $id = Id::from($operation['id'] ?? null);
+        $after = isset($operation['after']) ? Id::from($operation['after']) : null;
+        $value = $operation['v'] ?? null;
+
+        if ($id->client !== $client || $id->clock <= $lastClock || $id->clock > $this->clock + self::MAX_ITEMS) {
+            throw new InvalidOperation('The operation id is not valid for this editor.');
+        }
+
+        if ($after !== null && $id->clock <= $after->clock) {
+            throw new InvalidOperation('The insertion precedes its position.');
+        }
+
+        if (! is_string($value) || $value === '' || ! mb_check_encoding($value, 'UTF-8')) {
+            throw new InvalidOperation('The inserted text is not valid.');
+        }
+
+        if ($list->textLength($key, $path) + mb_strlen($value, 'UTF-8') > ItemList::MAX_TEXT) {
+            throw new InvalidOperation('The sub-field is too large to edit live.');
+        }
+
+        return [...$clean, 'id' => $id->toArray(), 'after' => $after?->toArray(), 'v' => $value];
     }
 
     /** @return list<array{int, int, int}> */

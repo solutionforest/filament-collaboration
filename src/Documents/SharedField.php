@@ -14,10 +14,12 @@ final readonly class SharedField
 {
     private const MAX_BYTES = 1_000_000;
 
+    /** @param list<string> $texts a list's sub-fields that merge by character */
     public function __construct(
         public string $name,
         public FieldKind $kind,
         public mixed $value,
+        public array $texts = [],
     ) {}
 
     public function canBeShared(): bool

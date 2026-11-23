@@ -1,19 +1,31 @@
-import { canonical } from '../crdt/id.js'
+import { canonical, characters } from '../crdt/id.js'
 import { flatten } from '../crdt/item-list.js'
 import { normalizeValue } from '../crdt/document.js'
-import { plain } from '../dom.js'
+import { modelOf, plain } from '../dom.js'
+import { measureText } from '../ui/measure-text.js'
 import { Binding } from './binding.js'
+
+const toIndex = (value, offset) => characters(value.slice(0, offset)).length
+const toOffset = (value, index) => characters(value).slice(0, index).join('').length
 
 /**
  * Repeaters and builders. Items are added, removed and moved by Filament's
  * own actions; this follows the resulting state. A change in which items
  * exist re-renders the field, a change inside an item does not.
+ *
+ * Text inputs and textareas inside items merge by character, keep the caret
+ * through colleagues' typing, and show where colleagues are.
  */
 export class ItemsBinding extends Binding {
     attach() {
         if (this.ready) return true
 
         this.ready = true
+        this.events = new AbortController()
+
+        for (const name of ['select', 'keyup', 'pointerup']) {
+            document.addEventListener(name, () => this.focused() && this.room.cursorMoved(), { signal: this.events.signal, capture: true })
+        }
 
         const current = this.read()
         const initial = this.content(this.room.initialValue(this.field) ?? {})
@@ -27,6 +39,10 @@ export class ItemsBinding extends Binding {
         }
 
         return true
+    }
+
+    get list() {
+        return this.document?.fields.get(this.field)?.list ?? null
     }
 
     read() {
@@ -46,6 +62,32 @@ export class ItemsBinding extends Binding {
         )
     }
 
+    /** The input of `key`'s sub-field at `path`, as in `data.key_points.<key>.point`. */
+    input(key, path) {
+        const model = path === '' ? `${this.path}.${key}` : `${this.path}.${key}.${path}`
+
+        return [...this.room.dom.root.querySelectorAll('input, textarea')].find((input) => modelOf(input) === model) ?? null
+    }
+
+    /** The text sub-field with the caret, if it is in this list. */
+    focused() {
+        const input = document.activeElement
+
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return null
+
+        const prefix = `${this.path}.`
+        const model = modelOf(input)
+
+        if (!model?.startsWith(prefix)) return null
+
+        const rest = model.slice(prefix.length)
+        const dot = rest.indexOf('.')
+        const key = dot < 0 ? rest : rest.slice(0, dot)
+        const path = dot < 0 ? '' : rest.slice(dot + 1)
+
+        return this.list?.isText(path) ? { input, key, path } : null
+    }
+
     collect() {
         if (!this.ready) return
 
@@ -54,8 +96,32 @@ export class ItemsBinding extends Binding {
 
         if (signature === this.seen) return
 
+        const focused = this.focused()
+        const caret = focused ? { key: focused.key, path: focused.path, index: toIndex(focused.input.value, focused.input.selectionEnd ?? 0) } : null
+
         this.seen = signature
-        this.room.change(this.field, current)
+        this.room.change(this.field, current, caret)
+    }
+
+    capture() {
+        this.anchors = null
+
+        const focused = this.focused()
+        const sequence = focused && this.list.sequence(focused.key, focused.path)
+
+        if (!sequence) return
+
+        const { input, key, path } = focused
+        const { value, selectionStart, selectionEnd, selectionDirection } = input
+
+        this.anchors = {
+            input,
+            key,
+            path,
+            start: sequence.idBefore(toIndex(value, selectionStart ?? 0)),
+            end: sequence.idBefore(toIndex(value, selectionEnd ?? 0)),
+            direction: selectionDirection,
+        }
     }
 
     render() {
@@ -63,6 +129,9 @@ export class ItemsBinding extends Binding {
 
         const value = this.document.value(this.field)
         const current = this.read()
+        const anchors = this.anchors
+
+        this.anchors = null
 
         if (canonical(value) === canonical(current)) {
             this.seen = canonical(current)
@@ -73,7 +142,56 @@ export class ItemsBinding extends Binding {
         // New, removed or reordered items need Filament to render their fields.
         const structural = canonical(Object.keys(value)) !== canonical(Object.keys(current))
 
+        // The input with the caret first, so setting the state leaves the caret alone.
+        if (!structural && anchors && document.activeElement === anchors.input) {
+            const sequence = this.list.sequence(anchors.key, anchors.path)
+            const text = sequence.text()
+
+            if (anchors.input.value !== text) anchors.input.value = text
+
+            anchors.input.setSelectionRange(
+                toOffset(text, sequence.indexAfter(anchors.start) ?? 0),
+                toOffset(text, sequence.indexAfter(anchors.end) ?? 0),
+                anchors.direction,
+            )
+        }
+
         this.room.wire.$set(this.path, value, structural)
         this.seen = canonical(value)
+    }
+
+    cursor() {
+        const focused = this.focused()
+        const sequence = focused && this.list.sequence(focused.key, focused.path)
+
+        if (!focused) return null
+
+        const { input, key, path } = focused
+        const { value, selectionStart, selectionEnd, selectionDirection } = input
+        const start = sequence?.idBefore(toIndex(value, selectionStart ?? 0)) ?? null
+        const end = sequence?.idBefore(toIndex(value, selectionEnd ?? 0)) ?? null
+
+        return { ...(selectionDirection === 'backward' ? { anchor: end, head: start } : { anchor: start, head: end }), item: key, path }
+    }
+
+    geometry({ anchor, head, item, path }) {
+        if (typeof item !== 'string' || typeof path !== 'string') return null
+
+        const input = this.input(item, path)
+        const sequence = this.list?.sequence(item, path)
+
+        if (!input) return null
+
+        const from = sequence ? sequence.indexAfter(anchor) : 0
+        const to = sequence ? sequence.indexAfter(head) : 0
+
+        if (from === null || to === null) return null
+
+        return measureText(input, toOffset(input.value, from), toOffset(input.value, to))
+    }
+
+    detach() {
+        this.events?.abort()
+        this.ready = false
     }
 }

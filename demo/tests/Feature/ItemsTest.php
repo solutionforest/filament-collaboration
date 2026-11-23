@@ -97,3 +97,63 @@ it('refuses a sub-field that the items do not have', function (): void {
     $editor->pending[] = ['n' => 1, 'ops' => [['o' => 'put', 'f' => 'key_points', 'i' => $key, 'p' => 'workspace_id', 'id' => [$editor->document->clock() + 1, $editor->config['client']], 'v' => 2]]];
     $editor->send()->assertConflict();
 });
+
+it('merges two people typing in the same sub-field of the same item', function (): void {
+    $article = arrangeItems();
+    $alice = Editor::open($this, User::factory()->create(), $article);
+    $bob = Editor::open($this, User::factory()->create(), $article);
+    $alice->sync();
+    $bob->sync();
+
+    $edit = function (Editor $editor, string $point): void {
+        $items = $editor->value('key_points');
+        $items[array_key_first($items)]['point'] = $point;
+        $editor->type('key_points', $items);
+    };
+
+    $edit($alice, 'First point');
+    $edit($bob, 'The First');
+    $alice->sync();
+    $bob->sync();
+    $alice->sync();
+
+    expect(array_values($alice->value('key_points'))[0]['point'])->toBe('The First point')
+        ->and($bob->value('key_points'))->toBe($alice->value('key_points'));
+});
+
+it('merges text inputs and textareas inside items by character, and nothing else', function (): void {
+    $this->actingAs(User::factory()->create());
+    $form = Livewire::test(EditDocument::class, ['record' => arrangeItems()->id])->instance()->form;
+    $fields = $form->getFlatFields(withHidden: true);
+
+    expect(ItemsType::textPaths($fields['key_points']))->toBe(['point'])
+        ->and(ItemsType::textPaths($fields['sidebar']))->toBe(['data.text', 'data.author', 'data.label', 'data.url'])
+        ->and(ItemsType::textPaths(Repeater::make('tags')->simple(TextInput::make('tag'))))->toBe([''])
+        ->and(ItemsType::textPaths(Repeater::make('codes')->simple(TextInput::make('code')->mask('999'))))->toBe([]);
+});
+
+it('rebuilds a list whose text sub-fields changed, keeping what was not saved yet', function (): void {
+    $article = arrangeItems();
+    $alice = Editor::open($this, User::factory()->create(), $article);
+    $alice->sync();
+    $items = $alice->value('key_points');
+    $items[array_key_first($items)]['point'] = 'First, edited';
+    $alice->type('key_points', $items)->sync();
+
+    // As a draft from before `point` merged by character.
+    $row = DB::table('filament_collaboration_documents')->first();
+    $forget = function (string $json): string {
+        $state = json_decode($json, true);
+        unset($state['fields']['key_points']['t']);
+
+        return json_encode($state);
+    };
+    DB::table('filament_collaboration_documents')->update(['state' => $forget($row->state), 'saved_state' => $forget($row->saved_state)]);
+
+    $bob = Editor::open($this, User::factory()->create(), $article);
+    $response = $bob->sync();
+
+    expect(array_column(array_values($bob->value('key_points')), 'point'))->toBe(['First, edited', 'Second'])
+        ->and($response->json('dirty'))->toContain('key_points')
+        ->and($response->json('state.fields.key_points.t'))->toBe(['point']);
+});

@@ -476,6 +476,33 @@ describe('repeaters and builders', () => {
         await eventually(() => assert.deepEqual(JSON.parse(app.article(id).key_points).map((item) => item.point), ['From Alice and more']), 'the list was not saved')
     })
 
+    test('two people typing in the same sub-field of one item both keep their typing', async () => {
+        await together()
+
+        await alice.getByRole('button', { name: 'Add key point' }).click()
+        await eventually(async () => assert.equal(await points(alice).count(), 1), 'Alice has no item')
+        await points(alice).first().fill('the fox')
+        await eventually(async () => assert.deepEqual(await values(bob), ['the fox']), 'Bob did not get the item')
+
+        await Promise.all([caret(alice, points(alice).first(), 3), caret(bob, points(bob).first(), -1)])
+        await Promise.all([
+            alice.keyboard.type(' quick', { delay: 60 }),
+            bob.keyboard.type(' jumps', { delay: 55 }),
+        ])
+
+        await eventually(async () => {
+            assert.deepEqual(await values(alice), ['the quick fox jumps'])
+            assert.deepEqual(await values(bob), ['the quick fox jumps'])
+        }, 'the typing did not merge')
+
+        // Each caret stayed where its owner was typing.
+        assert.equal(await points(alice).first().evaluate((input) => input.selectionStart), 'the quick'.length)
+        assert.equal(await points(bob).first().evaluate((input) => input.selectionStart), 'the quick fox jumps'.length)
+
+        // And each sees the other's caret in the input.
+        await eventually(async () => assert.ok(await bob.locator('.fi-collab-caret:visible').count(), 'no caret'), 'Bob does not see where Alice is')
+    })
+
     test('a builder block added by one person reaches the other', async () => {
         await together()
 

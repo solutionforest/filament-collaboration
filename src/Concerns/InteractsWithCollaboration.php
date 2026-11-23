@@ -432,10 +432,12 @@ trait InteractsWithCollaboration
     protected function getSharedFields(array $values): array
     {
         $fields = [];
-        $kinds = CollaborationPlugin::get()->getFieldResolver()->shareable($this->form, $this->getCollaborationIgnoredFields());
+        $resolver = CollaborationPlugin::get()->getFieldResolver();
+        $kinds = $resolver->shareable($this->form, $this->getCollaborationIgnoredFields());
+        $texts = $resolver->texts($this->form, $kinds, $this->getCollaborationIgnoredFields());
 
         foreach ($kinds as $path => $kind) {
-            $fields[] = new SharedField((string) $path, $kind, $values[$path] ?? null);
+            $fields[] = new SharedField((string) $path, $kind, $values[$path] ?? null, $texts[$path] ?? []);
         }
 
         return $fields;
