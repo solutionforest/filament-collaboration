@@ -33,4 +33,14 @@ class DocumentPolicy
     {
         return $this->update($user, $document);
     }
+
+    public function restore(User $user, Document $document): bool
+    {
+        return $this->update($user, $document);
+    }
+
+    public function forceDelete(User $user, Document $document): bool
+    {
+        return $this->update($user, $document);
+    }
 }

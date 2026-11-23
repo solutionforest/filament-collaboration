@@ -2,11 +2,13 @@ export class SyncError extends Error {
     /**
      * @param {number} status
      * @param {string} code the server's `error`, such as `expired`
+     * @param {Record<string, any> | null} body the whole answer
      */
-    constructor(status, code) {
+    constructor(status, code, body = null) {
         super(`${status} ${code}`)
         this.status = status
         this.code = code
+        this.body = body
     }
 }
 
@@ -44,7 +46,7 @@ export class HttpTransport {
 
             const body = await response.json().catch(() => null)
 
-            if (!response.ok || !body) throw new SyncError(response.status, body?.error ?? 'failed')
+            if (!response.ok || !body) throw new SyncError(response.status, body?.error ?? 'failed', body)
 
             return body
         } finally {

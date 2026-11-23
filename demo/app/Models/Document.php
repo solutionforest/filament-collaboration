@@ -9,9 +9,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Document extends Model
 {
+    // Deleting moves an article to the trash, where it can be restored with its shared draft.
+    use SoftDeletes;
+
     protected $attributes = [
         'workspace_id' => 1,
         'category' => 'News',

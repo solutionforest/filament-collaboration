@@ -13,6 +13,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Event;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
@@ -22,6 +23,7 @@ use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
+use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -83,6 +85,11 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
         });
 
         static::registerChannel();
+
+        // Tells a room at once when its record is deleted, and cleans up after it.
+        Event::listen('eloquent.deleted: *', static function (string $event, array $payload): void {
+            app(DeletedRecords::class)->handle($event, $payload);
+        });
 
         Field::macro('collaborative', function (bool|Closure $condition = true): Field {
             return FieldResolver::markField($this, $condition);

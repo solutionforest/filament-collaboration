@@ -6,10 +6,13 @@ use App\Models\Document;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
+use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use SolutionForest\FilamentCollaboration\Tables\PresenceColumn;
 
@@ -48,6 +51,7 @@ class DocumentsTable
                     'Guides' => 'Guides',
                     'Stories' => 'Stories',
                 ]),
+                TrashedFilter::make(),
             ])
             ->recordActions([
                 ActionGroup::make([
@@ -59,6 +63,8 @@ class DocumentsTable
                         ->url(fn (Document $record): string => $record->publicUrl())
                         ->openUrlInNewTab()
                         ->visible(fn (Document $record): bool => $record->status === 'published' && filled($record->slug)),
+                    RestoreAction::make(),
+                    ForceDeleteAction::make(),
                 ]),
             ]);
     }

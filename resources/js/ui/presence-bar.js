@@ -106,7 +106,7 @@ export class PresenceBar {
 
     status() {
         const { status, dirty, config } = this.room
-        const failing = ['offline', 'stopped', 'denied'].includes(status)
+        const failing = ['offline', 'stopped', 'denied', 'deleted'].includes(status)
 
         if (!this.room.isLive && !failing) return null
 
@@ -131,8 +131,9 @@ export class PresenceBar {
     }
 
     notice() {
-        const { notice, config } = this.room
+        const { notice, config, deleted } = this.room
 
+        if (deleted) return this.deletedNotice(deleted)
         if (!notice) return null
 
         return element('span', { class: 'fi-collab-notice', role: 'status' }, [
@@ -144,6 +145,32 @@ export class PresenceBar {
                     'data-key': 'pull',
                     text: config.strings.pull,
                     on: { click: () => this.room.pull(true) },
+                }),
+        ])
+    }
+
+    /**
+     * @param {{name: string | null, restorable: boolean, copied?: boolean}} deleted
+     */
+    deletedNotice(deleted) {
+        const { strings } = this.room.config
+
+        return element('span', { class: 'fi-collab-notice fi-collab-notice-danger', role: 'alert' }, [
+            element('span', { text: deleted.name ? translate(strings.deleted_by, { name: deleted.name }) : strings.deleted }),
+            element('button', {
+                type: 'button',
+                class: 'fi-collab-link',
+                'data-key': 'copy',
+                text: deleted.copied ? strings.copied : strings.copy,
+                on: { click: () => this.room.copyText() },
+            }),
+            deleted.restorable &&
+                element('button', {
+                    type: 'button',
+                    class: 'fi-collab-link',
+                    'data-key': 'restore',
+                    text: strings.restore,
+                    on: { click: () => this.room.restore() },
                 }),
         ])
     }
