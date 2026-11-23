@@ -557,7 +557,8 @@ describe('saving', () => {
 
         await alice.route(/livewire.*update/, async (route) => {
             await new Promise((resolve) => setTimeout(resolve, 1500))
-            await route.continue()
+            // Unrouted meanwhile, Playwright has let the request through itself.
+            await route.continue().catch(() => {})
         })
 
         await endOfParagraph(bob, 0)
@@ -627,7 +628,8 @@ describe('saving', () => {
         const original = await field(alice, 'title').inputValue()
         const slow = async (route) => {
             await new Promise((resolve) => setTimeout(resolve, 1500))
-            await route.continue()
+            // Unrouted meanwhile, Playwright has let the request through itself.
+            await route.continue().catch(() => {})
         }
 
         await alice.route(/livewire.*update/, slow)
