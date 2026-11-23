@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Documents;
 
 use Closure;
+use Illuminate\Contracts\Auth\Authenticatable;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Crdt\Document;
@@ -118,13 +119,13 @@ final class DocumentRepository
      *
      * @throws InvalidOperation
      */
-    public function receive(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = []): void
+    public function receive(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): void
     {
         if ($batches === []) {
             return;
         }
 
-        $this->transaction($room, fn (SharedDraft $draft) => $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed));
+        $this->transaction($room, fn (SharedDraft $draft) => $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed, $by));
     }
 
     /**
@@ -135,11 +136,11 @@ final class DocumentRepository
      * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
      */
-    public function snapshot(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = []): ?Document
+    public function snapshot(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): ?Document
     {
         try {
-            return $this->transaction($room, function (SharedDraft $draft) use ($client, $epoch, $batches, $writable, $allowed): Document {
-                $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed);
+            return $this->transaction($room, function (SharedDraft $draft) use ($client, $epoch, $batches, $writable, $allowed, $by): Document {
+                $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed, $by);
 
                 return clone $draft->document;
             });
@@ -154,10 +155,11 @@ final class DocumentRepository
      * @param  list<SharedField>  $fields
      * @param  list<string>  $published  fields that were saved from `$snapshot`
      * @param  list<string>  $overwritten  fields saved by an editor that was not live, whose value wins
+     * @return array<string, list<Contributor>> who changed each saved field since it was last saved
      */
-    public function markSaved(string $room, array $fields, ?Document $snapshot, array $published, array $overwritten, string $name, int $client): void
+    public function markSaved(string $room, array $fields, ?Document $snapshot, array $published, array $overwritten, string $name, int $client, ?Authenticatable $by = null): array
     {
-        $this->transaction($room, function (SharedDraft $draft) use ($fields, $snapshot, $published, $overwritten, $name, $client): void {
+        return $this->transaction($room, function (SharedDraft $draft) use ($fields, $snapshot, $published, $overwritten, $name, $client, $by): array {
             $operations = [];
             $touched = [];
 
@@ -195,6 +197,13 @@ final class DocumentRepository
             $draft->refreshDirty(...$touched);
             $draft->version++;
             $draft->savedBy = Data::encode(['name' => $name, 'client' => $client]);
+
+            // Whoever overwrote a field without live editing changed it too.
+            if ($by !== null) {
+                $draft->contributed(Contributor::of($by), ...array_values(array_intersect($overwritten, $touched)));
+            }
+
+            return $draft->takeContributors(...$touched);
         });
     }
 
@@ -227,6 +236,7 @@ final class DocumentRepository
 
             $this->append($draft, Document::SERVER, $operations);
             $draft->dirty = array_values(array_diff($draft->dirty, $fields));
+            $draft->takeContributors(...$fields);
         });
     }
 
@@ -302,7 +312,7 @@ final class DocumentRepository
      * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
      */
-    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable, array $allowed = []): void
+    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): void
     {
         if ($batches === []) {
             return;
@@ -340,6 +350,10 @@ final class DocumentRepository
 
         if ($touched !== []) {
             $draft->refreshDirty(...array_map(strval(...), array_keys($touched)));
+
+            if ($by !== null) {
+                $draft->contributed(Contributor::of($by), ...array_map(strval(...), array_keys($touched)));
+            }
         }
     }
 

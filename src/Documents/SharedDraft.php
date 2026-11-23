@@ -13,6 +13,9 @@ final class SharedDraft
     /** @var list<array{sequence: int, operations: list<array<string, mixed>>}> appended in this transaction */
     public array $appended = [];
 
+    /** @var array<string, array<string, Contributor>> by field, then by user, since the field was last saved */
+    public array $contributors = [];
+
     /**
      * @param  array<string, string>  $savedHashes
      * @param  list<string>  $dirty
@@ -34,7 +37,7 @@ final class SharedDraft
     /** @param array<string, mixed> $row */
     public static function fromRow(array $row): self
     {
-        return new self(
+        $draft = new self(
             id: Data::int($row['id'] ?? null),
             epoch: Data::int($row['epoch'] ?? null),
             sequence: Data::int($row['sequence'] ?? null),
@@ -47,6 +50,45 @@ final class SharedDraft
             dirty: Data::strings(Data::decode($row['dirty'] ?? null)),
             savedBy: Data::nullableString($row['saved_by'] ?? null),
         );
+
+        foreach (Data::decode($row['contributors'] ?? null) as $field => $people) {
+            foreach (Data::list($people) as $person) {
+                $contributor = Contributor::from(Data::map($person));
+
+                if ($contributor !== null) {
+                    $draft->contributors[$field][$contributor->key()] = $contributor;
+                }
+            }
+        }
+
+        return $draft;
+    }
+
+    /** Records that somebody changed these fields. */
+    public function contributed(Contributor $contributor, string ...$fields): void
+    {
+        foreach ($fields as $field) {
+            $this->contributors[$field][$contributor->key()] = $contributor;
+        }
+    }
+
+    /**
+     * Who changed these fields since they were last saved, forgetting them.
+     *
+     * @return array<string, list<Contributor>>
+     */
+    public function takeContributors(string ...$fields): array
+    {
+        $taken = [];
+
+        foreach ($fields as $field) {
+            if (isset($this->contributors[$field])) {
+                $taken[$field] = array_values($this->contributors[$field]);
+                unset($this->contributors[$field]);
+            }
+        }
+
+        return $taken;
     }
 
     public function refreshDirty(string ...$fields): void
@@ -78,6 +120,10 @@ final class SharedDraft
             'saved_hashes' => Data::encode($this->savedHashes),
             'dirty' => Data::encode($this->dirty),
             'saved_by' => $this->savedBy,
+            'contributors' => $this->contributors === [] ? null : Data::encode(array_map(
+                static fn (array $people): array => array_values(array_map(static fn (Contributor $person): array => $person->toArray(), $people)),
+                $this->contributors,
+            )),
         ];
     }
 }
