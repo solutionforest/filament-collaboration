@@ -95,6 +95,8 @@ interface RoomConfig {
     labels: Record<string, string>
     /** Fields that are not live and are read-only for others while somebody is in them. */
     locks: string[]
+    /** Live fields whose items are uploaded files. */
+    uploads?: string[]
     /** The adapter each live field is edited through, if not a built-in binding. */
     adapters?: Record<string, string>
     reactive: string[]

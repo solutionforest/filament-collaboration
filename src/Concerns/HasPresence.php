@@ -46,6 +46,7 @@ trait HasPresence
             allowed: $this->getCollaborationAllowedValues(),
             locks: $this->getCollaborationLocks(),
             adapters: $this->getCollaborationAdapters(),
+            uploads: $this->getCollaborationUploads(),
         );
 
         return $view?->render() ?? '';
@@ -104,6 +105,12 @@ trait HasPresence
 
     /** @return array<string, string> */
     protected function getCollaborationAdapters(): array
+    {
+        return [];
+    }
+
+    /** @return list<string> */
+    protected function getCollaborationUploads(): array
     {
         return [];
     }

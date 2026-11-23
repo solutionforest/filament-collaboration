@@ -7,6 +7,7 @@ namespace SolutionForest\FilamentCollaboration\Fields;
 use Closure;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Field;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
@@ -22,6 +23,7 @@ use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
+use SolutionForest\FilamentCollaboration\Fields\Types\UploadType;
 use SolutionForest\FilamentCollaboration\Support\FormState;
 use Throwable;
 
@@ -80,6 +82,25 @@ final readonly class FieldResolver
         }
 
         return $adapters;
+    }
+
+    /**
+     * The live fields whose items are uploaded files.
+     *
+     * @param  array<string, FieldKind>  $live
+     * @return list<string>
+     */
+    public function uploads(Schema $schema, array $live): array
+    {
+        $uploads = [];
+
+        foreach (FormState::fields($schema) as $path => $field) {
+            if (($live[(string) $path] ?? null) === FieldKind::Items && $field instanceof FileUpload) {
+                $uploads[] = (string) $path;
+            }
+        }
+
+        return $uploads;
     }
 
     /**
@@ -227,6 +248,14 @@ final readonly class FieldResolver
 
         foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
             $path = (string) $path;
+
+            if (($writable[$path] ?? null) === FieldKind::Items && $field instanceof FileUpload) {
+                // Each item is one file; the server fills in which files it may be.
+                $allowed[$path] = [''];
+                $allowed[$path.UploadType::FILES] = [];
+
+                continue;
+            }
 
             if (($writable[$path] ?? null) === FieldKind::Items) {
                 // For a list, what its items may contain.

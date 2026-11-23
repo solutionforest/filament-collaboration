@@ -13,6 +13,7 @@ use Filament\Forms\Components\Builder\Block;
 use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\CodeEditor\Enums\Language;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\MarkdownEditor;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
@@ -80,6 +81,12 @@ class DocumentForm
                                 ])
                                 ->addActionLabel('Add to sidebar'),
                         ]),
+                    Section::make('Gallery')
+                        ->description('Uploads are stored at once, so everybody sees them; adding, removing and reordering merge.')
+                        ->schema([
+                            FileUpload::make('gallery')->hiddenLabel()->image()->multiple()->reorderable()->directory('gallery')->disk('public')->maxSize(2048),
+                        ])
+                        ->collapsible(),
                     Section::make('More editors')
                         ->description("Filament's Markdown and code editors, live through the adapters the package ships.")
                         ->schema([

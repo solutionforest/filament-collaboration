@@ -75,7 +75,8 @@ Nothing in your form changes. The package reads the form you already have and de
 | `Select`, `Toggle`, `Checkbox`, `CheckboxList`, `Radio`, `ToggleButtons`, `TagsInput`, `DateTimePicker`, `ColorPicker`, `Slider`, masked, email and number inputs | the latest choice wins |
 | `Repeater` and `Builder` with simple fields inside | adding, removing and moving items merge; text inputs and textareas inside items merge by character; other sub-fields take the latest choice |
 | Many-to-many `Select` and `CheckboxList` | merge on save, unless you mark them `collaborative()` |
-| Passwords, uploads, Markdown and code editors, hidden and disabled fields, lists holding uploads, rich text or nested lists | merge on save |
+| `FileUpload` | each file is stored as soon as it is uploaded; adding, removing and reordering files merge |
+| Passwords, media library uploads, hidden and disabled fields, lists holding uploads, rich text or nested lists | merge on save |
 
 ![The rich editor, live](media/rich-editor.png)
 
@@ -366,7 +367,15 @@ An image inserted into a rich editor is stored at once, so whoever saves keeps i
 - Discarding the draft deletes the images nobody saved.
 - Images removed before saving are deleted by `php artisan filament-collaboration:prune-uploads`, scheduled daily for images older than `prune_uploads_after` hours. Undo can bring an image back until then. **Your scheduler must be running** (`php artisan schedule:work`, or cron).
 
-Upload fields themselves merge on save.
+**Upload fields** work the same way. A file is checked against the field's own rules (type, size, count) and stored the moment it finishes uploading, so everybody sees it at once and anybody's save keeps it. The list of files is shared like a repeater's items: adding, removing and reordering merge. A browser can only add files stored for this draft, or files the record already has.
+
+If you use Filament's `preventFilePathTampering()`, also allow files stored for the draft, as a colleague's file is not yet one of the record's:
+
+```php
+FileUpload::make('gallery')->preventFilePathTampering(allowFilePathUsing: fn (string $file): bool => app(SharedUploads::class)->isStored($file));
+```
+
+Media library and Curator fields, which save through a relationship, still merge on save.
 
 ## 9. Extending
 

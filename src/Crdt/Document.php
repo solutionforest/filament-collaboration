@@ -380,7 +380,7 @@ final class Document
         }
 
         if ($kind === FieldKind::Items) {
-            return $this->validateItemOperation($clean, $operation, $client, $lastClock, $allowed[$field] ?? []);
+            return $this->validateItemOperation($clean, $operation, $client, $lastClock, $allowed[$field] ?? [], $allowed[$field."\0files"] ?? null);
         }
 
         if ($type === 'del' && $kind !== FieldKind::Value) {
@@ -476,9 +476,10 @@ final class Document
      * @param  array<string, mixed>  $clean
      * @param  array<string, mixed>  $operation
      * @param  list<string>  $paths  the sub-field paths items may have
+     * @param  list<string>|null  $files  for uploads: the only files an item may be
      * @return array<string, mixed>
      */
-    private function validateItemOperation(array $clean, array $operation, int $client, int $lastClock, array $paths): array
+    private function validateItemOperation(array $clean, array $operation, int $client, int $lastClock, array $paths, ?array $files = null): array
     {
         $list = $this->fields[Data::string($clean['f'])] ?? null;
         $type = $clean['o'];
@@ -540,6 +541,11 @@ final class Document
 
         if (! self::isSimpleValue($value) || strlen(Data::encode($value)) > self::MAX_VALUE_BYTES) {
             throw new InvalidOperation('The value cannot be shared.');
+        }
+
+        // An upload may only name a file stored for this draft, or one the record already has.
+        if ($files !== null && $value !== null && ! in_array($value, $files, true)) {
+            throw new InvalidOperation('The file was not uploaded here.');
         }
 
         return [...$clean, 'i' => $key, 'p' => $path, 'v' => $value];

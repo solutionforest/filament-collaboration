@@ -6,11 +6,15 @@ namespace SolutionForest\FilamentCollaboration\Concerns;
 
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
 use Filament\Notifications\Notification;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
@@ -206,6 +210,51 @@ trait InteractsWithCollaboration
         return ['id' => (string) $stored, 'src' => $component->getFileAttachmentUrl($stored)];
     }
 
+    /**
+     * Stores the files just uploaded to a live upload field, so everybody sees
+     * them and any save keeps them. Validated by the field's own rules first.
+     *
+     * @return array<string, string> the field's files, by key
+     */
+    #[Exposed]
+    #[Renderless]
+    public function storeCollaborationUpload(string $field): array
+    {
+        $this->authorizeAccess();
+
+        $component = FormState::fields($this->form, withHidden: false)[$field] ?? null;
+
+        if (! $component instanceof FileUpload || ! isset($this->getCollaborationLiveFields()[$field])) {
+            return [];
+        }
+
+        $before = Arr::wrap($component->getRawState());
+        $validator = Validator::make(['files' => $before], ['files' => $component->getValidationRules()], [], ['files' => $component->getValidationAttribute()]);
+
+        if ($validator->fails()) {
+            throw ValidationException::withMessages([$component->getStatePath() => $validator->errors()->first()]);
+        }
+
+        $component->saveUploadedFiles();
+
+        $disk = $component->getDiskName();
+        $files = array_filter(Arr::wrap($component->getRawState()), is_string(...));
+
+        foreach (array_diff($files, array_filter($before, is_string(...))) as $stored) {
+            if (Storage::disk($disk)->exists($stored)) {
+                app(SharedUploads::class)->track($this->getCollaborationRoom(), $field, $disk, $stored);
+            }
+        }
+
+        $stored = [];
+
+        foreach ($files as $key => $path) {
+            $stored[(string) $key] = $path;
+        }
+
+        return $stored;
+    }
+
     public function discardSharedDraftAction(): Action
     {
         return Action::make('discardSharedDraft')
@@ -377,6 +426,12 @@ trait InteractsWithCollaboration
         $plugin = CollaborationPlugin::get();
 
         return $plugin->getFieldResolver()->lockable($this->form, $this->getCollaborationLiveFields(), $plugin->locksWhileEditing());
+    }
+
+    /** @return list<string> */
+    protected function getCollaborationUploads(): array
+    {
+        return CollaborationPlugin::get()->getFieldResolver()->uploads($this->form, $this->getCollaborationLiveFields());
     }
 
     /** @return array<string, string> */

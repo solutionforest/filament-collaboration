@@ -11,6 +11,7 @@ use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Crdt\Document;
 use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\FilamentCollaboration\Fields\Types\UploadType;
 use SolutionForest\FilamentCollaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Support\Database;
 
@@ -29,6 +30,7 @@ final class DocumentRepository
     public function __construct(
         private readonly PresenceRepository $presence,
         private readonly RoomNotifier $notifier,
+        private readonly SharedUploads $uploads,
     ) {}
 
     public function exists(string $room): bool
@@ -340,7 +342,7 @@ final class DocumentRepository
                 throw new InvalidOperation('Too many operations.');
             }
 
-            $operations = $draft->document->receive($client, Data::int($batch['n'] ?? null), $batch['ops'] ?? null, $writable, $allowed);
+            $operations = $draft->document->receive($client, Data::int($batch['n'] ?? null), $batch['ops'] ?? null, $writable, $this->withFiles($draft, $allowed));
 
             foreach ($operations as $operation) {
                 $accepted[] = $operation;
@@ -409,6 +411,33 @@ final class DocumentRepository
         unset($state['fields'][$field]);
 
         return Document::from($state);
+    }
+
+    /**
+     * For upload fields: the files their items may be, which are those stored
+     * for this draft and those the record or the draft already has.
+     *
+     * @param  array<string, list<string>>  $allowed
+     * @return array<string, list<string>>
+     */
+    private function withFiles(SharedDraft $draft, array $allowed): array
+    {
+        foreach (array_keys($allowed) as $key) {
+            $key = (string) $key;
+
+            if (! str_ends_with($key, UploadType::FILES)) {
+                continue;
+            }
+
+            $field = substr($key, 0, -strlen(UploadType::FILES));
+            $allowed[$key] = array_values(array_unique([
+                ...$this->uploads->storedFor($draft->room, $field),
+                ...SharedUploads::filesIn($draft->saved, $field),
+                ...SharedUploads::filesIn($draft->document, $field),
+            ]));
+        }
+
+        return $allowed;
     }
 
     /**
