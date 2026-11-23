@@ -164,7 +164,7 @@ final class DocumentRepository
                     $draft->saved->adopt($snapshot, $path);
 
                     // Saving turns a temporary upload into a stored path, which everybody needs.
-                    if ($field->kind === FieldKind::RichText && $this->images($snapshot->value($path)) !== $this->images($field->value)) {
+                    if ($field->kind === FieldKind::RichText && SharedUploads::images($snapshot->value($path)) !== SharedUploads::images($field->value)) {
                         $changes = $draft->saved->changes($path, $field->value, $draft->document->clock());
                         $draft->document->apply($changes);
                         $draft->saved->apply($changes);
@@ -383,20 +383,6 @@ final class DocumentRepository
         unset($state['fields'][$field]);
 
         return Document::from($state);
-    }
-
-    /** @return list<string> */
-    private function images(mixed $node): array
-    {
-        $node = Data::map($node);
-        $id = Data::nullableString(Data::map($node['attrs'] ?? null)['id'] ?? null);
-        $images = ($node['type'] ?? null) === 'image' && $id !== null ? [$id] : [];
-
-        foreach (Data::list($node['content'] ?? null) as $child) {
-            array_push($images, ...$this->images($child));
-        }
-
-        return $images;
     }
 
     /**

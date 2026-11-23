@@ -21,6 +21,9 @@ return [
     // How long an issued room token is valid. Tokens renew themselves while a page is open.
     'token_lifetime' => (int) env('FILAMENT_COLLABORATION_TOKEN_LIFETIME', 900),
 
+    // Hours before an image inserted into a draft, but never saved, is deleted daily. `null` turns this off.
+    'prune_uploads_after' => env('FILAMENT_COLLABORATION_PRUNE_UPLOADS_AFTER', 24),
+
     // Sync requests per user per minute, across all of their tabs.
     'rate_limit' => (int) env('FILAMENT_COLLABORATION_RATE_LIMIT', 2400),
 ];
