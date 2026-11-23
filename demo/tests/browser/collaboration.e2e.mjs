@@ -487,6 +487,36 @@ describe('saving', () => {
         }, 'the list was not saved')
     })
 
+    test('text inputs stay editable while their own form saves', async () => {
+        const id = await together()
+        const original = await field(alice, 'title').inputValue()
+        const slow = async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            await route.continue()
+        }
+
+        await alice.route(/livewire.*update/, slow)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' saved')
+
+        const { saved } = await startSave(alice)
+
+        await alice.waitForTimeout(250)
+        assert.equal(await field(alice, 'title').evaluate((input) => input.readOnly), false)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' and after', { delay: 40 })
+        await saved
+        await alice.unroute(/livewire.*update/, slow)
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), `${original} saved and after`)
+            assert.equal(await field(bob, 'title').inputValue(), `${original} saved and after`)
+        }, 'typing during the save was lost')
+
+        await save(bob)
+        await eventually(() => assert.equal(app.article(id).title, `${original} saved and after`), 'the second save missed it')
+    })
+
     test('two saves at once lose nothing', async () => {
         const id = await together()
 
