@@ -11,6 +11,10 @@ on:
         description: Rounds to run
         default: '30'
 
+# Composer downloads from GitHub as this repository, not anonymously, which is rate limited.
+env:
+  COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+
 jobs:
   chaos:
     runs-on: self-hosted
