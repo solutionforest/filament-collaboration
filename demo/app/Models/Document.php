@@ -45,6 +45,10 @@ class Document extends Model
         'editor_notes',
         'newsletter_markdown',
         'embed_code',
+        'tinymce_html',
+        'ckeditor_html',
+        'quill_html',
+        'trix_html',
     ];
 
     protected function casts(): array

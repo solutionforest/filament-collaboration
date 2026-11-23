@@ -140,6 +140,8 @@ interface Window {
     filamentCollaboration?: {
         inspect(): Array<ReturnType<import('./room/room.js').Room['inspect']>>
         registerAdapter(name: string, definition: AdapterDefinition): void
+        minimalChange: typeof import('./adapters/registry.js').minimalChange
+        html: typeof import('./adapters/html.js')
     }
 }
 

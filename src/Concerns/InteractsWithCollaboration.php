@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Crdt\Html;
+use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\EditTrail;
 use SolutionForest\FilamentCollaboration\Documents\SharedField;
@@ -284,7 +286,7 @@ trait InteractsWithCollaboration
 
         // Save the draft, then give the browser its own state back: replacing it
         // would erase whatever was typed while this request was running.
-        $publishing = $live->valuesToPublish($mine, $theirs);
+        $publishing = $this->fromSharedValues($live->valuesToPublish($this->toSharedValues($mine), $this->toSharedValues($theirs)), $theirs);
         $typed = FormState::only($mine, array_map(strval(...), array_keys($publishing)));
         $this->writeCollaborationValues($publishing);
 
@@ -463,11 +465,62 @@ trait InteractsWithCollaboration
         $kinds = $resolver->shareable($this->form, $this->getCollaborationIgnoredFields());
         $texts = $resolver->texts($this->form, $kinds, $this->getCollaborationIgnoredFields());
 
+        $values = $this->toSharedValues($values);
+
         foreach ($kinds as $path => $kind) {
             $fields[] = new SharedField((string) $path, $kind, $values[$path] ?? null, $texts[$path] ?? []);
         }
 
         return $fields;
+    }
+
+    /** @return list<string> rich text fields whose form state is HTML, edited through an adapter */
+    protected function getCollaborationHtmlFields(): array
+    {
+        $resolver = CollaborationPlugin::get()->getFieldResolver();
+
+        return $resolver->htmlFields($this->form, $resolver->shareable($this->form, $this->getCollaborationIgnoredFields()));
+    }
+
+    /**
+     * Form state as the draft holds it: HTML as a document.
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    protected function toSharedValues(array $values): array
+    {
+        foreach ($this->getCollaborationHtmlFields() as $path) {
+            if (array_key_exists($path, $values)) {
+                $values[$path] = Html::toDocument(is_string($values[$path]) ? $values[$path] : '');
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * The draft's values as form state: a document as HTML. A value that
+     * means what is stored is kept exactly as stored.
+     *
+     * @param  array<string, mixed>  $values
+     * @param  array<string, mixed>  $stored
+     * @return array<string, mixed>
+     */
+    protected function fromSharedValues(array $values, array $stored): array
+    {
+        foreach ($this->getCollaborationHtmlFields() as $path) {
+            if (! is_array($values[$path] ?? null)) {
+                continue;
+            }
+
+            $isStored = is_string($stored[$path] ?? null)
+                && Fingerprint::value(FieldKind::RichText, Html::toDocument($stored[$path])) === Fingerprint::value(FieldKind::RichText, $values[$path]);
+
+            $values[$path] = $isStored ? $stored[$path] : Html::fromDocument(Data::map($values[$path]));
+        }
+
+        return $values;
     }
 
     /** @return array<string, FieldKind> */

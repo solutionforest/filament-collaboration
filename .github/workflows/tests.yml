@@ -87,7 +87,7 @@ jobs:
     name: Browsers · ${{ matrix.browser }} · ${{ matrix.transport }}
     # Our runners include macOS machines, where setup-php can take minutes or fail.
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

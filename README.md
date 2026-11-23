@@ -20,7 +20,8 @@
 
 | | |
 | --- | --- |
-| **Live fields** | Text inputs, textareas and Filament's own `RichEditor` merge character by character, also inside repeaters and builders. Selects, toggles, dates and tags take the latest choice. |
+| **Live fields** | Text inputs, textareas and Filament's own `RichEditor`, Markdown and code editors merge character by character, also inside repeaters and builders. Selects, toggles, dates and tags take the latest choice. |
+| **Any editor** | TinyMCE, CKEditor, Quill, Trix or your own become live through a short JavaScript [adapter](docs/guide.md#adapters-for-other-editors); fields that cannot be live say who is editing them, and can lock. |
 | **See each other** | Avatars in the header, an outline and name on the field each person is in, their caret and selection, and who is on which record in tables. |
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
@@ -139,11 +140,11 @@ Each push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What |
 | --- | --- |
-| Pest | 270 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus Filament 4.13.3; at least 95% line coverage |
+| Pest | 281 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus Filament 4.13.3; at least 95% line coverage |
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
-| Browsers | 40 scenarios in Chromium with polling and with Reverb, and in WebKit |
+| Browsers | 47 scenarios in Chromium with polling and with Reverb, and in WebKit |
 | Chaos | [nightly](.github/workflows/chaos.yml): four browsers pressing random keys must converge with no editor error |
 
 Run them yourself:
@@ -160,7 +161,7 @@ cd .. && npm run check          # JavaScript: lint, types and tests
 
 - Without broadcasting, changes arrive by polling, every 0.4 s by default.
 - Inside repeater and builder items, only text inputs and textareas merge by character, and undo there is the browser's own. Lists holding uploads, rich text or nested lists merge on save.
-- Rich editors with custom blocks, mentions or plugins, Markdown and code editors merge on save.
+- Rich editors with custom blocks, mentions or plugins merge on save. Other editors (TinyMCE, CKEditor, Quill, Trix...) are live through a short [adapter](docs/guide.md#adapters-for-other-editors); the demo has working ones.
 - It relies on two Filament internals, Livewire's `queueUpdate` and the rich editor's `getEditor()`, both covered by the browser tests.
 
 More in the guide's [troubleshooting](docs/guide.md#11-troubleshooting).

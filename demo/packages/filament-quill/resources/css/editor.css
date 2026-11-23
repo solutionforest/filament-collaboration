@@ -1,0 +1,7 @@
+/* The field sits in a Filament form: match its rounded, bordered inputs. */
+.demo-quill {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: white;
+    color: #18181b;
+}

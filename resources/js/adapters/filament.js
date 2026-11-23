@@ -82,6 +82,9 @@ export function registerFilamentAdapters(register) {
             return {
                 read: () => view.state.doc.toString(),
                 write(value) {
+                    // Take in typing the editor has not read from its DOM yet, or the two collide.
+                    view.observer?.flush?.()
+
                     const change = minimalChange(view.state.doc.toString(), value)
 
                     if (change) view.dispatch({ changes: change })

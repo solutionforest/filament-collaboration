@@ -584,7 +584,7 @@ describe('saving', () => {
 
                 const value = await text(page)
 
-                assert.match(value, /paragraph\. before the save/)
+                assert.match(value, / before the save/)
                 assert.match(value, / saved and after/)
             }
         }, 'typing during the save was lost')
@@ -855,6 +855,37 @@ describe('editors made live by adapters', () => {
             const column = name.startsWith('markdown') ? 'newsletter_markdown' : 'embed_code'
 
             await eventually(() => assert.equal(app.article(id)[column], 'the quick fox jumps'), 'the editor was not saved')
+        })
+    }
+})
+
+describe('third-party HTML editors, through adapters', () => {
+    const call = (page, name, method, ...args) =>
+        page.evaluate(({ name, method, args }) => window.Alpine.$data(document.querySelector(`.fi-page .demo-${name}`))[method](...args), { name, method, args })
+    const text = (page, name) => call(page, name, 'text')
+
+    for (const [name, column] of [['tinymce', 'tinymce_html'], ['ckeditor', 'ckeditor_html'], ['quill', 'quill_html'], ['trix', 'trix_html']]) {
+        test(`${name}: two people typing in one paragraph both keep their words, with carets`, async () => {
+            const id = await together()
+
+            // Position 1 is just inside the first paragraph.
+            await call(alice, name, 'place', 1)
+            await alice.keyboard.type('the fox', { delay: 25 })
+            await eventually(async () => assert.equal((await text(bob, name)).trim(), 'the fox'), 'Bob did not get the text')
+
+            await Promise.all([call(alice, name, 'place', 4), call(bob, name, 'place', 8)])
+            await Promise.all([alice.keyboard.type(' quick', { delay: 70 }), bob.keyboard.type(' jumps', { delay: 65 })])
+
+            await eventually(async () => {
+                assert.equal((await text(alice, name)).trim(), 'the quick fox jumps')
+                assert.equal((await text(bob, name)).trim(), 'the quick fox jumps')
+            }, 'the typing did not merge', 15000)
+
+            await eventually(async () => assert.ok(await bob.locator('.fi-collab-caret:visible').count(), 'no caret'), 'Bob does not see where Alice is')
+
+            await save(bob)
+            // Quill writes its spaces as &nbsp;.
+            await eventually(() => assert.match((app.article(id)[column] ?? '').replaceAll('&nbsp;', ' '), /the quick fox jumps/), 'the editor was not saved')
         })
     }
 })

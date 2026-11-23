@@ -82,6 +82,27 @@ final readonly class FieldResolver
         return $adapters;
     }
 
+    /**
+     * Rich text fields edited through an adapter hold HTML; the draft holds a document.
+     *
+     * @param  array<string, FieldKind>  $kinds
+     * @return list<string>
+     */
+    public function htmlFields(Schema $schema, array $kinds): array
+    {
+        $fields = [];
+
+        foreach (FormState::fields($schema) as $path => $field) {
+            $path = (string) $path;
+
+            if (($kinds[$path] ?? null) === FieldKind::RichText && $this->adapterOf($field) !== null) {
+                $fields[] = $path;
+            }
+        }
+
+        return $fields;
+    }
+
     private function adapterOf(Field $field): ?string
     {
         $marked = $field->getMeta(self::ADAPTER_META_KEY);

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e2a6bfdcf1e02f9d2ca68d3f54d04ecf",
+    "content-hash": "83d9267569fc9f241686bf22c5fc541c",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -896,6 +896,154 @@
                 }
             ],
             "time": "2026-09-18T07:38:01+00:00"
+        },
+        {
+            "name": "demo/filament-ckeditor",
+            "version": "dev-feat/html-editors",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament-ckeditor",
+                "reference": "5f8d71291f293c2e476355c67693901fa0ddf13c"
+            },
+            "require": {
+                "filament/forms": "^5.8.3",
+                "php": "^8.3"
+            },
+            "suggest": {
+                "solutionforest/filament-collaboration": "Makes the field live, with carets"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Demo\\CkEditor\\CkEditorServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Demo\\CkEditor\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "A CKEditor 5 form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "demo/filament-quill",
+            "version": "dev-feat/html-editors",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament-quill",
+                "reference": "6a9539c89b6a8a41bde48a3ffce256a50edfdda5"
+            },
+            "require": {
+                "filament/forms": "^5.8.3",
+                "php": "^8.3"
+            },
+            "suggest": {
+                "solutionforest/filament-collaboration": "Makes the field live, with carets"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Demo\\Quill\\QuillServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Demo\\Quill\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "A Quill form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "demo/filament-tinymce",
+            "version": "dev-feat/html-editors",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament-tinymce",
+                "reference": "2f33d3187929dbcb9cb29c4ef2b2a99a8c1be7d1"
+            },
+            "require": {
+                "filament/forms": "^5.8.3",
+                "php": "^8.3"
+            },
+            "suggest": {
+                "solutionforest/filament-collaboration": "Makes the field live, with carets"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Demo\\TinyMce\\TinyMceServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Demo\\TinyMce\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "A TinyMCE form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "demo/filament-trix",
+            "version": "dev-feat/html-editors",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament-trix",
+                "reference": "9d8bbc6d1a9936db6f1498a1c7b47c2aa94507b8"
+            },
+            "require": {
+                "filament/forms": "^5.8.3",
+                "php": "^8.3"
+            },
+            "suggest": {
+                "solutionforest/filament-collaboration": "Makes the field live, with carets"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Demo\\Trix\\TrixServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Demo\\Trix\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "A Trix form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "dflydev/dot-access-data",
@@ -6145,11 +6293,11 @@
         },
         {
             "name": "solutionforest/filament-collaboration",
-            "version": "dev-feat/reverb-transport",
+            "version": "dev-feat/html-editors",
             "dist": {
                 "type": "path",
                 "url": "..",
-                "reference": "4bead6b3d84136ceb5b17e75dc86f67ec76da578"
+                "reference": "af430ce40d0e117ea4028b5f5fb1c1ba85dd763f"
             },
             "require": {
                 "filament/filament": "^4.13.3 || ^5.8.3",
@@ -6186,8 +6334,8 @@
             ],
             "description": "Google Docs-style collaborative editing for Filament: live fields, presence, cursors and merge on save, over plain HTTP with its own CRDT.",
             "keywords": [
-                "collaborative editing",
                 "collaboration",
+                "collaborative editing",
                 "crdt",
                 "filament",
                 "filament-plugin",
@@ -13417,6 +13565,10 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
+        "demo/filament-ckeditor": 20,
+        "demo/filament-quill": 20,
+        "demo/filament-tinymce": 20,
+        "demo/filament-trix": 20,
         "solutionforest/filament-collaboration": 20
     },
     "prefer-stable": true,
