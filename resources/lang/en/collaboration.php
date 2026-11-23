@@ -113,5 +113,9 @@ return [
         'in_field' => 'In :field',
         'more' => ':count more',
         'jump' => 'Go to :name',
+        'follow' => 'Follow',
+        'follow_title' => 'Keep going to the field :name is in',
+        'following' => 'Following :name',
+        'stop_following' => 'Stop following',
     ],
 ];

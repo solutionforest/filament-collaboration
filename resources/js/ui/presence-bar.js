@@ -52,6 +52,7 @@ export class PresenceBar {
             this.room.status,
             this.room.dirty,
             this.room.notice,
+            this.room.following,
             this.room.presence.total,
             this.room.config.labels,
             people,
@@ -134,6 +135,7 @@ export class PresenceBar {
         const { notice, config, deleted } = this.room
 
         if (deleted) return this.deletedNotice(deleted)
+        if (this.room.following) return this.followingNotice(this.room.following)
         if (!notice) return null
 
         return element('span', { class: 'fi-collab-notice', role: 'status' }, [
@@ -146,6 +148,23 @@ export class PresenceBar {
                     text: config.strings.pull,
                     on: { click: () => this.room.pull(true) },
                 }),
+        ])
+    }
+
+    /** @param {string} key whom this page follows */
+    followingNotice(key) {
+        const { strings } = this.room.config
+        const person = this.room.presence.people.find((item) => item.key === key)
+
+        return element('span', { class: 'fi-collab-notice', role: 'status' }, [
+            element('span', { text: translate(strings.following, { name: person?.name ?? '' }) }),
+            element('button', {
+                type: 'button',
+                class: 'fi-collab-link',
+                'data-key': 'unfollow',
+                text: strings.stop_following,
+                on: { click: () => this.room.follow(null) },
+            }),
         ])
     }
 
@@ -225,24 +244,46 @@ export class PresenceBar {
             ]),
         ]
 
-        if (!person.field) return element('div', { class: 'fi-collab-person-row' }, content)
+        const row = person.field
+            ? element(
+                  'button',
+                  {
+                      type: 'button',
+                      class: 'fi-collab-person-row',
+                      'data-key': `person-${person.key}`,
+                      title: translate(strings.jump, { name: person.name }),
+                      on: {
+                          click: () => {
+                              this.toggle(false)
+                              this.room.jumpTo(person)
+                          },
+                      },
+                  },
+                  content,
+              )
+            : element('div', { class: 'fi-collab-person-row' }, content)
 
-        return element(
-            'button',
-            {
+        if (person.self) return row
+
+        const following = this.room.following === person.key
+
+        return element('div', { class: 'fi-collab-person-line' }, [
+            row,
+            element('button', {
                 type: 'button',
-                class: 'fi-collab-person-row',
-                'data-key': `person-${person.key}`,
-                title: translate(strings.jump, { name: person.name }),
+                class: 'fi-collab-follow',
+                'data-key': `follow-${person.key}`,
+                'aria-pressed': String(following),
+                title: translate(strings.follow_title, { name: person.name }),
+                text: following ? strings.stop_following : strings.follow,
                 on: {
                     click: () => {
                         this.toggle(false)
-                        this.room.jumpTo(person)
+                        this.room.follow(following ? null : person)
                     },
                 },
-            },
-            content,
-        )
+            }),
+        ])
     }
 
     destroy() {

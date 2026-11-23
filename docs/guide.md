@@ -230,6 +230,8 @@ Pass `notify: false` to skip the notifications. `CommentPosted` (`record`, `by`,
 
 **Fields out of sight.** When somebody is in a field behind a tab that is not selected, a wizard step that is not current, or a collapsed section, their initials show on that tab, step or section header. Choosing them in the avatar list opens the tab and the section and scrolls to the field. There is nothing to set up.
 
+**Following a colleague.** In the avatar list, **Follow** next to somebody keeps going to whichever field they are in, opening tabs and sections on the way, so you can watch a walkthrough without chasing it. Clicking or typing anywhere in the form stops it, and so does **Stop following** or them leaving.
+
 **A column with the people on each record:**
 
 ```php
