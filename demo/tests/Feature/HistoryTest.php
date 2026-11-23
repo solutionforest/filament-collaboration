@@ -80,6 +80,6 @@ it('shows the panel on the edit page, with the history', function (): void {
         ->assertActionVisible(CollaborationPanelAction::class);
 
     expect(view('filament-collaboration::panel', ['page' => $page->instance()])->render())
-        ->toContain(__('filament-collaboration::collaboration.panel.history'))
+        ->toContain('data-collaboration-history')
         ->toContain('Alice Chen');
 });
