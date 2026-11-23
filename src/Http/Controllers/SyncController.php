@@ -7,6 +7,8 @@ namespace SolutionForest\FilamentCollaboration\Http\Controllers;
 use Filament\Facades\Filament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
@@ -28,6 +30,10 @@ use SolutionForest\FilamentCollaboration\Support\Data;
 final readonly class SyncController
 {
     private const MAX_BYTES = 2_000_000;
+
+    private const MAX_REPORTS = 3;
+
+    private const MAX_REPORT_BYTES = 20_000;
 
     public function __construct(
         private RoomAuthorizer $authorizer,
@@ -76,6 +82,8 @@ final readonly class SyncController
             // The same answer whether the record is missing or is somebody else's.
             return new JsonResponse(['error' => 'not_found'], 404);
         }
+
+        $this->report($context, $identity, Data::list($input['problems'] ?? null));
 
         $resumed = $this->resume($context, Data::map($input['resume'] ?? null));
         $epoch = Data::int($input['epoch'] ?? null);
@@ -141,6 +149,45 @@ final readonly class SyncController
             'people' => ($input['presence'] ?? null) === $etag ? null : $people,
             'total' => $total,
         ]);
+    }
+
+    /**
+     * Editor errors the browser recovered from, for developers to replay.
+     *
+     * @param  list<mixed>  $problems
+     */
+    private function report(RoomContext $context, Identity $identity, array $problems): void
+    {
+        if ($problems === [] || ! CollaborationPlugin::get()->reportsEditorErrors()) {
+            return;
+        }
+
+        foreach (array_slice($problems, 0, self::MAX_REPORTS) as $problem) {
+            $problem = Data::map($problem);
+            $field = Data::string($problem['field'] ?? null);
+
+            // Only fields this editor can write: the log must not take anything else.
+            if (! isset($context->fields[$field]) || strlen(Data::encode($problem)) > self::MAX_REPORT_BYTES) {
+                continue;
+            }
+
+            // A browser in a loop must not fill the log.
+            if (! RateLimiter::attempt('filament-collaboration:report:'.$identity->key, 20, static fn (): bool => true, 3600)) {
+                return;
+            }
+
+            Log::warning('[filament-collaboration] An editor recovered from an error.', [
+                'room' => $context->room,
+                'resource' => $context->resource,
+                'record' => $context->key,
+                'user' => $identity->key,
+                'field' => $field,
+                'error' => Data::string($problem['error'] ?? null),
+                'pressed' => Data::nullableString($problem['key'] ?? null),
+                'selection' => $problem['selection'] ?? null,
+                'document' => $problem['doc'] ?? null,
+            ]);
+        }
     }
 
     /**

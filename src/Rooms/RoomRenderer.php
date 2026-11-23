@@ -91,6 +91,7 @@ final readonly class RoomRenderer
                 'interval' => $plugin->getPollingInterval(),
                 'channel' => $plugin->isBroadcasting() ? Audience::of($context)->channel() : null,
                 'avatarLimit' => $plugin->getAvatarLimit(),
+                'reportErrors' => $mode === PresenceMode::Editing && $plugin->reportsEditorErrors(),
                 'strings' => trans('filament-collaboration::collaboration.client'),
                 'modes' => trans('filament-collaboration::collaboration.modes'),
             ]),
