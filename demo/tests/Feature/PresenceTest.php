@@ -130,6 +130,10 @@ it('shows people in the table column', function (): void {
 });
 
 it('reads presence once for a whole table page', function (): void {
+    if (config('filament-collaboration.presence') === 'redis') {
+        $this->markTestSkipped('Counts database queries; Redis presence makes none.');
+    }
+
     arrangePresence($this);
     foreach (range(1, 8) as $number) {
         Document::create(['title' => "Article {$number}"]);

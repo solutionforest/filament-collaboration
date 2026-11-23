@@ -13,7 +13,10 @@ const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mill
 const percentile = (values, fraction) =>
     values.length ? Math.round([...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * fraction))]) : null
 
-const app = await start({ optimized: true })
+// SERVERS=2 PRESENCE=redis: two application servers, each with half of the editors.
+const SERVERS = Number(process.env.SERVERS ?? 1)
+
+const app = await start({ optimized: true, servers: SERVERS })
 
 try {
     const joining = Date.now()
@@ -133,7 +136,11 @@ try {
         requestMs: { p50: percentile(latency, 0.5), p95: percentile(latency, 0.95), p99: percentile(latency, 0.99) },
         typedToSeenMs: { p50: percentile(arrivals, 0.5), p95: percentile(arrivals, 0.95), samples: arrivals.length },
         errors: editors.flatMap((editor) => editor.errors).length,
+        servers: SERVERS,
+        presence: process.env.PRESENCE === 'redis' ? 'redis' : 'database',
         peopleSeen: editors[0].total,
+        // Everybody counts everybody else, whichever server they are on.
+        seeEverybody: editors.filter((editor) => editor.total === editors.length - 1).length,
         converged: editors.filter((editor) => ['title', 'excerpt'].every((field) => editor.document.value(field) === reference.value(field))).length,
         marksKept: `${marks.filter((mark) => reference.value('excerpt').includes(mark)).length}/${marks.length}`,
     }
@@ -141,7 +148,7 @@ try {
     console.log(JSON.stringify(report, null, 4))
 
     if (process.env.LOAD_REPORT) writeFileSync(process.env.LOAD_REPORT, JSON.stringify(report, null, 4))
-    if (report.errors || report.converged !== editors.length || report.marksKept !== `${marks.length}/${marks.length}`) process.exitCode = 1
+    if (report.errors || report.seeEverybody !== editors.length || report.converged !== editors.length || report.marksKept !== `${marks.length}/${marks.length}`) process.exitCode = 1
 } finally {
     await app.stop()
 }

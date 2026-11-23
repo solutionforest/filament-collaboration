@@ -8,8 +8,12 @@ export async function crowd(app, { size, article = 3, parallel = 8 }) {
     const queue = app.sessions(size)
     const members = []
 
+    let joined = 0
+
     async function join({ name, cookie }) {
-        const response = await fetch(`${app.base}/admin/documents/${article}/edit`, { headers: { cookie } })
+        // With several servers, each member stays on one, in turn.
+        const base = app.bases[joined++ % app.bases.length]
+        const response = await fetch(`${base}/admin/documents/${article}/edit`, { headers: { cookie } })
         const encoded = (await response.text()).match(/data-collaboration="([^"]+)"/)?.[1]
 
         if (!encoded) throw new Error(`${name} has no room (HTTP ${response.status})`)
@@ -18,7 +22,8 @@ export async function crowd(app, { size, article = 3, parallel = 8 }) {
             encoded.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'),
         )
 
-        members.push(new Member(name, cookie, config))
+        config.url = config.url.replace(app.base, base)
+        members.push(Object.assign(new Member(name, cookie, config), { server: base }))
     }
 
     await Promise.all(

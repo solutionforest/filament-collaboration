@@ -24,6 +24,7 @@ use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
+use SolutionForest\FilamentCollaboration\Presence\RedisPresenceRepository;
 use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -44,7 +45,9 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
-        $this->app->bindIf(PresenceRepository::class, DatabasePresenceRepository::class);
+        $this->app->bindIf(PresenceRepository::class, fn (): PresenceRepository => config('filament-collaboration.presence') === 'redis'
+            ? new RedisPresenceRepository
+            : new DatabasePresenceRepository);
 
         // One per request, so a request's changes are pushed once.
         $this->app->scoped(RoomNotifier::class);

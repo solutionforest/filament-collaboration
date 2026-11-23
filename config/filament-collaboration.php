@@ -12,6 +12,12 @@ return [
     // Serialises saves. Every application server must share it and it must support locks.
     'cache_store' => env('FILAMENT_COLLABORATION_CACHE_STORE'),
 
+    // Where presence is kept: `database`, or `redis` for many servers and many people.
+    'presence' => env('FILAMENT_COLLABORATION_PRESENCE', 'database'),
+
+    // The Redis connection for `redis` presence, from `config/database.php`. `null` is `default`.
+    'redis_connection' => env('FILAMENT_COLLABORATION_REDIS_CONNECTION'),
+
     // Seconds without a heartbeat before someone disappears.
     'presence_timeout' => (int) env('FILAMENT_COLLABORATION_PRESENCE_TIMEOUT', 20),
 

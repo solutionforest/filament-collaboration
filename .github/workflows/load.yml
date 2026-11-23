@@ -1,0 +1,73 @@
+name: Load
+
+# Editors without a browser on one article, behind two application servers
+# sharing one database, with presence in the database or in Redis, over
+# polling or Reverb. Run it on a runner with several cores: on one core the
+# servers, Reverb and the crowd all compete for it.
+on:
+  workflow_dispatch:
+    inputs:
+      editors:
+        description: Editors on the article
+        default: '300'
+      seconds:
+        description: Seconds of editing
+        default: '45'
+
+# Composer downloads from GitHub as this repository, not anonymously, which is rate limited.
+env:
+  COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+
+jobs:
+  load:
+    name: ${{ matrix.presence }} presence · ${{ matrix.transport }}
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        presence: [database, redis]
+        transport: [polling, reverb]
+    defaults:
+      run:
+        working-directory: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, intl, redis
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: npm ci
+      - run: npm ci
+        working-directory: .
+      - run: cp .env.example .env && php artisan key:generate --no-interaction
+      - run: npm run build
+
+      - if: matrix.presence == 'redis'
+        working-directory: .
+        run: scripts/start-redis.sh
+
+      - name: Run
+        run: npm run test:load -- "${{ inputs.editors }}" "${{ inputs.seconds }}"
+        env:
+          SERVERS: '2'
+          PRESENCE: ${{ matrix.presence }}
+          TRANSPORT: ${{ matrix.transport == 'reverb' && 'reverb' || '' }}
+          LOAD_REPORT: ${{ runner.temp }}/load.json
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### ${{ matrix.presence }} presence, ${{ matrix.transport }}, $(nproc) cores" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "${{ runner.temp }}/load.json" >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
