@@ -78,10 +78,17 @@ export function registerFilamentAdapters(register) {
 
             // CodeMirror 6 has no change events; its DOM does.
             const events = new AbortController()
-            /** Typing CodeMirror will only read on the next frame (WebKit). */
-            const pending = () => (view.observer?.delayedFlush ?? -1) >= 0
+            /**
+             * Typing CodeMirror has not read from its DOM yet: deferred to the next frame
+             * (WebKit), or still in its MutationObserver's queue (a busy CPU). Changing or
+             * measuring the editor meanwhile makes it read stale DOM.
+             */
+            const pending = () => (view.observer?.delayedFlush ?? -1) >= 0 || (view.observer?.pendingRecords?.().length ?? 0) > 0
 
-            view.dom.addEventListener('input', () => queueMicrotask(changed), { signal: events.signal })
+            // Once CodeMirror has read the typing, or it would be skipped as busy.
+            const typed = () => (pending() ? requestAnimationFrame(typed) : changed())
+
+            view.dom.addEventListener('input', () => queueMicrotask(typed), { signal: events.signal })
             view.dom.addEventListener('keyup', () => moved(), { signal: events.signal })
             view.dom.addEventListener('pointerup', () => moved(), { signal: events.signal })
 
@@ -104,7 +111,7 @@ export function registerFilamentAdapters(register) {
                 },
                 setSelection: ({ anchor, head }) => view.dispatch({ selection: { anchor, head } }),
                 caretRect(offset) {
-                    // Measuring makes CodeMirror read typing it has deferred, mid-keystroke in WebKit.
+                    // Measuring makes CodeMirror read typing it has not read yet, mid-keystroke.
                     if (pending()) return null
 
                     const rect = view.coordsAtPos(Math.min(offset, view.state.doc.length))
@@ -112,7 +119,7 @@ export function registerFilamentAdapters(register) {
                     return rect ? new DOMRect(rect.left, rect.top, 2, rect.bottom - rect.top) : null
                 },
                 isFocused: () => view.hasFocus,
-                // Composing, or typing the editor will only read on the next frame (WebKit).
+                // Composing, or typing the editor has not read yet.
                 isBusy: () => view.composing || pending(),
                 isAlive: () => view.dom.isConnected,
                 destroy: () => events.abort(),
