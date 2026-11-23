@@ -383,6 +383,58 @@ describe('picked values', () => {
     })
 })
 
+describe('repeaters and builders', () => {
+    const points = (page) => page.locator('.fi-page input[id*="key_points"][id$=".point"]')
+    const values = async (page) => Promise.all((await points(page).all()).map((input) => input.inputValue()))
+
+    test('items added, edited and removed by two people', async () => {
+        const id = await together()
+
+        await alice.getByRole('button', { name: 'Add key point' }).click()
+        await eventually(async () => assert.equal(await points(alice).count(), 1), 'Alice has no item')
+        await points(alice).first().fill('From Alice')
+
+        await eventually(async () => assert.deepEqual(await values(bob), ['From Alice']), 'Bob did not get the item')
+
+        await bob.getByRole('button', { name: 'Add key point' }).click()
+        await eventually(async () => assert.equal(await points(bob).count(), 2), 'Bob has no second item')
+        await points(bob).nth(1).fill('From Bob')
+
+        await eventually(async () => assert.deepEqual(await values(alice), ['From Alice', 'From Bob']), 'Alice did not get the second item')
+
+        // Both typing at once, each in their own item.
+        await Promise.all([
+            points(alice).first().pressSequentially(' and more', { delay: 40 }),
+            points(bob).nth(1).pressSequentially(' too', { delay: 45 }),
+        ])
+
+        await eventually(async () => {
+            assert.deepEqual(await values(alice), ['From Alice and more', 'From Bob too'])
+            assert.deepEqual(await values(bob), ['From Alice and more', 'From Bob too'])
+        }, 'the items did not converge')
+
+        await alice.locator('.fi-page .fi-fo-repeater-item').nth(1).getByRole('button', { name: /delete/i }).click()
+        await eventually(async () => assert.deepEqual(await values(bob), ['From Alice and more']), 'the removal did not reach Bob')
+
+        await save(bob)
+        await eventually(() => assert.deepEqual(JSON.parse(app.article(id).key_points).map((item) => item.point), ['From Alice and more']), 'the list was not saved')
+    })
+
+    test('a builder block added by one person reaches the other', async () => {
+        await together()
+
+        await alice.getByRole('button', { name: 'Add to sidebar' }).click()
+        await alice.locator('.fi-dropdown-panel:visible').getByText('Quote', { exact: true }).click()
+
+        const quote = (page) => page.locator('.fi-page textarea[id*="sidebar"]')
+
+        await eventually(async () => assert.equal(await quote(alice).count(), 1), 'Alice has no block')
+        await quote(alice).fill('Shared quote')
+
+        await eventually(async () => assert.equal(await quote(bob).inputValue(), 'Shared quote'), 'Bob did not get the block')
+    })
+})
+
 describe('saving', () => {
     test('opening a record does not create a draft', async () => {
         await together()

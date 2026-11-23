@@ -4,7 +4,10 @@ namespace App\Filament\Resources\Documents\Schemas;
 
 use App\Models\Document;
 use App\Models\User;
+use Filament\Forms\Components\Builder as BlockBuilder;
+use Filament\Forms\Components\Builder\Block;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -39,6 +42,37 @@ class DocumentForm
                             ])
                             ->extraInputAttributes(['style' => 'min-height: 22rem']),
                     ]),
+                    Section::make('Key points')
+                        ->description('Shown above the article. Add, reorder and edit them together.')
+                        ->schema([
+                            Repeater::make('key_points')
+                                ->hiddenLabel()
+                                ->schema([
+                                    TextInput::make('point')->required()->maxLength(200),
+                                    Toggle::make('highlight')->inline(false),
+                                ])
+                                ->columns(['md' => 4])
+                                ->itemLabel(fn (array $state): ?string => is_string($state['point'] ?? null) ? $state['point'] : null)
+                                ->addActionLabel('Add key point')
+                                ->defaultItems(0)
+                                ->collapsible(),
+                        ]),
+                    Section::make('Sidebar')
+                        ->schema([
+                            BlockBuilder::make('sidebar')
+                                ->hiddenLabel()
+                                ->blocks([
+                                    Block::make('quote')->schema([
+                                        Textarea::make('text')->rows(2)->required(),
+                                        TextInput::make('author'),
+                                    ]),
+                                    Block::make('link')->schema([
+                                        TextInput::make('label')->required(),
+                                        TextInput::make('url')->url()->required(),
+                                    ]),
+                                ])
+                                ->addActionLabel('Add to sidebar'),
+                        ]),
                     Section::make('SEO')
                         ->schema([
                             TextInput::make('seo_title')->label('Meta title')->maxLength(70)

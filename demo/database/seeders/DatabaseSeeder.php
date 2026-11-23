@@ -80,6 +80,10 @@ class DatabaseSeeder extends Seeder
                 .'<ul><li><p>Reading lists for subscribers</p></li><li><p>Audio versions of long reads</p></li></ul>'
                 .'<p>Welcome to the public Fieldnotes blog.</p>',
             'tags' => ['product', 'release'],
+            'key_points' => [
+                ['point' => 'Faster reading on long articles', 'highlight' => true],
+                ['point' => 'Editors work on one article together', 'highlight' => false],
+            ],
             'seo_title' => 'Spring product update | Fieldnotes',
             'seo_description' => 'What shipped this season at Fieldnotes.',
             'seo_keywords' => 'product update, spring',

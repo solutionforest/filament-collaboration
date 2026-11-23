@@ -5,10 +5,10 @@ import { toDocument, toTokens } from '../../resources/js/crdt/rich-text.js'
 import { paragraph, simulate } from './simulation.js'
 
 const pair = (kind, value) => {
-    const base = new Document({ fields: { field: { k: kind, r: [] } } })
+    const base = new Document({ fields: { field: { k: kind, r: [], m: {} } } })
     const seed = base.changes('field', value, 0)
     const replicas = [1, 2].map(() => {
-        const replica = new Document({ fields: { field: { k: kind, r: [] } } })
+        const replica = new Document({ fields: { field: { k: kind, r: [], m: {} } } })
 
         replica.apply(seed)
 
@@ -34,7 +34,7 @@ test('2,000 random sessions converge on every replica', () => {
         const { server, replicas } = simulate(seed * 7919)
 
         for (const { document, client } of replicas) {
-            for (const field of ['title', 'body', 'status']) {
+            for (const field of ['title', 'body', 'status', 'items']) {
                 assert.deepEqual(document.value(field), server.value(field), `seed ${seed}, editor ${client}, ${field}`)
             }
         }
@@ -126,4 +126,45 @@ test('unsafe attributes never enter the shared document', () => {
 
         assert.deepEqual(token.formatting, { 'm:link': '1' }, href)
     }
+})
+
+const itemKey = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
+
+test('two people adding items at once both keep them', () => {
+    const base = { [itemKey(1)]: { title: 'One' } }
+    const result = concurrently(
+        pair('items', base),
+        { value: { ...base, [itemKey(2)]: { title: 'Alice' } } },
+        { value: { ...base, [itemKey(3)]: { title: 'Bob' } } },
+    )
+
+    assert.deepEqual(Object.values(result).map((item) => item.title).sort(), ['Alice', 'Bob', 'One'])
+})
+
+test('edits to different sub-fields of one item merge', () => {
+    const base = { [itemKey(1)]: { title: 'One', done: false } }
+    const result = concurrently(
+        pair('items', base),
+        { value: { [itemKey(1)]: { title: 'Renamed', done: false } } },
+        { value: { [itemKey(1)]: { title: 'One', done: true } } },
+    )
+
+    assert.deepEqual(result, { [itemKey(1)]: { done: true, title: 'Renamed' } })
+})
+
+test('moving an item keeps what someone typed in it', () => {
+    const base = { [itemKey(1)]: { title: 'One' }, [itemKey(2)]: { title: 'Two' } }
+    const result = concurrently(
+        pair('items', base),
+        { value: { [itemKey(2)]: { title: 'Two' }, [itemKey(1)]: { title: 'One' } } },
+        { value: { [itemKey(1)]: { title: 'One!' }, [itemKey(2)]: { title: 'Two' } } },
+    )
+
+    assert.deepEqual(result, { [itemKey(2)]: { title: 'Two' }, [itemKey(1)]: { title: 'One!' } })
+})
+
+test('the same items loaded again under new keys change nothing', () => {
+    const [alice] = pair('items', { [itemKey(1)]: { title: 'One' } })
+
+    assert.deepEqual(alice.changes('field', { [itemKey(9)]: { title: 'One' } }, 1), [])
 })

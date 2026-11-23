@@ -6,6 +6,7 @@ namespace SolutionForest\FilamentCollaboration\Documents;
 
 use Illuminate\Database\Eloquent\Model;
 use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
+use SolutionForest\FilamentCollaboration\Crdt\ItemList;
 use SolutionForest\FilamentCollaboration\Crdt\Register;
 use SolutionForest\FilamentCollaboration\Crdt\RichText;
 use SolutionForest\FilamentCollaboration\Crdt\Token;
@@ -21,6 +22,8 @@ final class Fingerprint
             FieldKind::Text => str_replace(["\r\n", "\r"], "\n", Data::string($value)),
             FieldKind::Value => Register::normalize($value),
             FieldKind::RichText => self::richText($value),
+            // Item keys are random on every page load; the content is what counts.
+            FieldKind::Items => ItemList::contentOf(Data::map($value)),
         };
 
         return sha1(Data::encode($canonical));

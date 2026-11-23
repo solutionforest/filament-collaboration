@@ -3,7 +3,7 @@
 const MATRIX_LIMIT = 250_000
 
 const sameContent = ({ value: a }, { value: b }) =>
-    typeof a === 'string' || typeof b === 'string' ? a === b : a.n === b.n && a.b === b.b
+    typeof a === 'string' || typeof b === 'string' ? a === b : a.n === b.n && a.b === b.b && a.i === b.i
 
 const sameFormatting = (a, b) => {
     const keys = Object.keys(a)

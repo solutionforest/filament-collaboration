@@ -23,7 +23,7 @@ final class Document
 
     private const MAX_VALUE_BYTES = 65_535;
 
-    /** @var array<string, Sequence|Register> */
+    /** @var array<string, Sequence|Register|ItemList> */
     private array $fields = [];
 
     /** @var array<string, FieldKind> */
@@ -46,7 +46,11 @@ final class Document
 
             if ($kind !== null) {
                 $document->kinds[$name] = $kind;
-                $document->fields[$name] = $kind === FieldKind::Value ? Register::from($field) : Sequence::from($field['r'] ?? null);
+                $document->fields[$name] = match ($kind) {
+                    FieldKind::Value => Register::from($field),
+                    FieldKind::Items => ItemList::from($field),
+                    default => Sequence::from($field['r'] ?? null),
+                };
             }
         }
 
@@ -60,7 +64,7 @@ final class Document
 
     public function __clone()
     {
-        $this->fields = array_map(static fn (Sequence|Register $field): Sequence|Register => clone $field, $this->fields);
+        $this->fields = array_map(static fn (Sequence|Register|ItemList $field): Sequence|Register|ItemList => clone $field, $this->fields);
     }
 
     public function clock(): int
@@ -87,7 +91,11 @@ final class Document
     public function create(string $field, FieldKind $kind): void
     {
         $this->kinds[$field] = $kind;
-        $this->fields[$field] = $kind === FieldKind::Value ? new Register : new Sequence;
+        $this->fields[$field] = match ($kind) {
+            FieldKind::Value => new Register,
+            FieldKind::Items => new ItemList,
+            default => new Sequence,
+        };
     }
 
     public function value(string $field): mixed
@@ -96,6 +104,7 @@ final class Document
 
         return match (true) {
             $state instanceof Register => $state->value,
+            $state instanceof ItemList => $state->value(),
             $state instanceof Sequence => $this->kinds[$field] === FieldKind::RichText
                 ? RichText::document($state->tokens())
                 : $state->text(),
@@ -135,6 +144,10 @@ final class Document
             return Register::normalize($state->value) === $value
                 ? []
                 : [['o' => 'set', 'f' => $field, 'id' => [$clock + 1, $client], 'v' => $value]];
+        }
+
+        if ($state instanceof ItemList) {
+            return $state->changes($field, Data::map($value), $clock, $client);
         }
 
         if (! $state instanceof Sequence) {
@@ -236,9 +249,11 @@ final class Document
                 continue;
             }
 
-            $fields[(string) $name] = $state instanceof Register
-                ? ['k' => FieldKind::Value->value, ...$state->toArray()]
-                : ['k' => $this->kinds[$name]->value, 'r' => $state->toArray()];
+            $fields[(string) $name] = match (true) {
+                $state instanceof Register => ['k' => FieldKind::Value->value, ...$state->toArray()],
+                $state instanceof ItemList => ['k' => FieldKind::Items->value, ...$state->toArray()],
+                default => ['k' => $this->kinds[$name]->value, 'r' => $state->toArray()],
+            };
         }
 
         return ['clock' => $this->clock, 'fields' => $fields, 'clients' => $only === null ? $this->clients : []];
@@ -250,6 +265,7 @@ final class Document
 
         return match (true) {
             $state instanceof Register => Register::normalize($state->value),
+            $state instanceof ItemList => $state->signature(),
             $state instanceof Sequence => $state->signature(),
             default => null,
         };
@@ -267,6 +283,10 @@ final class Document
             }
 
             $state->set($operation['v'] ?? null, Id::from($operation['id'] ?? null));
+        } elseif ($state instanceof ItemList && $type === 'put') {
+            $state->put(Data::string($operation['i'] ?? null), Data::string($operation['p'] ?? null), $operation['v'] ?? null, Id::from($operation['id'] ?? null));
+        } elseif ($state instanceof ItemList) {
+            $this->applyToSequence($state->order, $type, $operation);
         } elseif ($type === 'ins') {
             $value = $operation['v'] ?? null;
             $formatting = [];
@@ -301,6 +321,29 @@ final class Document
         }
     }
 
+    /** @param array<string, mixed> $operation */
+    private function applyToSequence(Sequence $sequence, string $type, array $operation): void
+    {
+        if ($type === 'ins') {
+            $sequence->insert(
+                Id::from($operation['id'] ?? null),
+                isset($operation['after']) ? Id::from($operation['after']) : null,
+                Data::map($operation['v'] ?? null),
+                [],
+            );
+
+            return;
+        }
+
+        if ($type !== 'del') {
+            throw new InvalidOperation('The operation does not suit this field.');
+        }
+
+        foreach (Data::list($operation['ids'] ?? null) as $range) {
+            $sequence->delete(Id::from($range), Data::int(Data::list($range)[2] ?? null));
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $operation
      * @param  array<string, FieldKind>  $writable
@@ -325,6 +368,10 @@ final class Document
 
         if ($type === 'del' && $kind !== FieldKind::Value) {
             return $clean;
+        }
+
+        if ($kind === FieldKind::Items) {
+            return $this->validateItemOperation($clean, $operation, $client, $lastClock, $allowed[$field] ?? []);
         }
 
         $id = Id::from($operation['id'] ?? null);
@@ -410,6 +457,70 @@ final class Document
         $clean += ['after' => $after?->toArray(), 'v' => $value];
 
         return $formatting === [] ? $clean : [...$clean, 'a' => $formatting];
+    }
+
+    /**
+     * @param  array<string, mixed>  $clean
+     * @param  array<string, mixed>  $operation
+     * @param  list<string>  $paths  the sub-field paths items may have
+     * @return array<string, mixed>
+     */
+    private function validateItemOperation(array $clean, array $operation, int $client, int $lastClock, array $paths): array
+    {
+        $id = Id::from($operation['id'] ?? null);
+
+        if ($id->client !== $client || $id->clock <= $lastClock || $id->clock > $this->clock + self::MAX_ITEMS) {
+            throw new InvalidOperation('The operation id is not valid for this editor.');
+        }
+
+        $list = $this->fields[Data::string($clean['f'])] ?? null;
+        $type = $clean['o'];
+        $value = $operation['v'] ?? null;
+        $clean['id'] = $id->toArray();
+
+        if (! $list instanceof ItemList) {
+            throw new InvalidOperation('The field is not a list.');
+        }
+
+        if ($type === 'ins') {
+            $key = is_array($value) && array_keys($value) === ['i'] ? $value['i'] : null;
+
+            // A new item needs a new random key; "record-5" may only move, never be invented.
+            $isNewKey = is_string($key) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iD', $key) === 1;
+
+            if (! is_string($key) || (! $isNewKey && ! $list->hasKey($key))) {
+                throw new InvalidOperation('The item key is not valid.');
+            }
+
+            $after = isset($operation['after']) ? Id::from($operation['after']) : null;
+
+            if ($after !== null && $id->clock <= $after->clock) {
+                throw new InvalidOperation('The insertion precedes its position.');
+            }
+
+            if ($list->order->length() >= 2000) {
+                throw new InvalidOperation('The list is too long to edit live.');
+            }
+
+            return [...$clean, 'after' => $after?->toArray(), 'v' => ['i' => $key]];
+        }
+
+        if ($type !== 'put') {
+            throw new InvalidOperation('The operation does not suit this field.');
+        }
+
+        $key = $operation['i'] ?? null;
+        $path = $operation['p'] ?? null;
+
+        if (! is_string($key) || ! $list->hasKey($key) || ! is_string($path) || ! in_array($path, $paths, true)) {
+            throw new InvalidOperation('The item or sub-field is not valid.');
+        }
+
+        if (! self::isSimpleValue($value) || strlen(Data::encode($value)) > self::MAX_VALUE_BYTES) {
+            throw new InvalidOperation('The value cannot be shared.');
+        }
+
+        return [...$clean, 'i' => $key, 'p' => $path, 'v' => $value];
     }
 
     /** @return list<array{int, int, int}> */

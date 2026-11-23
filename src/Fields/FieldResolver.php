@@ -19,6 +19,7 @@ use ReflectionNamedType;
 use ReflectionObject;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
 use SolutionForest\FilamentCollaboration\Support\FormState;
 use Throwable;
 
@@ -97,6 +98,13 @@ final readonly class FieldResolver
 
         foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
             $path = (string) $path;
+
+            if (($writable[$path] ?? null) === FieldKind::Items) {
+                // For a list, what its items may contain.
+                $allowed[$path] = ItemsType::paths($field) ?? [];
+
+                continue;
+            }
 
             if (($writable[$path] ?? null) !== FieldKind::Value) {
                 continue;

@@ -98,6 +98,9 @@ export class Room {
             )
         }
 
+        // Inputs inside repeater items have no binding of their own.
+        document.addEventListener('input', () => queueMicrotask(() => this.collect()), { signal, capture: true })
+
         document.addEventListener(
             'visibilitychange',
             () => {

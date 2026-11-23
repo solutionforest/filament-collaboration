@@ -1,5 +1,6 @@
 import { canonical, characters, isAfter, wellFormed } from './id.js'
 import { diff } from './diff.js'
+import { ItemList } from './item-list.js'
 import { toDocument, toTokens } from './rich-text.js'
 import { Sequence } from './sequence.js'
 
@@ -24,7 +25,9 @@ export class Document {
                 name,
                 field.k === 'value'
                     ? { kind: field.k, value: field.v, at: field.at ?? [0, 0] }
-                    : { kind: field.k, sequence: new Sequence(field.r) },
+                    : field.k === 'items'
+                      ? { kind: field.k, list: new ItemList(field, normalizeValue) }
+                      : { kind: field.k, sequence: new Sequence(field.r) },
             ]),
         )
     }
@@ -43,6 +46,7 @@ export class Document {
         if (!field) return null
         if (field.kind === 'value') return field.value
         if (field.kind === 'text') return field.sequence.text()
+        if (field.kind === 'items') return field.list.value()
 
         return toDocument(field.sequence.tokens())
     }
@@ -57,6 +61,8 @@ export class Document {
                 ? []
                 : [{ o: 'set', f: name, id: [this.clock + 1, client], v: normalizeValue(value) }]
         }
+
+        if (field.kind === 'items') return field.list.changes(name, value ?? {}, this.clock, client)
 
         let old = field.sequence.tokens()
         let next
@@ -89,7 +95,11 @@ export class Document {
 
             if (!field) continue
 
-            if (o === 'set') {
+            if (field.kind === 'items') {
+                if (o === 'put') field.list.put(operation.i, operation.p, v, id)
+                else if (o === 'ins') field.list.order.insert(id, operation.after, v)
+                else if (o === 'del') ids.forEach((range) => field.list.order.delete(range))
+            } else if (o === 'set') {
                 if (isAfter(id, field.at)) {
                     field.value = v
                     field.at = id
