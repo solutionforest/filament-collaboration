@@ -17,7 +17,8 @@ env:
 jobs:
   php:
     name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · Filament ${{ matrix.filament }}
-    runs-on: self-hosted
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -63,7 +64,8 @@ jobs:
 
   javascript:
     name: JavaScript · lint, types, tests
-    runs-on: self-hosted
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +85,8 @@ jobs:
 
   browser:
     name: Browsers · ${{ matrix.browser }} · ${{ matrix.transport }}
-    runs-on: self-hosted
+    # Our runners include macOS machines, where setup-php can take minutes or fail.
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 30
     strategy:
       fail-fast: false
