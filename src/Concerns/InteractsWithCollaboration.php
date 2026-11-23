@@ -15,6 +15,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Documents\EditTrail;
 use SolutionForest\FilamentCollaboration\Documents\SharedField;
 use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
@@ -319,6 +320,15 @@ trait InteractsWithCollaboration
         );
 
         app(SharedUploads::class)->release($room);
+
+        // Edits that only reached the server with this save belong in the trail too.
+        if (CollaborationPlugin::get()->isAuditing()) {
+            foreach ($contributors as $field => $people) {
+                foreach ($people as $contributor) {
+                    app(EditTrail::class)->record($room, $this->getRecord(), $contributor, [$field]);
+                }
+            }
+        }
 
         $this->collaborationBase = [...$this->getCollaborationFormValues(), ...FormState::only($saved, $live->fields)];
 

@@ -21,6 +21,7 @@ use SolutionForest\FilamentCollaboration\Support\Data;
 class CollaborationPlugin implements Plugin
 {
     use EvaluatesClosures;
+    use PluginConcerns\HasAuditing;
     use PluginConcerns\HasBroadcasting;
     use PluginConcerns\HasDebugging;
     use PluginConcerns\HasLiveEditing;
