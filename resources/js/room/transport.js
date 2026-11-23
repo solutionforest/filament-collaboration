@@ -1,4 +1,8 @@
 export class SyncError extends Error {
+    /**
+     * @param {number} status
+     * @param {string} code the server's `error`, such as `expired`
+     */
     constructor(status, code) {
         super(`${status} ${code}`)
         this.status = status
@@ -12,6 +16,12 @@ export class SyncError extends Error {
 export class HttpTransport {
     name = 'HTTP'
 
+    /**
+     * @param {{url: string, csrf: string}} config
+     * @param {Record<string, unknown>} payload
+     * @param {{keepalive?: boolean}} options
+     * @returns {Promise<any>} the server's answer
+     */
     async send({ url, csrf }, payload, { keepalive = false } = {}) {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 15000)

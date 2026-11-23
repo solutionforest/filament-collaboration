@@ -65,13 +65,6 @@ async function selectInBody(page, find, { whole = false } = {}) {
     await wait(150)
 }
 
-async function focusEnd(page, field) {
-    const input = page.locator(`[id="form.${field}"]`)
-
-    await input.click()
-    await input.evaluate((element) => element.setSelectionRange(element.value.length, element.value.length))
-}
-
 try {
     const viewport = { width: 1440, height: 960 }
     const alice = await app.signIn('alice', { viewport })

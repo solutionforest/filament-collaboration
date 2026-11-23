@@ -2,7 +2,15 @@ import { element } from '../dom.js'
 
 const MAX_CARETS = 30
 const MAX_FLAGS = 6
+/**
+ * Something drawn: a field outline and name tag, a caret with its flag, or a selection.
+ *
+ * @typedef {{kind: 'outline' | 'tag' | 'selection' | 'caret' | 'flag', left: number, top: number, width?: number, height?: number, color: string, text?: string}} Shape
+ */
+
+/** @type {(name: string) => string} */
 const firstName = (name) => name.trim().split(/\s+/)[0] ?? ''
+/** @type {(a: {left: number, right: number, top: number, bottom: number}, b: {left: number, right: number, top: number, bottom: number}) => boolean} */
 const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 
 /**
@@ -11,6 +19,11 @@ const overlaps = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bot
  * Drawn in a layer of its own, so Livewire morphs and ProseMirror never see it.
  */
 export class Overlay {
+    /** @type {number | null} */
+    frame = null
+    destroyed = false
+
+    /** @param {import('../room/room.js').Room} room */
     constructor(room) {
         this.room = room
         this.layer = element('div', { class: 'fi-collab-overlay', 'aria-hidden': 'true' })
@@ -55,14 +68,16 @@ export class Overlay {
             `${Math.max(0, modal ? 0 : (document.querySelector('.fi-topbar-ctn, .fi-topbar')?.getBoundingClientRect().bottom ?? 0))}px`,
         )
 
+        /** @type {Map<string, Person[]>} */
         const fields = new Map()
 
         for (const person of people) {
-            if (!fields.has(person.field)) fields.set(person.field, [])
+            const field = /** @type {string} */ (person.field)
 
-            fields.get(person.field).push(person)
+            fields.set(field, [...(fields.get(field) ?? []), person])
         }
 
+        /** @type {Shape[]} */
         const shapes = []
 
         for (const [field, present] of fields) this.drawField(field, present, shapes)
@@ -89,6 +104,11 @@ export class Overlay {
         )
     }
 
+    /**
+     * @param {string} field
+     * @param {Person[]} present who is in it, at least one
+     * @param {Shape[]} shapes drawn so far
+     */
     drawField(field, present, shapes) {
         const wrapper = this.room.dom.wrapper(field)
 
@@ -104,6 +124,8 @@ export class Overlay {
 
         const lead = present.find((person) => !person.idle) ?? present[0]
 
+        if (!lead) return
+
         shapes.push({ kind: 'outline', left: box.left, top: box.top, width: box.width, height: box.height, color: lead.color })
 
         const names = new Map(present.map((person) => [person.key, person]))
@@ -117,10 +139,11 @@ export class Overlay {
         })
 
         const binding = this.room.bindings.get(field)
+        /** @type {Array<{left: number, right: number, top: number, bottom: number}>} */
         const flags = []
 
         for (const person of present.filter((item) => item.cursor).slice(0, MAX_CARETS)) {
-            const geometry = binding?.geometry(person.cursor)
+            const geometry = person.cursor && binding?.geometry(person.cursor)
 
             if (!geometry) continue
 
@@ -157,7 +180,7 @@ export class Overlay {
     destroy() {
         this.destroyed = true
         this.events.abort()
-        cancelAnimationFrame(this.frame)
+        if (this.frame !== null) cancelAnimationFrame(this.frame)
         this.layer.remove()
     }
 }

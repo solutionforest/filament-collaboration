@@ -3,34 +3,48 @@ import { Document } from '../../resources/js/crdt/document.js'
 /**
  * Editors changing one record concurrently, through a server that orders
  * operations by arrival, as the PHP endpoint does.
+ *
+ * @param {number} seed
+ * @param {{editors?: number, steps?: number}} options
  */
 export function simulate(seed, { editors = 4, steps = 90 } = {}) {
     let state = seed
     const random = () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646
-    const pick = (items) => items[Math.floor(random() * items.length)]
+    /** @type {<T>(items: T[]) => T} */
+    const pick = (items) => /** @type {any} */ (items[Math.floor(random() * items.length)])
 
+    /** @type {DocumentState} */
     const initial = { clock: 0, fields: { title: { k: 'text', r: [] }, body: { k: 'rich', r: [] }, status: { k: 'value', v: null, at: [0, 0] }, items: { k: 'items', r: [], m: {}, t: ['title'] } } }
     const server = new Document(initial)
+    /** @type {Array<{client: number, operations: Operation[]}>} */
     const log = []
+    /** @type {Array<{client: number, operations: Operation[]}>} */
     const batches = []
 
+    /**
+     * @param {number} client
+     * @param {Operation[]} operations
+     */
     const push = (client, operations) => {
         server.apply(operations)
         log.push({ client, operations })
     }
 
-    for (const [field, value] of [
+    for (const [field, value] of /** @type {Array<[string, any]>} */ ([
         ['title', 'Shared title'],
         ['status', 'draft'],
         ['body', { type: 'doc', content: [paragraph('First paragraph'), paragraph('Second paragraph')] }],
         ['items', { [key(1)]: { title: 'One', done: false }, [key(2)]: { title: 'Two', meta: { tag: 'a' } } }],
-    ]) {
+    ])) {
         const operations = server.changes(field, value, 0)
 
         push(0, operations)
         batches.push({ client: 0, operations })
     }
 
+    /** @typedef {{client: number, document: Document, cursor: number, queue: Operation[][]}} Replica */
+
+    /** @type {Replica[]} */
     const replicas = Array.from({ length: editors }, (_, index) => ({
         client: index + 1,
         document: new Document(initial),
@@ -38,6 +52,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
         queue: [],
     }))
 
+    /** @param {Replica} replica */
     const pull = (replica) => {
         for (; replica.cursor < log.length; replica.cursor++) {
             const entry = log[replica.cursor]
@@ -46,6 +61,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
         }
     }
 
+    /** @param {Replica} replica */
     const flush = (replica) => {
         for (const operations of replica.queue.splice(0)) {
             push(replica.client, operations)
@@ -81,13 +97,23 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
     return { server, replicas, batches }
 }
 
+/**
+ * @param {string} [text]
+ * @returns {RichNode}
+ */
 export function paragraph(text) {
     return { type: 'paragraph', ...(text ? { content: [{ type: 'text', text }] } : {}) }
 }
 
+/** @type {(number: number) => string} */
 const key = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
 let nextKey = 100
 
+/**
+ * @param {Record<string, any>} items
+ * @param {() => number} random
+ * @param {<T>(items: T[]) => T} pick
+ */
 function mutateItems(items, random, pick) {
     const entries = Object.entries(structuredClone(items))
     const action = Math.floor(random() * 5)
@@ -112,6 +138,15 @@ function mutateItems(items, random, pick) {
     return Object.fromEntries(entries)
 }
 
+/**
+ * A random edit, as a person would make it.
+ *
+ * @param {string} field
+ * @param {any} value
+ * @param {() => number} random
+ * @param {<T>(items: T[]) => T} pick
+ * @returns {any}
+ */
 function mutate(field, value, random, pick) {
     if (field === 'items') return mutateItems(value, random, pick)
 

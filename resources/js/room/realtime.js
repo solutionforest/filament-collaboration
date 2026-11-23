@@ -4,13 +4,23 @@
  * sent over HTTP, where every request is authorised and validated.
  */
 export class Realtime {
+    /** @param {import('./room.js').Room} room */
     constructor(room) {
         this.room = room
+        /** @type {any} Echo's private channel */
         this.channel = null
+        /** @type {string | null} */
         this.name = null
+        this.subscribed = false
+        /** @type {(() => void) | null} */
+        this.onState = null
     }
 
-    /** Echo is only there when the panel configures `broadcasting.echo`. */
+    /**
+     * Echo is only there when the panel configures `broadcasting.echo`.
+     *
+     * @returns {any}
+     */
     get echo() {
         return window.Echo ?? null
     }
@@ -33,7 +43,7 @@ export class Realtime {
             this.room.realtimeChanged()
         })
         this.channel.error?.(() => this.disconnect())
-        this.channel.listen('.changed', (payload) => this.room.pushed(payload))
+        this.channel.listen('.changed', (/** @type {Record<string, any>} */ payload) => this.room.pushed(payload))
 
         const connection = this.echo.connector?.pusher?.connection
 

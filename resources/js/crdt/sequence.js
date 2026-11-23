@@ -4,11 +4,23 @@ import { characters, isAfter } from './id.js'
  * Replicated growable array, stored as runs. Mirrors `src/Crdt/Sequence.php`.
  */
 class Run {
+    /**
+     * @param {Id} id
+     * @param {string | string[] | object} value text, kept as characters, or one item
+     * @param {boolean} deleted
+     * @param {Map<string, [string | null, number, number]>} attributes each formatting key's value and the id that set it
+     */
     constructor(id, value, deleted = false, attributes = new Map()) {
         this.id = id
+        /** @type {string[] | object} */
         this.value = typeof value === 'string' ? characters(value) : value
         this.deleted = deleted
         this.attributes = attributes
+    }
+
+    /** @returns {string[] | null} */
+    get characters() {
+        return Array.isArray(this.value) ? this.value : null
     }
 
     get isText() {
@@ -16,25 +28,31 @@ class Run {
     }
 
     get length() {
-        return this.isText ? this.value.length : 1
+        return this.characters?.length ?? 1
     }
 
+    /** @param {Id} id */
     contains([clock, client]) {
         return client === this.id[1] && clock >= this.id[0] && clock < this.id[0] + this.length
     }
 
+    /** @param {number} offset */
     split(offset) {
         const tail = new Run([this.id[0] + offset, this.id[1]], '', this.deleted, new Map(this.attributes))
 
-        tail.value = this.value.splice(offset)
+        tail.value = /** @type {string[]} */ (this.value).splice(offset)
 
         return tail
     }
 
+    /** @param {Run} next */
     join(next) {
+        const own = this.characters
+        const following = next.characters
+
         if (
-            !this.isText ||
-            !next.isText ||
+            !own ||
+            !following ||
             next.id[1] !== this.id[1] ||
             next.id[0] !== this.id[0] + this.length ||
             next.deleted !== this.deleted ||
@@ -49,30 +67,40 @@ class Run {
             if (!other || other.some((part, index) => part !== write[index])) return false
         }
 
-        for (const character of next.value) this.value.push(character)
+        for (const character of following) own.push(character)
 
         return true
     }
 
+    /** @returns {Formatting} */
     formatting() {
         return Object.fromEntries(
             [...this.attributes]
                 .filter(([, [value]]) => value !== null)
-                .map(([key, [value]]) => [key, value])
+                .map(([key, [value]]) => [key, /** @type {string} */ (value)])
                 .sort(([a], [b]) => (a < b ? -1 : 1)),
         )
     }
 }
 
 export class Sequence {
+    /** @param {SequenceData} data */
     constructor(data = []) {
+        /** @type {Run[]} */
         this.runs = data.map(
             ([clock, client, value, deleted, attributes]) =>
                 new Run([clock, client], value, deleted === 1, new Map(Object.entries(attributes ?? {}))),
         )
+        /** @type {Required<Token>[] | null} */
         this.cache = null
     }
 
+    /**
+     * @param {Id} id
+     * @param {Id | null | undefined} after
+     * @param {TokenValue} value
+     * @param {Formatting} formatting
+     */
     insert(id, after, value, formatting = {}) {
         if (this.find(id) !== -1) return
 
@@ -93,34 +121,44 @@ export class Sequence {
 
         while (position < this.runs.length && isAfter(this.runs[position].id, id)) position++
 
-        const attributes = new Map(Object.entries(formatting).map(([key, item]) => [key, [item, ...id]]))
+        /** @type {Map<string, [string | null, number, number]>} */
+        const attributes = new Map(Object.entries(formatting).map(([key, item]) => [key, [item, id[0], id[1]]]))
 
         this.runs.splice(position, 0, new Run(id, value, false, attributes))
         this.compact()
     }
 
+    /** @param {IdRange} range */
     delete(range) {
         this.each(range, (run) => (run.deleted = true))
     }
 
+    /**
+     * @param {IdRange} range
+     * @param {string} key
+     * @param {string | null} value
+     * @param {Id} at
+     */
     format(range, key, value, at) {
         this.each(range, (run) => {
             const current = run.attributes.get(key)
 
-            if (!current || isAfter(at, [current[1], current[2]])) run.attributes.set(key, [value, ...at])
+            if (!current || isAfter(at, [current[1], current[2]])) run.attributes.set(key, [value, at[0], at[1]])
         })
     }
 
+    /** @returns {Required<Token>[]} */
     tokens() {
         if (this.cache) return this.cache
 
+        /** @type {Required<Token>[]} */
         const tokens = []
 
         for (const run of this.runs) {
             if (run.deleted) continue
 
             const formatting = run.formatting()
-            const values = run.isText ? run.value : [run.value]
+            const values = run.characters ?? [/** @type {TokenValue} */ (run.value)]
 
             values.forEach((value, offset) =>
                 tokens.push({ value, formatting, id: [run.id[0] + offset, run.id[1]] }),
@@ -132,14 +170,16 @@ export class Sequence {
 
     text() {
         return this.runs
-            .filter((run) => !run.deleted && run.isText)
-            .map((run) => run.value.join(''))
+            .map((run) => (run.deleted ? '' : (run.characters?.join('') ?? '')))
             .join('')
     }
 
     /**
      * The number of visible items up to and including `id`. A cursor stored as
      * the id on its left stays in place however much changes around it.
+     *
+     * @param {Id | null | undefined} id
+     * @returns {number | null} null if the id is not in this sequence
      */
     indexAfter(id) {
         if (!id) return 0
@@ -154,6 +194,10 @@ export class Sequence {
         return null
     }
 
+    /**
+     * @param {number} index
+     * @returns {Id | null}
+     */
     idBefore(index) {
         let remaining = index
 
@@ -167,12 +211,18 @@ export class Sequence {
         return null
     }
 
+    /** @param {Id} id */
     find(id) {
         return this.runs.findIndex((run) => run.contains(id))
     }
 
+    /**
+     * @param {IdRange} range
+     * @param {(run: Run) => void} callback
+     */
     each([clock, client, length], callback) {
         const end = clock + length
+        /** @type {Run[]} */
         const runs = []
 
         for (let run of this.runs) {
@@ -202,6 +252,7 @@ export class Sequence {
     }
 
     compact() {
+        /** @type {Run[]} */
         const runs = []
 
         for (const run of this.runs) {

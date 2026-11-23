@@ -1,5 +1,9 @@
 import { element } from '../dom.js'
 
+/**
+ * @param {Pick<Person, 'avatar' | 'initials' | 'idle' | 'color'>} person
+ * @param {{small?: boolean}} options
+ */
 export function avatar(person, { small = false } = {}) {
     const image =
         person.avatar &&
@@ -7,7 +11,7 @@ export function avatar(person, { small = false } = {}) {
             src: person.avatar,
             alt: '',
             referrerpolicy: 'no-referrer',
-            on: { error: (event) => event.currentTarget.replaceWith(person.initials) },
+            on: { error: (event) => /** @type {Element} */ (event.currentTarget).replaceWith(person.initials) },
         })
 
     const node = element(

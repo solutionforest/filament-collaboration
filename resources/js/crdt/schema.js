@@ -7,6 +7,7 @@ export const INLINE = new Set(['hardBreak', 'image', 'mergeTag'])
 
 const CELL = ['align', 'colspan', 'colwidth', 'rowspan']
 
+/** @type {Map<string, string[]>} */
 const NODES = new Map(
     Object.entries({
         paragraph: ['textAlign'],
@@ -33,6 +34,7 @@ const NODES = new Map(
     }),
 )
 
+/** @type {Map<string, string[]>} */
 const MARKS = new Map(
     Object.entries({
         bold: [],
@@ -49,6 +51,7 @@ const MARKS = new Map(
     }),
 )
 
+/** @type {Record<string, string | number>} */
 const DEFAULTS = {
     colspan: 1,
     rowspan: 1,
@@ -60,16 +63,28 @@ const DEFAULTS = {
 }
 
 const INTEGERS = new Set(['level', 'start', 'colspan', 'rowspan', 'data-cols', 'data-col-span'])
+/** @type {(value: number, minimum: number, maximum: number) => number} */
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value))
 
+/**
+ * @param {string} url
+ * @param {string[]} schemes
+ */
 function isSafeUrl(url, schemes) {
+    // Control characters and spaces are how `java\tscript:` gets past a scheme check.
+    // eslint-disable-next-line no-control-regex
     if (new TextEncoder().encode(url).length > 8192 || /[\u0000- \u007f]/.test(url)) return false
 
     const scheme = url.match(/^([^/?#]*):/)
 
-    return !scheme || schemes.includes(scheme[1].toLowerCase())
+    return !scheme || schemes.includes(String(scheme[1]).toLowerCase())
 }
 
+/**
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {string | number | number[] | null} the value, if safe to share
+ */
 function attribute(name, value) {
     if (name === 'colwidth') {
         return Array.isArray(value) && value.length
@@ -122,7 +137,13 @@ function attribute(name, value) {
     return valid ? text : null
 }
 
+/**
+ * @param {string[]} allowed
+ * @param {Record<string, unknown> | null | undefined} given
+ * @returns {Record<string, string | number | number[]> | null}
+ */
 function attributes(allowed, given) {
+    /** @type {Record<string, string | number | number[]>} */
     const result = {}
 
     for (const name of [...allowed].sort()) {
@@ -134,14 +155,26 @@ function attributes(allowed, given) {
     return Object.keys(result).length ? result : null
 }
 
+/**
+ * @param {string} type
+ * @param {Record<string, unknown> | null | undefined} given
+ */
 export function nodeAttributes(type, given) {
-    if (!NODES.has(type)) throw new Error(`Rich content node [${type}] cannot be shared live.`)
+    const allowed = NODES.get(type)
 
-    return attributes(NODES.get(type), given)
+    if (!allowed) throw new Error(`Rich content node [${type}] cannot be shared live.`)
+
+    return attributes(allowed, given)
 }
 
+/**
+ * @param {string} type
+ * @param {Record<string, unknown> | null | undefined} given
+ */
 export function markAttributes(type, given) {
-    if (!MARKS.has(type)) throw new Error(`Rich content mark [${type}] cannot be shared live.`)
+    const allowed = MARKS.get(type)
 
-    return attributes(MARKS.get(type), given)
+    if (!allowed) throw new Error(`Rich content mark [${type}] cannot be shared live.`)
+
+    return attributes(allowed, given)
 }

@@ -5,6 +5,10 @@ const PANEL_LIMIT = 100
 
 /** The avatar stack and sync status in the page header. */
 export class PresenceBar {
+    /** @type {HTMLElement | null} */
+    host = null
+
+    /** @param {import('../room/room.js').Room} room */
     constructor(room) {
         this.room = room
         this.open = false
@@ -16,7 +20,7 @@ export class PresenceBar {
         document.addEventListener(
             'pointerdown',
             (event) => {
-                if (this.open && !this.host?.contains(event.target)) this.toggle(false)
+                if (this.open && !(event.target instanceof Node && this.host?.contains(event.target))) this.toggle(false)
             },
             { signal, capture: true },
         )
@@ -26,7 +30,7 @@ export class PresenceBar {
                 if (!this.open || event.key !== 'Escape') return
 
                 this.toggle(false)
-                this.host?.querySelector('[data-collaboration-people]')?.focus()
+                this.host?.querySelector(/** @type {'button'} */ ('[data-collaboration-people]'))?.focus()
             },
             { signal },
         )
@@ -38,7 +42,7 @@ export class PresenceBar {
     }
 
     render() {
-        const host = this.room.el.querySelector('[data-collaboration-presence]')
+        const host = this.room.el.querySelector(/** @type {'div'} */ ('[data-collaboration-presence]'))
 
         if (!host) return
 
@@ -58,19 +62,21 @@ export class PresenceBar {
         this.host = host
         this.signature = signature
 
-        const focused = host.contains(document.activeElement) ? document.activeElement.dataset.key : null
+        const active = document.activeElement
+        const focused = active instanceof HTMLElement && host.contains(active) ? active.dataset.key : null
         const scrolled = host.querySelector('.fi-collab-panel-list')?.scrollTop ?? 0
 
         host.replaceChildren(
-            ...[this.notice(), this.stack(people), this.status(), this.open && this.panel(people)].filter(Boolean),
+            ...[this.notice(), this.stack(people), this.status(), this.open ? this.panel(people) : null].flatMap((node) => node ?? []),
         )
 
         const list = host.querySelector('.fi-collab-panel-list')
 
         if (list) list.scrollTop = scrolled
-        if (focused) [...host.querySelectorAll('[data-key]')].find((node) => node.dataset.key === focused)?.focus()
+        if (focused) [...host.querySelectorAll(/** @type {'button'} */ ('[data-key]'))].find((node) => node.dataset.key === focused)?.focus()
     }
 
+    /** @param {Person[]} people */
     stack(people) {
         const others = people.filter((person) => !person.self)
 
@@ -130,7 +136,7 @@ export class PresenceBar {
         if (!notice) return null
 
         return element('span', { class: 'fi-collab-notice', role: 'status' }, [
-            element('span', { text: notice.text ?? translate(config.strings.saved, { name: notice.name }) }),
+            element('span', { text: notice.text ?? translate(config.strings.saved, { name: notice.name ?? '' }) }),
             notice.pull &&
                 element('button', {
                     type: 'button',
@@ -142,6 +148,7 @@ export class PresenceBar {
         ])
     }
 
+    /** @param {Person[]} people */
     panel(people) {
         const { strings } = this.room.config
 
@@ -174,6 +181,7 @@ export class PresenceBar {
         ])
     }
 
+    /** @param {Person} person */
     person(person) {
         const { strings, modes, labels } = this.room.config
 

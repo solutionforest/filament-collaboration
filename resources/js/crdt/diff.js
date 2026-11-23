@@ -2,9 +2,11 @@
 
 const MATRIX_LIMIT = 250_000
 
+/** @type {(a: Token, b: Token) => boolean} */
 const sameContent = ({ value: a }, { value: b }) =>
     typeof a === 'string' || typeof b === 'string' ? a === b : a.n === b.n && a.b === b.b && a.i === b.i
 
+/** @type {(a: Formatting, b: Formatting) => boolean} */
 const sameFormatting = (a, b) => {
     const keys = Object.keys(a)
 
@@ -13,17 +15,23 @@ const sameFormatting = (a, b) => {
 
 /**
  * @param {string} field
- * @param {Array} old tokens that carry ids
- * @param {Array} next
+ * @param {Token[]} old tokens that carry ids
+ * @param {Token[]} next
  * @param {number} clock the highest clock in the document
  * @param {number} client
  * @param {number|null} caret the index after the edit, which tells "aa|" from "a|a"
+ * @returns {Operation[]}
  */
 export function diff(field, old, next, clock, client, caret = null) {
+    /** @type {Operation[]} */
     const operations = []
+    /** @type {Map<string, {key: string, value: string | null, ids: Id[]}>} */
     const formats = new Map()
+    /** @type {Id | null} */
     let previous = null
+    /** @type {Token[]} */
     let inserting = []
+    /** @type {Id[]} */
     let deleting = []
 
     const flush = () => {
@@ -33,6 +41,7 @@ export function diff(field, old, next, clock, client, caret = null) {
         }
 
         for (const { value, formatting, length } of segments(inserting)) {
+            /** @type {Operation} */
             const operation = { o: 'ins', f: field, id: [clock + 1, client], after: previous, v: value }
 
             if (Object.keys(formatting).length) operation.a = formatting
@@ -46,12 +55,15 @@ export function diff(field, old, next, clock, client, caret = null) {
     }
 
     for (const [from, to] of align(old, next, caret)) {
-        if (!to) {
-            deleting.push(from.id)
-        } else if (!from) {
+        if (from && !to) {
+            if (from.id) deleting.push(from.id)
+        } else if (to && !from) {
             inserting.push(to)
-        } else {
+        } else if (from && to) {
             flush()
+
+            if (!from.id) continue
+
             previous = from.id
 
             for (const key of new Set([...Object.keys(from.formatting), ...Object.keys(to.formatting)])) {
@@ -61,9 +73,10 @@ export function diff(field, old, next, clock, client, caret = null) {
 
                 const group = `${key}\u0000${value ?? '\u0000'}`
 
-                if (!formats.has(group)) formats.set(group, { key, value, ids: [] })
+                const format = formats.get(group) ?? { key, value, ids: [] }
 
-                formats.get(group).ids.push(from.id)
+                format.ids.push(from.id)
+                formats.set(group, format)
             }
         }
     }
@@ -77,6 +90,12 @@ export function diff(field, old, next, clock, client, caret = null) {
     return operations
 }
 
+/**
+ * @param {Token[]} old
+ * @param {Token[]} next
+ * @param {number | null} caret
+ * @returns {Array<[Token | null, Token | null]>}
+ */
 function align(old, next, caret) {
     let start = 0
     let oldEnd = old.length
@@ -97,6 +116,7 @@ function align(old, next, caret) {
         newEnd--
     }
 
+    /** @type {Array<[Token | null, Token | null]>} */
     const pairs = []
 
     for (let index = 0; index < start; index++) pairs.push([old[index], next[index]])
@@ -108,8 +128,14 @@ function align(old, next, caret) {
     return pairs
 }
 
+/**
+ * @param {Token[]} old
+ * @param {Token[]} next
+ * @returns {Array<[Token | null, Token | null]>}
+ */
 function middle(old, next) {
     const [m, n] = [old.length, next.length]
+    /** @type {Array<[Token | null, Token | null]>} */
     const pairs = []
     let i = 0
     let j = 0
@@ -138,8 +164,16 @@ function middle(old, next) {
     return pairs
 }
 
+/**
+ * Consecutive characters with the same formatting, as one insertion.
+ *
+ * @param {Token[]} tokens
+ * @returns {Array<{value: TokenValue, formatting: Formatting, length: number}>}
+ */
 function segments(tokens) {
+    /** @type {Array<{value: TokenValue, formatting: Formatting, length: number}>} */
     const result = []
+    /** @type {{value: string, formatting: Formatting, length: number} | null} */
     let current = null
 
     for (const { value, formatting } of tokens) {
@@ -158,7 +192,12 @@ function segments(tokens) {
     return result
 }
 
+/**
+ * @param {Id[]} ids
+ * @returns {IdRange[]}
+ */
 function ranges(ids) {
+    /** @type {IdRange[]} */
     const result = []
 
     for (const [clock, client] of ids) {
