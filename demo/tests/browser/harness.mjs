@@ -221,5 +221,8 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
 
     const article = (id = 3) => db.prepare('select * from documents where id = ?').get(id)
 
-    return { base, browser, article, db, edit, env, problems, reverb, sessions, signIn, stop, stopReverb }
+    /** Runs Artisan against this server's database and caches. */
+    const artisan = (...args) => execFileSync('php', ['artisan', ...args], { cwd: demo, env, stdio: 'ignore' })
+
+    return { artisan, base, browser, article, db, edit, env, problems, reverb, sessions, signIn, stop, stopReverb }
 }

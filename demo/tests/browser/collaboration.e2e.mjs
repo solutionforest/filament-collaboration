@@ -562,6 +562,25 @@ describe('saving', () => {
         app.problems.length = known
     })
 
+    test('a permission change renews tokens without interrupting typing', async () => {
+        await together()
+
+        const renewed = []
+        const watch = (response) => response.url().includes('_collaboration/sync') && response.status() === 410 && renewed.push(response)
+        const known = app.problems.length
+
+        alice.on('response', watch)
+        app.artisan('filament-collaboration:refresh-permissions')
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' after the change', { delay: 40 })
+
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / after the change$/), 'typing stopped', 15000)
+
+        alice.off('response', watch)
+        assert.ok(renewed.length >= 1, 'the old token was still accepted')
+        app.problems.length = known
+    })
+
     test('discard returns everybody to the saved version', async () => {
         await together()
 

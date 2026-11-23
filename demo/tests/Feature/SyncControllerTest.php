@@ -4,8 +4,12 @@ use App\Models\Document;
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
@@ -260,4 +264,34 @@ it('does not let another user resume somebody\'s edits', function (): void {
         ->assertJsonPath('resumed', false);
 
     expect($bob->value('title'))->toBe('Shared');
+});
+
+it('returns 410 to open tabs once permissions change, so they render a new token', function (): void {
+    arrangeSync($this);
+    $alice = Editor::open($this, $this->alice, $this->article);
+    $other = Editor::open($this, $this->alice, Document::create(['title' => 'Other']));
+    $alice->sync();
+    $other->sync();
+
+    Permissions::changed($this->article);
+
+    $alice->send()->assertStatus(410);
+    $other->send()->assertOk();
+
+    Permissions::changed();
+
+    $other->send()->assertStatus(410);
+    Editor::open($this, $this->alice, $this->article)->sync();
+});
+
+it('pushes a refresh to the room when its permissions change', function (): void {
+    arrangeSync($this);
+    CollaborationPlugin::get()->broadcasting();
+    $alice = Editor::open($this, $this->alice, $this->article);
+    $alice->sync();
+
+    Event::fake([RoomChanged::class]);
+    Permissions::changed($this->article);
+
+    Event::assertDispatched(RoomChanged::class, fn (RoomChanged $event): bool => $event->channel === $alice->config['channel'] && $event->payload === ['refresh' => true]);
 });

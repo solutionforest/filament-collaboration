@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
+use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Support\Data;
 
 /**
@@ -43,6 +44,7 @@ final readonly class RoomContext
         public ?string $key = null,
         public int $expiresAt = 0,
         public array $allowed = [],
+        public string $permissions = '',
     ) {}
 
     public function toToken(): string
@@ -63,6 +65,7 @@ final readonly class RoomContext
             'k' => $this->key,
             'e' => $this->expiresAt,
             'o' => $this->allowed,
+            'a' => $this->permissions,
         ]));
     }
 
@@ -108,6 +111,7 @@ final readonly class RoomContext
             key: Data::nullableString($data['k'] ?? null),
             expiresAt: Data::int($data['e'] ?? null),
             allowed: array_map(Data::strings(...), Data::map($data['o'] ?? null)),
+            permissions: Data::string($data['a'] ?? null),
         );
     }
 
@@ -126,8 +130,9 @@ final readonly class RoomContext
             && $this->mode === PresenceMode::Editing;
     }
 
+    /** Too old, or issued before `Permissions::changed()`: the page must render a new one. */
     public function hasExpired(): bool
     {
-        return $this->expiresAt < now()->getTimestamp();
+        return $this->expiresAt < now()->getTimestamp() || ! hash_equals(Permissions::version($this->room), $this->permissions);
     }
 }
