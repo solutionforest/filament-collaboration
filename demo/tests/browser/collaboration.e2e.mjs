@@ -834,7 +834,10 @@ describe('editors made live by adapters', () => {
         }, name)
 
     for (const [name, label] of [['markdownEditorFormComponent', 'Markdown'], ['codeEditorFormComponent', 'code']]) {
-        test(`two people typing in ${label} editor at once both keep their typing, with carets`, async () => {
+        // CodeMirror 6 merges on save in WebKit; see the adapter.
+        const skip = label === 'code' && process.env.BROWSER === 'webkit'
+
+        test(`two people typing in ${label} editor at once both keep their typing, with carets`, { skip }, async () => {
             const id = await together()
 
             await place(alice, name, 0)

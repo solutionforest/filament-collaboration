@@ -162,6 +162,7 @@ cd .. && npm run check          # JavaScript: lint, types and tests
 - Without broadcasting, changes arrive by polling, every 0.4 s by default.
 - Inside repeater and builder items, only text inputs and textareas merge by character, and undo there is the browser's own. Lists holding uploads, rich text or nested lists merge on save.
 - Rich editors with custom blocks, mentions or plugins merge on save. Other editors (TinyMCE, CKEditor, Quill, Trix...) are live through a short [adapter](docs/guide.md#adapters-for-other-editors); the demo has working ones.
+- In Safari (WebKit), Filament's `CodeEditor` merges on save rather than live: CodeMirror 6 there can lose a keystroke when a colleague's change lands mid-keystroke.
 - It relies on two Filament internals, Livewire's `queueUpdate` and the rich editor's `getEditor()`, both covered by the browser tests.
 
 More in the guide's [troubleshooting](docs/guide.md#11-troubleshooting).

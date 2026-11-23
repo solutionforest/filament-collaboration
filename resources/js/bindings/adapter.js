@@ -25,6 +25,8 @@ export class AdapterBinding extends Binding {
     /** @type {{anchor: Id | null, head: Id | null} | null} */
     anchors = null
     warned = false
+    /** The adapter said this editor cannot be live here: it merges on save. */
+    unsupported = false
     /** True while writing: the editor's own change events then are ours. */
     writing = false
 
@@ -46,6 +48,8 @@ export class AdapterBinding extends Binding {
     }
 
     attach() {
+        if (this.unsupported) return false
+
         const definition = adapters.get(this.name)
         const element = this.room.dom.wrapper(this.field)
 
@@ -55,7 +59,7 @@ export class AdapterBinding extends Binding {
         this.detach()
 
         try {
-            this.handle = definition.attach({
+            const handle = definition.attach({
                 field: this.field,
                 element,
                 statePath: this.path,
@@ -63,6 +67,15 @@ export class AdapterBinding extends Binding {
                 changed: () => this.collect(),
                 moved: () => this.room.cursorMoved(),
             })
+
+            if (handle === false) {
+                this.unsupported = true
+                this.room.bindingFailed(this.field)
+
+                return false
+            }
+
+            this.handle = handle
         } catch (error) {
             this.warn(error)
 

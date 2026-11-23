@@ -772,7 +772,7 @@ export class Room {
             fields: Object.entries(this.config.fields).map(([field, kind]) => [
                 field,
                 kind,
-                this.bound.has(field) ? (this.dirty.includes(field) ? 'live, unsaved' : 'live') : 'merge on save',
+                this.bound.has(field) ? (this.dirty.includes(field) ? 'live, unsaved' : 'live') : this.failed.has(field) ? 'merge on save (not live here)' : 'merge on save',
             ]),
             people: this.presence.users().map((person) => [person.name, person.mode, person.field ?? '—']),
             problems: this.problems.map(({ field, error, at }) => [new Date(at).toLocaleTimeString(), field, error]),
