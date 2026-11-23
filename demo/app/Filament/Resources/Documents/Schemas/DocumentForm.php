@@ -86,6 +86,12 @@ class DocumentForm
                 ])->columnSpan(['lg' => 2]),
 
                 Group::make([
+                    Section::make("Editor's notes")
+                        ->description('Not shared live: one person at a time.')
+                        ->schema([
+                            // Shows how a field that cannot be live is kept safe: others wait while somebody is in it.
+                            Textarea::make('editor_notes')->hiddenLabel()->rows(3)->collaborative(false)->lockWhileEditing(),
+                        ]),
                     Section::make('Publishing')->schema([
                         Select::make('status')->options([
                             'draft' => 'Draft',

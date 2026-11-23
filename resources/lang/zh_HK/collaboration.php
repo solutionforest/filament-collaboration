@@ -63,6 +63,8 @@ return [
         'stopped' => '即時編輯已停止，修改會在儲存時合併',
         'denied' => '你已沒有存取權限',
         'deleted' => '此記錄已被刪除',
+        'busy_field' => ':name 正在編輯此欄位，儲存時會合併變更。',
+        'locked_field' => ':name 正在編輯此欄位',
         'deleted_by' => ':name 刪除了此記錄',
         'copy' => '複製我的內容',
         'copied' => '已複製',

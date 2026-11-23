@@ -106,6 +106,13 @@ CollaborationPlugin::make()
     ->liveEditing(fn (?Model $record): bool => ! $record?->is_locked);
 ```
 
+### Fields from other packages, and fields that cannot be live
+
+A field the package does not know, such as a third-party editor, merges on save. People still see who is in it, and while somebody is, everybody else reads "Bob is editing this field. Changes merge when saved." under it.
+
+- **Lock it while somebody is in it**, so two people never change it at once: `->lockWhileEditing()` on the field, or `CollaborationPlugin::make()->lockWhileEditing()` for every field that cannot be live (`->lockWhileEditing(false)` exempts one). The field is read-only for the others until that person leaves it or goes idle.
+- **Share its whole value live** with `->collaborative()`: the latest change wins, through Livewire state, so most editors update for everybody without any code. For merging by character and carets, write an [adapter](#adapters-for-other-editors).
+
 Pages with a locale switcher (translatable content) and date pickers with a personal timezone always merge on save, because their state differs per person.
 
 ## 3. Saving, drafts and conflicts
@@ -292,6 +299,7 @@ CollaborationPlugin::make()
 | `fieldTypes()` | none | your own field types, tried before the built-in ones; see [Extending](#9-extending) |
 | `debug()` | off | shows `CollaborationDebugAction`; see [Debugging](#10-debugging) |
 | `reportEditorErrors()` | off | logs rich editor errors with their content; see [Debugging](#10-debugging) |
+| `lockWhileEditing()` | off | fields that cannot be live are read-only for others while somebody is in them |
 | `audit()` | off | keeps a per-minute trail of who changed which field; see [Auditing](#an-edit-trail-saved-or-not) |
 
 ### In `config/filament-collaboration.php`

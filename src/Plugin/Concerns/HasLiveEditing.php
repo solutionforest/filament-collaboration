@@ -20,6 +20,8 @@ trait HasLiveEditing
 
     protected int|Closure $pollingInterval = 400;
 
+    protected bool|Closure $locksWhileEditing = false;
+
     /** Without live editing, forms still get presence and merge when saved. */
     public function liveEditing(bool|Closure $condition = true): static
     {
@@ -38,6 +40,24 @@ trait HasLiveEditing
         array_unshift($this->fieldTypes, $types);
 
         return $this;
+    }
+
+    /**
+     * Makes a field that cannot be live read-only for everybody else while
+     * somebody is in it, so two people never change it at once. Without
+     * this, others are only told who is editing it. Per field:
+     * `->lockWhileEditing()`.
+     */
+    public function lockWhileEditing(bool|Closure $condition = true): static
+    {
+        $this->locksWhileEditing = $condition;
+
+        return $this;
+    }
+
+    public function locksWhileEditing(): bool
+    {
+        return (bool) $this->evaluate($this->locksWhileEditing);
     }
 
     /** Milliseconds between syncs while working together. Crowds and idle tabs sync less often. */

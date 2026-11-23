@@ -29,6 +29,8 @@ final readonly class FieldResolver
 {
     public const META_KEY = 'collaborative';
 
+    public const LOCK_META_KEY = 'collaborationLock';
+
     private const MAX_OPTIONS = 500;
 
     /** @param list<FieldType> $types the first match wins */
@@ -45,6 +47,38 @@ final readonly class FieldResolver
         }
 
         return $field->meta(self::META_KEY, $condition);
+    }
+
+    /** Backs the `lockWhileEditing()` method on every field. */
+    public static function markLock(mixed $field, bool $condition): Field
+    {
+        if (! $field instanceof Field) {
+            throw new LogicException('lockWhileEditing() may only be called on a field.');
+        }
+
+        return $field->meta(self::LOCK_META_KEY, $condition);
+    }
+
+    /**
+     * The visible fields that are not live and lock while somebody is in them.
+     *
+     * @param  array<string, FieldKind>  $live
+     * @return list<string>
+     */
+    public function lockable(Schema $schema, array $live, bool $byDefault): array
+    {
+        $locks = [];
+
+        foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
+            $path = (string) $path;
+            $lock = $field->getMeta(self::LOCK_META_KEY);
+
+            if (! isset($live[$path]) && ! $field->isDisabled() && (is_bool($lock) ? $lock : $byDefault)) {
+                $locks[] = $path;
+            }
+        }
+
+        return $locks;
     }
 
     /**
@@ -241,6 +275,8 @@ final readonly class FieldResolver
             }
         }
 
-        return null;
+        // A field no type knows, such as a third-party editor, marked `->collaborative()`:
+        // its whole value is shared, and the latest change wins.
+        return $condition !== null ? FieldKind::Value : null;
     }
 }

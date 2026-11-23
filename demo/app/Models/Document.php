@@ -42,6 +42,7 @@ class Document extends Model
         'robots_noindex',
         'key_points',
         'sidebar',
+        'editor_notes',
     ];
 
     protected function casts(): array

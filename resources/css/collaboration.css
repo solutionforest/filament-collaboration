@@ -402,3 +402,28 @@ button.fi-collab-person-row:hover {
         flex-basis: 100%;
     }
 }
+
+/* A field that is not live while somebody else is in it. */
+.fi-collab-field-note {
+    margin-top: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: #b45309;
+}
+
+.fi-collab-field-note[data-locked] {
+    color: #b91c1c;
+}
+
+.dark .fi-collab-field-note {
+    color: #fcd34d;
+}
+
+.dark .fi-collab-field-note[data-locked] {
+    color: #fca5a5;
+}
+
+.fi-collab-locked > :not(.fi-collab-field-note) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

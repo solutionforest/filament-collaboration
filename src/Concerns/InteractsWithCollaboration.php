@@ -369,6 +369,14 @@ trait InteractsWithCollaboration
         return $writable === [] ? [] : CollaborationPlugin::get()->getFieldResolver()->allowedValues($this->form, $writable);
     }
 
+    /** @return list<string> */
+    protected function getCollaborationLocks(): array
+    {
+        $plugin = CollaborationPlugin::get();
+
+        return $plugin->getFieldResolver()->lockable($this->form, $this->getCollaborationLiveFields(), $plugin->locksWhileEditing());
+    }
+
     /** @return array<string, string> */
     protected function getCollaborationLabels(): array
     {
