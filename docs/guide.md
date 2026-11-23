@@ -196,9 +196,9 @@ app(EditTrail::class)->for($post);
 
 Each new row also dispatches `DraftEdited` (`record`, `by`, `field`, `minute`), to send wherever you like. The trail is kept until you delete it, for example with a scheduled `DB::table('filament_collaboration_edits')->where('minute', '<', now()->subYear()->getTimestamp())->delete()`.
 
-### Version history
+### Comments and version history
 
-Add `CollaborationPanelAction` to the page's header actions. It opens a slide-over whose **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
+Add `CollaborationPanelAction` to the page's header actions. It opens one slide-over with two tabs, **Comments** and **History**. Its **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
 
 ```php
 use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
@@ -213,7 +213,22 @@ protected function getHeaderActions(): array
 
 A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
 
+**Comments** are on the record, or on one of its fields. Everybody who can open the record reads them and can comment. The author and anybody who may edit the record can resolve or reopen a comment. The button shows how many comments are open. Every language of a translated record shares its comments, and deleting a record for good deletes them too.
+
+To let people `@mention` each other, say who may be mentioned on a record. The comment box suggests their names after `@`. Each person mentioned gets a Filament [database notification](https://filamentphp.com/docs/notifications/database-notifications) that links back to the record:
+
+```php
+CollaborationPlugin::make()
+    ->mentionable(fn (Model $record) => User::query()->where('team_id', $record->team_id));
+
+$panel->databaseNotifications(); // to show them in the panel
+```
+
+Pass `notify: false` to skip the notifications. `CommentPosted` (`record`, `by`, `comment`, `url`) is dispatched for every comment, and `$event->comment->mentions` lists the people it mentions, so you can send the news anywhere else too.
+
 ## 4. Presence in tables and modals
+
+**Fields out of sight.** When somebody is in a field behind a tab that is not selected, a wizard step that is not current, or a collapsed section, their initials show on that tab, step or section header. Choosing them in the avatar list opens the tab and the section and scrolls to the field. There is nothing to set up.
 
 **A column with the people on each record:**
 
@@ -318,6 +333,7 @@ CollaborationPlugin::make()
 | `presenceRenderHook()` | header actions | where the avatars render; use one of Filament's page hooks |
 | `fieldTypes()` | none | your own field types, tried before the built-in ones; see [Extending](#9-extending) |
 | `debug()` | off | shows `CollaborationDebugAction`; see [Debugging](#10-debugging) |
+| `mentionable($users, notify:)` | none | who can be `@mentioned` in comments; see [Comments](#comments-and-version-history) |
 | `reportEditorErrors()` | off | logs rich editor errors with their content; see [Debugging](#10-debugging) |
 | `lockWhileEditing()` | off | fields that cannot be live are read-only for others while somebody is in them |
 | `audit()` | off | keeps a per-minute trail of who changed which field; see [Auditing](#an-edit-trail-saved-or-not) |

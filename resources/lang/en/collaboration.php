@@ -47,6 +47,20 @@ return [
         'action' => 'Discard draft',
     ],
 
+    'comments' => [
+        'none' => 'No comments yet.',
+        'placeholder' => 'Write a comment. Type @ to mention somebody.',
+        'on' => 'On',
+        'whole_record' => 'The whole record',
+        'post' => 'Comment',
+        'resolve' => 'Resolve',
+        'reopen' => 'Reopen',
+        'resolved' => 'Resolved by :name',
+        'resolved_heading' => 'Resolved (:count)',
+        'mentioned' => ':name mentioned you on :record',
+        'view' => 'View',
+    ],
+
     'panel' => [
         'label' => 'Comments & history',
         'heading' => 'Comments & history',

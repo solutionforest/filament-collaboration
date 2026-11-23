@@ -10,6 +10,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
+use SolutionForest\FilamentCollaboration\Support\Data;
 
 /**
  * One slide-over for a record's comments and its history: field comments
@@ -32,6 +33,7 @@ class CollaborationPanelAction extends Action
             ->icon(Heroicon::OutlinedChatBubbleLeftRight)
             ->color('gray')
             ->visible(fn (Component $livewire): bool => in_array(InteractsWithCollaboration::class, class_uses_recursive($livewire), true))
+            ->badge(fn (Component $livewire): ?int => method_exists($livewire, 'getCollaborationOpenCommentCount') ? (Data::int($livewire->getCollaborationOpenCommentCount()) ?: null) : null)
             ->slideOver()
             ->modalWidth(Width::Large)
             ->modalHeading(__('filament-collaboration::collaboration.panel.heading'))

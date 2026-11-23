@@ -23,6 +23,7 @@ class CollaborationPlugin implements Plugin
     use EvaluatesClosures;
     use PluginConcerns\HasAuditing;
     use PluginConcerns\HasBroadcasting;
+    use PluginConcerns\HasComments;
     use PluginConcerns\HasDebugging;
     use PluginConcerns\HasLiveEditing;
     use PluginConcerns\HasPresenceAppearance;

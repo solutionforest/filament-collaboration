@@ -961,6 +961,38 @@ describe('translated pages', () => {
     })
 })
 
+describe('fields out of sight', () => {
+    test('someone in a field behind a closed tab and section shows on the tab, and jumping to them opens both', async () => {
+        for (const page of [alice, bob]) {
+            await page.goto(`${app.base}/admin/pages/2/edit`)
+            await page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length), undefined, { timeout: 20000 })
+        }
+
+        await bob.getByRole('tab', { name: 'Publishing' }).click()
+        await bob.locator('.fi-section-header', { hasText: 'Address' }).click()
+        await field(bob, 'slug').click()
+
+        const tab = alice.getByRole('tab', { name: 'Publishing' })
+
+        await eventually(async () => {
+            const chip = await alice.locator('.fi-collab-chip').boundingBox()
+            const header = await tab.boundingBox()
+
+            assert.ok(chip && header, 'no chip')
+            assert.equal(await alice.locator('.fi-collab-chip').innerText(), 'BM')
+            // On the tab's top right corner.
+            assert.ok(Math.abs(chip.x + chip.width - (header.x + header.width - 6)) < 2 && Math.abs(chip.y + chip.height / 2 - header.y - 2) < 2, JSON.stringify({ chip, header }))
+        }, 'Alice did not see Bob on the tab', 12000)
+
+        await alice.locator('[data-collaboration-people]').click()
+        await alice.getByRole('button', { name: /Bob Martinez/ }).filter({ hasText: 'Slug' }).click()
+
+        await eventually(async () => assert.ok(await field(alice, 'slug').isVisible()), 'the slug was not revealed')
+        await eventually(async () => assert.equal(await alice.locator('.fi-collab-chip').count(), 0), 'the chip stayed after the field was shown')
+        assert.equal(await alice.locator('.fi-collab-outline').count(), 1)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()
@@ -1134,6 +1166,31 @@ describe('seeing each other', () => {
         await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Edited in a modal'), 'the open editor was not updated')
     })
 
+    test('a comment on a field, with an @mention picked from the list, reaches a colleague', async () => {
+        await together()
+
+        await alice.getByRole('button', { name: 'Comments & history' }).click()
+
+        const panel = alice.locator('[data-collaboration-comments]')
+
+        await panel.locator('[data-collaboration-comment-field]').selectOption('excerpt')
+        await panel.locator('textarea').pressSequentially('Shorter, @Bo')
+        await panel.getByRole('option', { name: 'Bob Martinez' }).click()
+        await eventually(async () => assert.ok(await panel.locator('textarea').evaluate((input) => input === document.activeElement)), 'the comment box lost focus')
+        await alice.keyboard.type('please?')
+        await panel.getByRole('button', { name: 'Comment', exact: true }).click()
+
+        await eventually(async () => assert.match(await panel.locator('[data-collaboration-comment]').first().innerText(), /Summary[\s\S]*Shorter, @Bob Martinez please\?/), 'the comment was not shown')
+        assert.equal(await panel.locator('.fi-collab-mention').innerText(), '@Bob Martinez')
+
+        await bob.reload()
+        await bob.getByRole('button', { name: /Comments & history/ }).click()
+        await eventually(async () => assert.match(await bob.locator('[data-collaboration-comments]').innerText(), /Shorter, @Bob Martinez please\?/), 'Bob did not see the comment')
+
+        await bob.locator('[data-collaboration-comment]').first().getByRole('button', { name: 'Resolve' }).click()
+        await eventually(async () => assert.match(await bob.locator('.fi-collab-resolved summary').innerText(), /Resolved \(1\)/), 'the comment was not resolved')
+    })
+
     test('the history restores an earlier draft for everybody', async () => {
         await together()
 
@@ -1145,6 +1202,7 @@ describe('seeing each other', () => {
         await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version two'), 'Bob did not get version two')
 
         await bob.getByRole('button', { name: 'Comments & history' }).click()
+        await bob.getByRole('tab', { name: 'History' }).click()
 
         const history = bob.locator('[data-collaboration-history]')
 

@@ -13,6 +13,9 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -33,12 +36,21 @@ class PageResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        // In tabs and a collapsed section, to show who is in a field that cannot be seen.
         return $schema->components([
-            TextInput::make('title')->required()->maxLength(120),
-            TextInput::make('slug')->required()->maxLength(120),
-            Textarea::make('summary')->rows(2)->columnSpanFull(),
-            RichEditor::make('body')->columnSpanFull(),
-        ])->columns(2);
+            Tabs::make('Page')->columnSpanFull()->tabs([
+                Tab::make('Content')->schema([
+                    TextInput::make('title')->required()->maxLength(120),
+                    Textarea::make('summary')->rows(2),
+                    RichEditor::make('body'),
+                ]),
+                Tab::make('Publishing')->schema([
+                    Section::make('Address')->collapsible()->collapsed()->schema([
+                        TextInput::make('slug')->required()->maxLength(120),
+                    ]),
+                ]),
+            ]),
+        ]);
     }
 
     public static function table(Table $table): Table
