@@ -16,6 +16,8 @@ final class SharedDraft
     /** @var array<string, array<string, Contributor>> by field, then by user, since the field was last saved */
     public array $contributors = [];
 
+    public string $room = '';
+
     /**
      * @param  array<string, string>  $savedHashes
      * @param  list<string>  $dirty
@@ -50,6 +52,8 @@ final class SharedDraft
             dirty: Data::strings(Data::decode($row['dirty'] ?? null)),
             savedBy: Data::nullableString($row['saved_by'] ?? null),
         );
+
+        $draft->room = Data::string($row['room'] ?? null);
 
         foreach (Data::decode($row['contributors'] ?? null) as $field => $people) {
             foreach (Data::list($people) as $person) {

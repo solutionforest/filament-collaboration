@@ -29,6 +29,7 @@ final readonly class RoomRenderer
      * @param  array<string, list<string>>  $allowed
      * @param  list<string>  $locks  fields that are read-only for others while somebody is in them
      * @param  array<string, string>  $adapters  the JavaScript adapter each live field is edited through
+     * @param  list<string>  $uploads  live fields whose items are uploaded files
      */
     public function render(
         PresenceMode $mode,
@@ -44,6 +45,7 @@ final readonly class RoomRenderer
         array $allowed = [],
         array $locks = [],
         array $adapters = [],
+        array $uploads = [],
     ): ?View {
         $plugin = CollaborationPlugin::find();
         $panel = Filament::getCurrentOrDefaultPanel();
@@ -92,6 +94,7 @@ final readonly class RoomRenderer
                 'labels' => (object) $labels,
                 'locks' => array_values(array_intersect($locks, array_keys($labels))),
                 'adapters' => (object) array_intersect_key($adapters, $fields),
+                'uploads' => array_values(array_intersect($uploads, array_keys($fields))),
                 'reactive' => $reactive,
                 'canPull' => $canPull,
                 'interval' => $plugin->getPollingInterval(),

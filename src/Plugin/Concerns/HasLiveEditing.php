@@ -111,6 +111,7 @@ trait HasLiveEditing
             new Types\TextInputType,
             new Types\TextareaType,
             new Types\RichEditorType,
+            new Types\UploadType,
             new Types\ItemsType,
             Types\ValueType::defaults(),
             // Filament's own CodeMirror editors, through the adapters this package ships.

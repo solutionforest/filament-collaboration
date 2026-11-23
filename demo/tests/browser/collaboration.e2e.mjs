@@ -893,6 +893,26 @@ describe('third-party HTML editors, through adapters', () => {
     }
 })
 
+describe('live uploads', () => {
+    test('a file one person uploads appears for the other at once, and either save keeps it', async () => {
+        const id = await together()
+        const items = (page) => page.locator('.fi-page [x-data^="fileUploadFormComponent"] .filepond--item')
+        const known = app.problems.length
+        // A 1x1 PNG.
+        const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+        await alice.locator('.fi-page [x-data^="fileUploadFormComponent"] input[type=file]').setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer })
+
+        await eventually(async () => assert.equal(await items(bob).count(), 1), 'Bob does not see the upload', 20000)
+
+        await save(bob)
+        await eventually(() => assert.match(app.article(id).gallery ?? '', /gallery\\?\/[^"]+\.png/), "Bob's save did not keep Alice's upload")
+
+        // The demo has no storage link, so the image itself is not served.
+        app.problems.splice(known, app.problems.length - known, ...app.problems.slice(known).filter((problem) => !/\/storage\//.test(problem)))
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()

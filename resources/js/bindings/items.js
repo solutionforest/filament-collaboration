@@ -6,6 +6,10 @@ import { measureText } from '../ui/measure-text.js'
 import { Binding } from './binding.js'
 
 
+
+/** Livewire's name for a file that is uploaded but not yet stored. */
+const isTemporary = (/** @type {unknown} */ file) => typeof file === 'string' && file.startsWith('livewire-file:')
+
 /**
  * Repeaters and builders. Items are added, removed and moved by Filament's
  * own actions; this follows the resulting state. A change in which items
@@ -16,6 +20,7 @@ import { Binding } from './binding.js'
  */
 export class ItemsBinding extends Binding {
     ready = false
+    storing = false
     seen = ''
     /** @type {AbortController | null} */
     events = null
@@ -54,10 +59,39 @@ export class ItemsBinding extends Binding {
         return /** @type {import('../crdt/item-list.js').ItemList} */ (this.document.list(this.field))
     }
 
+    /** An upload field: its items are files, stored as soon as they are uploaded. */
+    get isUpload() {
+        return this.room.config.uploads?.includes(this.field) ?? false
+    }
+
+    /** @returns {Record<string, any>} */
     read() {
         const value = plain(this.wire.$get(this.path, false))
+        const items = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
 
-        return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+        // A file still being uploaded is only on this page; it is shared once stored.
+        return this.isUpload ? Object.fromEntries(Object.entries(items).filter(([, file]) => !isTemporary(file))) : items
+    }
+
+    /** Files uploaded here but not stored yet, by key. */
+    temporary() {
+        const value = plain(this.wire.$get(this.path, false))
+
+        return Object.fromEntries(Object.entries(value && typeof value === 'object' ? value : {}).filter(([, file]) => isTemporary(file)))
+    }
+
+    /** Stores what was just uploaded; the stored files then come back as state. */
+    store() {
+        if (this.storing || !Object.keys(this.temporary()).length) return
+
+        this.storing = true
+        this.wire
+            .$call('storeCollaborationUpload', this.field)
+            .catch(() => {})
+            .finally(() => {
+                this.storing = false
+                this.collect()
+            })
     }
 
     /**
@@ -110,6 +144,8 @@ export class ItemsBinding extends Binding {
 
     collect() {
         if (!this.ready) return
+
+        if (this.isUpload) this.store()
 
         const current = this.read()
         const signature = canonical(current)
@@ -175,6 +211,14 @@ export class ItemsBinding extends Binding {
                 toOffset(text, sequence.indexAfter(anchors.end) ?? 0),
                 anchors.direction ?? undefined,
             )
+        }
+
+        if (this.isUpload) {
+            // Keep what is still uploading here; Filament's upload field follows its state itself.
+            this.wire.$set(this.path, { ...value, ...this.temporary() }, false)
+            this.seen = canonical(value)
+
+            return
         }
 
         this.wire.$set(this.path, value, structural)

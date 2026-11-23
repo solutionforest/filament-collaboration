@@ -49,6 +49,7 @@ class Document extends Model
         'ckeditor_html',
         'quill_html',
         'trix_html',
+        'gallery',
     ];
 
     protected function casts(): array
@@ -59,6 +60,7 @@ class Document extends Model
             'tags' => 'array',
             'key_points' => 'array',
             'sidebar' => 'array',
+            'gallery' => 'array',
             'published_at' => 'datetime',
             'robots_noindex' => 'boolean',
         ];

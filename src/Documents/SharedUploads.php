@@ -59,6 +59,40 @@ final class SharedUploads
     }
 
     /**
+     * The files stored for a draft's field, which its items may then be.
+     *
+     * @return list<string>
+     */
+    public function storedFor(string $room, string $field): array
+    {
+        return Data::strings($this->uploads()->where('room', $room)->where('field', $field)->pluck('path')->all());
+    }
+
+    /** Whether a file was stored for some shared draft, and not yet saved or deleted. */
+    public function isStored(string $path): bool
+    {
+        return $this->uploads()->where('path', $path)->exists();
+    }
+
+    /**
+     * The files a field of a draft refers to: a rich editor's images, or an upload field's files.
+     *
+     * @return list<string>
+     */
+    public static function filesIn(Document $document, string $field): array
+    {
+        if (! $document->has($field)) {
+            return [];
+        }
+
+        return match ($document->kind($field)) {
+            FieldKind::RichText => self::images($document->value($field)),
+            FieldKind::Items => array_values(array_filter(Data::list(array_values(Data::map($document->value($field)))), is_string(...))),
+            default => [],
+        };
+    }
+
+    /**
      * The image ids in a rich editor's document.
      *
      * @return list<string>
@@ -95,9 +129,9 @@ final class SharedUploads
             $drafts[$room] ??= $this->draft($room);
             [$draft, $saved] = $drafts[$room] ?? [null, null];
 
-            if ($saved !== null && in_array($path, $this->imagesIn($saved, $field), true)) {
+            if ($saved !== null && in_array($path, self::filesIn($saved, $field), true)) {
                 $forget[] = $upload['id'];
-            } elseif ($keepDrafts && $draft !== null && in_array($path, $this->imagesIn($draft, $field), true)) {
+            } elseif ($keepDrafts && $draft !== null && in_array($path, self::filesIn($draft, $field), true)) {
                 continue;
             } elseif ($deleteUnused) {
                 try {
@@ -131,12 +165,6 @@ final class SharedUploads
         }
 
         return [Document::from(Data::decode($row['state'] ?? null)), Document::from(Data::decode($row['saved_state'] ?? null))];
-    }
-
-    /** @return list<string> */
-    private function imagesIn(Document $document, string $field): array
-    {
-        return $document->has($field) && $document->kind($field) === FieldKind::RichText ? self::images($document->value($field)) : [];
     }
 
     private function uploads(): Builder
