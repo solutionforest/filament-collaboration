@@ -6,16 +6,19 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
+    // Properties rather than Laravel 13's #[Fillable] and #[Hidden], so the demo also runs on Laravel 12.
+    /** @var list<string> */
+    protected $fillable = ['name', 'email', 'password'];
+
+    /** @var list<string> */
+    protected $hidden = ['password', 'remember_token'];
+
     protected $attributes = ['workspace_id' => 1];
 
     /** @use HasFactory<UserFactory> */
