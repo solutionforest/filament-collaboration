@@ -95,6 +95,8 @@ interface RoomConfig {
     labels: Record<string, string>
     /** Fields that are not live and are read-only for others while somebody is in them. */
     locks: string[]
+    /** The adapter each live field is edited through, if not a built-in binding. */
+    adapters?: Record<string, string>
     reactive: string[]
     canPull: boolean
     interval: number
@@ -135,7 +137,10 @@ interface Window {
     Livewire?: { find(id: string | null): Wire | undefined }
     Echo?: any
     FilamentRichEditor?: { tiptap?: { pmState?: typeof import('prosemirror-state') } }
-    filamentCollaboration?: { inspect(): Array<ReturnType<import('./room/room.js').Room['inspect']>> }
+    filamentCollaboration?: {
+        inspect(): Array<ReturnType<import('./room/room.js').Room['inspect']>>
+        registerAdapter(name: string, definition: AdapterDefinition): void
+    }
 }
 
 /** Where to draw somebody's caret and selection, in viewport coordinates. */
@@ -158,4 +163,48 @@ interface RichEditor {
     off(event: string, handler: (...args: any[]) => void): void
     getJSON(): RichNode
     chain(): any
+}
+
+/** What an adapter is given for one field. */
+interface AdapterContext {
+    /** The field's name, as in the form's state: `body`. */
+    field: string
+    /** The field's wrapper element. */
+    element: Element
+    /** The field's Livewire state path: `data.body`. */
+    statePath: string
+    wire: Wire
+    /** Call whenever the editor's content changes. */
+    changed(): void
+    /** Call whenever the caret or selection moves. */
+    moved(): void
+}
+
+/**
+ * One attached editor. Positions are UTF-16 offsets into `read()` for text,
+ * and `positions` units (see `adapters/html.js`) for HTML.
+ */
+interface AdapterHandle {
+    /** The editor's content: a string for text and HTML, anything JSON for a value. */
+    read(): any
+    /** Replaces the content. Change only what differs, so the editor's own state survives. */
+    write(value: any): void
+    selection?(): { anchor: number; head: number } | null
+    setSelection?(selection: { anchor: number; head: number }): void
+    /** Where a caret at this position is drawn, for other people's carets. */
+    caretRect?(position: number): DOMRect | null
+    /** Whether the editor has focus; the wrapper containing the focus otherwise. */
+    isFocused?(): boolean
+    /** True during IME composition: no remote change is applied meanwhile. */
+    isBusy?(): boolean
+    /** False once the editor was replaced, for example by a Livewire morph. */
+    isAlive?(): boolean
+    destroy?(): void
+}
+
+interface AdapterDefinition {
+    /** `text` merges characters, `html` merges characters, blocks and marks, `value` takes the latest. */
+    format: 'text' | 'html' | 'value'
+    /** Returns null while the editor is not ready yet; it is asked again shortly. */
+    attach(context: AdapterContext): AdapterHandle | null
 }

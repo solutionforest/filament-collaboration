@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Plugin\Concerns;
 
 use Closure;
+use Filament\Forms\Components\CodeEditor;
+use Filament\Forms\Components\MarkdownEditor;
 use Illuminate\Database\Eloquent\Model;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
@@ -21,6 +23,19 @@ trait HasLiveEditing
     protected int|Closure $pollingInterval = 400;
 
     protected bool|Closure $locksWhileEditing = false;
+
+    /** @var list<FieldType> registered by other packages, for every panel */
+    protected static array $globalFieldTypes = [];
+
+    /**
+     * For packages: makes their fields collaborative in every panel, for
+     * example in a service provider's `boot()`. A panel's own
+     * `fieldTypes()` still come first.
+     */
+    public static function registerFieldTypes(FieldType ...$types): void
+    {
+        array_push(static::$globalFieldTypes, ...$types);
+    }
 
     /** Without live editing, forms still get presence and merge when saved. */
     public function liveEditing(bool|Closure $condition = true): static
@@ -92,11 +107,15 @@ trait HasLiveEditing
 
         return new FieldResolver([
             ...$types,
+            ...static::$globalFieldTypes,
             new Types\TextInputType,
             new Types\TextareaType,
             new Types\RichEditorType,
             new Types\ItemsType,
             Types\ValueType::defaults(),
+            // Filament's own CodeMirror editors, through the adapters this package ships.
+            Types\AdapterType::make([MarkdownEditor::class], 'filament-markdown-editor'),
+            Types\AdapterType::make([CodeEditor::class], 'filament-code-editor'),
         ]);
     }
 }

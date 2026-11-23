@@ -803,6 +803,62 @@ describe('saving', () => {
     })
 })
 
+describe('editors made live by adapters', () => {
+    /** Puts the caret at a UTF-16 offset of a CodeMirror 5 or 6 editor's text, -1 for the end. */
+    const place = (page, name, offset) =>
+        page.evaluate(
+            ({ name, offset }) => {
+                const root = document.querySelector(`.fi-page [x-data^="${name}"]`)
+                const data = window.Alpine.$data(root)
+                const cm5 = data.editor?.codemirror
+
+                if (cm5) {
+                    cm5.focus()
+                    cm5.setCursor(cm5.posFromIndex(offset < 0 ? cm5.getValue().length : offset))
+
+                    return
+                }
+
+                const view = data.editor
+
+                view.focus()
+                view.dispatch({ selection: { anchor: offset < 0 ? view.state.doc.length : offset } })
+            },
+            { name, offset },
+        )
+    const value = (page, name) =>
+        page.evaluate((name) => {
+            const data = window.Alpine.$data(document.querySelector(`.fi-page [x-data^="${name}"]`))
+
+            return data.editor?.codemirror?.getValue() ?? data.editor.state.doc.toString()
+        }, name)
+
+    for (const [name, label] of [['markdownEditorFormComponent', 'Markdown'], ['codeEditorFormComponent', 'code']]) {
+        test(`two people typing in ${label} editor at once both keep their typing, with carets`, async () => {
+            const id = await together()
+
+            await place(alice, name, 0)
+            await alice.keyboard.type('the fox', { delay: 20 })
+            await eventually(async () => assert.equal(await value(bob, name), 'the fox'), 'Bob did not get the text')
+
+            await Promise.all([place(alice, name, 3), place(bob, name, -1)])
+            await Promise.all([alice.keyboard.type(' quick', { delay: 60 }), bob.keyboard.type(' jumps', { delay: 55 })])
+
+            await eventually(async () => {
+                assert.equal(await value(alice, name), 'the quick fox jumps')
+                assert.equal(await value(bob, name), 'the quick fox jumps')
+            }, 'the typing did not merge')
+
+            await eventually(async () => assert.ok(await bob.locator('.fi-collab-caret:visible').count(), 'no caret'), 'Bob does not see where Alice is')
+
+            await save(bob)
+            const column = name.startsWith('markdown') ? 'newsletter_markdown' : 'embed_code'
+
+            await eventually(() => assert.equal(app.article(id)[column], 'the quick fox jumps'), 'the editor was not saved')
+        })
+    }
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()

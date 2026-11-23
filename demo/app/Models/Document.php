@@ -43,6 +43,8 @@ class Document extends Model
         'key_points',
         'sidebar',
         'editor_notes',
+        'newsletter_markdown',
+        'embed_code',
     ];
 
     protected function casts(): array

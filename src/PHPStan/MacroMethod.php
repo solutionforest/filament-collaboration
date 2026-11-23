@@ -15,10 +15,12 @@ use PHPStan\Type\BooleanType;
 use PHPStan\Type\ClosureType;
 use PHPStan\Type\Generic\TemplateTypeMap;
 use PHPStan\Type\IntegerType;
+use PHPStan\Type\ObjectType;
 use PHPStan\Type\StaticType;
 use PHPStan\Type\StringType;
 use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
+use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 /** @internal */
 final readonly class MacroMethod implements MethodReflection
@@ -108,7 +110,11 @@ final readonly class MacroMethod implements MethodReflection
     private function parameters(): array
     {
         if ($this->name === 'collaborative') {
-            return [new MacroParameter('condition', TypeCombinator::union(new BooleanType, new ClosureType, new StringType))];
+            return [
+                new MacroParameter('condition', TypeCombinator::union(new BooleanType, new ClosureType, new StringType)),
+                new MacroParameter('adapter', TypeCombinator::addNull(new StringType)),
+                new MacroParameter('as', new ObjectType(FieldKind::class)),
+            ];
         }
 
         if ($this->name === 'lockWhileEditing') {

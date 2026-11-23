@@ -378,6 +378,12 @@ trait InteractsWithCollaboration
     }
 
     /** @return array<string, string> */
+    protected function getCollaborationAdapters(): array
+    {
+        return CollaborationPlugin::get()->getFieldResolver()->adapters($this->form, $this->getCollaborationLiveFields());
+    }
+
+    /** @return array<string, string> */
     protected function getCollaborationLabels(): array
     {
         return CollaborationPlugin::get()->getFieldResolver()->labels($this->form);
