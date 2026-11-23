@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SolutionForest\FilamentCollaboration\Presence;
 
+use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
 
 /** One open tab. A person may be several participants. */
@@ -21,6 +22,7 @@ final readonly class Participant
         public ?string $field = null,
         public ?array $cursor = null,
         public bool $idle = false,
+        public ?Audience $audience = null,
     ) {}
 
     public function initials(): string

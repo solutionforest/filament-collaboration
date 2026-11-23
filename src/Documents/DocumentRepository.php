@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Documents;
 
 use Closure;
+use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Crdt\Document;
 use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
@@ -24,7 +25,10 @@ final class DocumentRepository
 
     private const MAX_OPERATIONS_PER_REQUEST = 20_000;
 
-    public function __construct(private readonly PresenceRepository $presence) {}
+    public function __construct(
+        private readonly PresenceRepository $presence,
+        private readonly RoomNotifier $notifier,
+    ) {}
 
     public function exists(string $room): bool
     {
@@ -101,17 +105,18 @@ final class DocumentRepository
 
     /**
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
      *
      * @throws InvalidOperation
      */
-    public function receive(string $room, int $client, int $epoch, array $batches, array $writable): void
+    public function receive(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = []): void
     {
         if ($batches === []) {
             return;
         }
 
-        $this->transaction($room, fn (SharedDraft $draft) => $this->receiveInto($draft, $client, $epoch, $batches, $writable));
+        $this->transaction($room, fn (SharedDraft $draft) => $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed));
     }
 
     /**
@@ -119,13 +124,14 @@ final class DocumentRepository
      * exactly as it is being saved. Null means this browser cannot be merged.
      *
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
      */
-    public function snapshot(string $room, int $client, int $epoch, array $batches, array $writable): ?Document
+    public function snapshot(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = []): ?Document
     {
         try {
-            return $this->transaction($room, function (SharedDraft $draft) use ($client, $epoch, $batches, $writable): Document {
-                $this->receiveInto($draft, $client, $epoch, $batches, $writable);
+            return $this->transaction($room, function (SharedDraft $draft) use ($client, $epoch, $batches, $writable, $allowed): Document {
+                $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed);
 
                 return clone $draft->document;
             });
@@ -285,9 +291,10 @@ final class DocumentRepository
 
     /**
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
      */
-    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable): void
+    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable, array $allowed = []): void
     {
         if ($batches === []) {
             return;
@@ -313,7 +320,7 @@ final class DocumentRepository
                 throw new InvalidOperation('Too many operations.');
             }
 
-            $operations = $draft->document->receive($client, Data::int($batch['n'] ?? null), $batch['ops'] ?? null, $writable);
+            $operations = $draft->document->receive($client, Data::int($batch['n'] ?? null), $batch['ops'] ?? null, $writable, $allowed);
 
             foreach ($operations as $operation) {
                 $accepted[] = $operation;
@@ -341,6 +348,8 @@ final class DocumentRepository
             'client' => $client,
             'operations' => Data::encode($operations),
         ]);
+
+        $draft->appended[] = ['sequence' => $draft->sequence, 'operations' => $operations];
 
         if ($draft->sequence % 50 === 0 && $draft->sequence > self::KEEP_UPDATES) {
             $oldest = $draft->sequence - self::KEEP_UPDATES;
@@ -398,7 +407,9 @@ final class DocumentRepository
      */
     private function transaction(string $room, Closure $callback): mixed
     {
-        return Database::connection()->transaction(function () use ($room, $callback) {
+        $changed = null;
+
+        $result = Database::connection()->transaction(function () use ($room, $callback, &$changed) {
             $empty = Data::encode((new Document)->toArray());
 
             // Both statements write, so SQLite takes its write lock before anything is read.
@@ -420,9 +431,17 @@ final class DocumentRepository
 
             if ($after !== $before) {
                 Database::table('documents')->where('id', $draft->id)->update([...$after, 'updated_at' => now()]);
+                $changed = $draft;
             }
 
             return $result;
         }, attempts: 3);
+
+        // After the commit, so whoever is told can already read the change.
+        if ($changed !== null) {
+            $this->notifier->documentChanged($room, $changed->epoch, $changed->appended, $changed->dirty);
+        }
+
+        return $result;
     }
 }

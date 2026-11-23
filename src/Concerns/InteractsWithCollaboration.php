@@ -205,7 +205,7 @@ trait InteractsWithCollaboration
 
         if ($this->isCollaborationLive()) {
             $documents->reconcile($room, $this->getSharedFields($theirs));
-            $live = LiveSave::prepare($documents, $room, $this->collaborationClient, $this->collaborationSync, $writable);
+            $live = LiveSave::prepare($documents, $room, $this->collaborationClient, $this->collaborationSync, $writable, $this->getCollaborationAllowedValues());
         }
 
         $mine = $this->getCollaborationFormValues();
@@ -302,6 +302,14 @@ trait InteractsWithCollaboration
         return $this->isCollaborationLive()
             ? CollaborationPlugin::get()->getFieldResolver()->writable($this->form, $this->getCollaborationIgnoredFields())
             : [];
+    }
+
+    /** @return array<string, list<string>> */
+    protected function getCollaborationAllowedValues(): array
+    {
+        $writable = $this->getCollaborationLiveFields();
+
+        return $writable === [] ? [] : CollaborationPlugin::get()->getFieldResolver()->allowedValues($this->form, $writable);
     }
 
     /** @return array<string, string> */

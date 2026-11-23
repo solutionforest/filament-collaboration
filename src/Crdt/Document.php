@@ -180,9 +180,10 @@ final class Document
      * this instance must be thrown away, as part of the batch may have applied.
      *
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed  the only values a picked field may take, where known
      * @return list<array<string, mixed>> the operations that were new
      */
-    public function receive(int $client, int $batch, mixed $operations, array $writable): array
+    public function receive(int $client, int $batch, mixed $operations, array $writable, array $allowed = []): array
     {
         $key = 'c'.$client;
         [$lastBatch, $lastClock, $lastChecksum] = $this->clients[$key] ?? [0, 0, 0];
@@ -203,7 +204,7 @@ final class Document
         $accepted = [];
 
         foreach ($operations as $operation) {
-            $operation = $this->validate(Data::map($operation), $client, $lastClock, $writable);
+            $operation = $this->validate(Data::map($operation), $client, $lastClock, $writable, $allowed);
             $this->applyOne($operation);
             $accepted[] = $operation;
 
@@ -303,9 +304,10 @@ final class Document
     /**
      * @param  array<string, mixed>  $operation
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed
      * @return array<string, mixed> only the keys this package understands
      */
-    private function validate(array $operation, int $client, int $lastClock, array $writable): array
+    private function validate(array $operation, int $client, int $lastClock, array $writable, array $allowed): array
     {
         $field = Data::string($operation['f'] ?? null);
         $kind = $writable[$field] ?? null;
@@ -338,6 +340,10 @@ final class Document
         if ($type === 'set' && $kind === FieldKind::Value) {
             if (! self::isSimpleValue($value) || strlen(Data::encode($value)) > self::MAX_VALUE_BYTES) {
                 throw new InvalidOperation('The value cannot be shared.');
+            }
+
+            if (isset($allowed[$field]) && ! self::isAllowed($value, $allowed[$field])) {
+                throw new InvalidOperation('The value is not one this editor may choose.');
             }
 
             return [...$clean, 'v' => $value];
@@ -427,6 +433,20 @@ final class Document
         }
 
         return $clean;
+    }
+
+    /** @param list<string> $allowed */
+    private static function isAllowed(mixed $value, array $allowed): bool
+    {
+        foreach (is_array($value) ? $value : [$value] as $item) {
+            $item = is_bool($item) ? ($item ? '1' : '0') : $item;
+
+            if ($item !== null && $item !== '' && ! in_array(Data::string($item), $allowed, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function isSimpleValue(mixed $value): bool

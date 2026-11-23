@@ -5,6 +5,7 @@ import { Overlay } from '../ui/overlay.js'
 import { PresenceBar } from '../ui/presence-bar.js'
 import { Outbox } from './outbox.js'
 import { Presence } from './presence.js'
+import { Realtime } from './realtime.js'
 import { Recovery } from './recovery.js'
 import { HttpTransport } from './transport.js'
 
@@ -24,6 +25,7 @@ export class Room {
         this.outbox = new Outbox()
         this.presence = new Presence()
         this.recovery = new Recovery(config.canPull ? config.storageKey : null)
+        this.realtime = new Realtime(this)
         this.bindings = new Map()
         this.bound = new Set()
         this.failed = new Set()
@@ -200,7 +202,8 @@ export class Room {
         this.active()
         this.setStatus('syncing')
         this.publish()
-        this.syncSoon(Math.max(100, this.interval() / 3))
+        // Sending does not wait for the heartbeat. With pushes, others see it as soon as it is sent.
+        this.syncSoon(this.realtime.isConnected ? 30 : Math.max(100, this.pollingInterval() / 3))
         this.overlay.schedule()
     }
 
@@ -225,7 +228,7 @@ export class Room {
 
     cursorMoved() {
         this.active()
-        this.syncSoon(Math.max(150, this.interval() / 2))
+        this.syncSoon(this.realtime.isConnected ? 60 : Math.max(150, this.pollingInterval() / 2))
     }
 
     active() {
@@ -237,6 +240,12 @@ export class Room {
     }
 
     interval() {
+        // Pushed changes arrive at once, so polling is only a heartbeat and a safety net.
+        return this.realtime.isConnected ? 8000 : this.pollingInterval()
+    }
+
+    /** How often to sync with nothing pushing changes. */
+    pollingInterval() {
         const base = this.config.interval
 
         if (document.hidden) return 5000
@@ -251,6 +260,42 @@ export class Room {
         const crowd = base * Math.max(1, Math.sqrt(others / 10))
 
         return this.isIdle() ? Math.max(crowd, 2000) : crowd
+    }
+
+    /**
+     * A change pushed by the server. Operations that follow on from what this
+     * tab has are applied directly; anything else is fetched.
+     */
+    pushed(payload = {}) {
+        if (this.destroyed) return
+
+        if (payload.operations && this.document && !this.stopped) {
+            const isNext = payload.epoch === this.epoch && payload.from === this.sequence && this.sequence >= 0
+            const isBusy = this.syncing || [...this.bindings.values()].some((binding) => binding.isBusy)
+
+            if (isNext && !isBusy) {
+                this.merge(payload.operations)
+                this.sequence = payload.to
+                this.dirty = payload.dirty
+                this.bar.render()
+            } else if (payload.to > this.sequence || payload.epoch !== this.epoch) {
+                this.syncSoon(isBusy ? 80 : 30)
+            }
+        }
+
+        if (payload.person) this.presence.move(payload.person)
+        if (payload.sync) this.syncSoon(30)
+
+        // A crowd coming and going is fetched a little less eagerly.
+        if (payload.people) this.syncSoon(Math.min(1500, Math.max(50, 10 * this.presence.activeCount)))
+
+        this.overlay.schedule()
+    }
+
+    realtimeChanged() {
+        if (this.destroyed) return
+
+        this.syncSoon(this.realtime.isConnected ? 0 : Math.min(this.interval(), 400))
     }
 
     syncSoon(delay = this.interval()) {
@@ -310,6 +355,7 @@ export class Room {
             }
 
             this.receive(response, batches.at(-1)?.n ?? 0, fieldsVersion)
+            this.realtime.connect()
         } catch (error) {
             delay = this.handleFailure(error, batches)
         } finally {
@@ -519,7 +565,7 @@ export class Room {
                 Status: this.status,
                 'Round trip': `${this.roundTrip} ms`,
                 'Sync every': `${Math.round(this.interval())} ms`,
-                Transport: this.transport.name ?? 'custom',
+                Transport: `${this.transport.name ?? 'custom'}${this.realtime.isConnected ? ' + WebSocket push' : this.config.channel ? ' (WebSocket not connected)' : ''}`,
                 Sequence: `${this.sequence} (epoch ${this.epoch})`,
                 Clock: this.document?.clock ?? 0,
                 'Waiting to send': this.outbox.batches.length,
@@ -554,6 +600,7 @@ export class Room {
         for (const timer of [this.timer, this.pullTimer, this.noticeTimer, this.renderTimer]) clearTimeout(timer)
 
         this.bindings.forEach((binding) => binding.detach())
+        this.realtime.destroy()
         this.bar.destroy()
         this.overlay.destroy()
     }

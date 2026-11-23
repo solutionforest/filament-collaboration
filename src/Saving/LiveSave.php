@@ -26,8 +26,9 @@ final readonly class LiveSave
     /**
      * @param  string  $sync  what the browser reported
      * @param  array<string, FieldKind>  $writable
+     * @param  array<string, list<string>>  $allowed
      */
-    public static function prepare(DocumentRepository $documents, string $room, int $client, string $sync, array $writable): self
+    public static function prepare(DocumentRepository $documents, string $room, int $client, string $sync, array $writable, array $allowed = []): self
     {
         $sync = Data::decode($sync);
         $bound = Data::strings($sync['fields'] ?? null);
@@ -36,7 +37,7 @@ final readonly class LiveSave
             return new self;
         }
 
-        $snapshot = $documents->snapshot($room, $client, Data::int($sync['epoch'] ?? null), Data::list($sync['batches'] ?? null), $writable);
+        $snapshot = $documents->snapshot($room, $client, Data::int($sync['epoch'] ?? null), Data::list($sync['batches'] ?? null), $writable, $allowed);
 
         if ($snapshot === null) {
             return new self;

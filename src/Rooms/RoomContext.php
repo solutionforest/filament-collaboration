@@ -22,6 +22,7 @@ final readonly class RoomContext
     /**
      * @param  array<string, FieldKind>  $fields
      * @param  list<string>  $visible  fields whose names this user may learn
+     * @param  array<string, list<string>>  $allowed  values each picked field may take
      * @param  class-string<resource>|null  $resource
      * @param  class-string|null  $page
      * @param  class-string<Model>|null  $model
@@ -41,6 +42,7 @@ final readonly class RoomContext
         public ?string $model = null,
         public ?string $key = null,
         public int $expiresAt = 0,
+        public array $allowed = [],
     ) {}
 
     public function toToken(): string
@@ -60,6 +62,7 @@ final readonly class RoomContext
             'mo' => $this->model,
             'k' => $this->key,
             'e' => $this->expiresAt,
+            'o' => $this->allowed,
         ]));
     }
 
@@ -104,6 +107,7 @@ final readonly class RoomContext
             model: $model !== null && is_subclass_of($model, Model::class) ? $model : null,
             key: Data::nullableString($data['k'] ?? null),
             expiresAt: Data::int($data['e'] ?? null),
+            allowed: array_map(Data::strings(...), Data::map($data['o'] ?? null)),
         );
     }
 

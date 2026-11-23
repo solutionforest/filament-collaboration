@@ -9,7 +9,7 @@ Google Docs-style collaborative editing for Filament: everyone on a record sees 
 - **Live fields.** Text inputs, textareas and Filament's own `RichEditor` merge character by character. Selects, toggles, dates and tags take the latest choice. Nothing extra is bundled into the editor.
 - **See each other.** Avatars in the header, an outline and name on the field each person is in, their caret and selection, and who is on which record in tables and modals.
 - **Real merging.** Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading.
-- **No extra infrastructure.** It runs on HTTP through your Laravel app: no WebSocket server, no Node process, no Yjs. The merge engine is our own: about 1,700 lines of PHP and 850 of JavaScript implementing the same algorithm, checked against each other.
+- **Polling or WebSockets.** It runs on plain HTTP through your Laravel app with nothing else to install. Add Laravel Reverb (or any Pusher-compatible broadcaster) and changes are pushed: a keystroke reaches others in about 60 ms instead of 350 ms. No Node process, no Yjs. The merge engine is our own: about 1,700 lines of PHP and 850 of JavaScript implementing the same algorithm, checked against each other.
 - **Merge on save for the rest.** Fields that cannot be live, and browsers that are not connected, get a field-by-field three-way merge with a conflict dialog.
 
 ## Requirements
@@ -53,6 +53,32 @@ class ListPosts extends ListRecords
 
 That is all a resource needs: its existing form fields become live.
 
+## Real time with Reverb
+
+Polling works everywhere. With broadcasting, the server pushes every change as it happens and browsers poll only every 8 seconds as a safety net.
+
+1. Set up broadcasting with Reverb: `php artisan install:broadcasting --reverb`, then run `php artisan reverb:start`.
+2. Give Filament an Echo connection in `config/filament.php` (`php artisan vendor:publish --tag=filament-config`):
+
+    ```php
+    'broadcasting' => [
+        'echo' => [
+            'broadcaster' => 'reverb',
+            'key' => env('REVERB_APP_KEY'),
+            'wsHost' => env('REVERB_HOST'),
+            'wsPort' => env('REVERB_PORT'),
+            'wssPort' => env('REVERB_PORT'),
+            'forceTLS' => env('REVERB_SCHEME', 'https') === 'https',
+            'enabledTransports' => ['ws', 'wss'],
+            'authEndpoint' => '/broadcasting/auth',
+        ],
+    ],
+    ```
+
+3. Turn it on: `CollaborationPlugin::make()->broadcasting()`.
+
+Edits are still sent over HTTP, where each one is authorised and validated. What comes back over the socket is filtered: each tab listens on a channel for its audience (the room and the fields it may read), and a channel only admits people who currently have a tab in that room and audience. If Reverb is down, nothing breaks: browsers fall back to polling and the server reports the failed pushes.
+
 ## Tables and modals
 
 ```php
@@ -94,6 +120,7 @@ CollaborationPlugin::make()->debug(fn (): bool => app()->isLocal())
 ```php
 CollaborationPlugin::make()
     ->liveEditing(fn (?Model $record): bool => true) // false: presence and merge on save only
+    ->broadcasting()                                 // push changes over Reverb; polling otherwise
     ->pollingInterval(400)                           // milliseconds while working together
     ->avatarLimit(5)
     ->colors(['#1a73e8', /* ... */])                 // white text must be readable on each
@@ -175,7 +202,9 @@ The draft is a CRDT, a replicated growable array (RGA): each character has an id
 - Rooms are scoped by tenant, `scopeRoomsUsing()` and the database name.
 - Sync never writes the session, so it cannot race a save or a logout.
 
-**Know this before enabling it:** a shared draft is shared. When you save, you publish what colleagues put in the fields you can edit, validated by your form. If some people may choose options that others may not (for example who may set "Published"), mark that field `collaborative(false)`. Revoking access to one field takes effect within the token lifetime, 15 minutes by default; revoking access to the record takes effect on the next request.
+- A picked field only accepts the options its editor was offered. If only editors may choose "Published", a writer's browser cannot push it into the draft for an editor to save. Options computed from other fields (`fn (Get $get) => ...`) are checked by Save's validation instead, as they change while people edit.
+
+**Know this before enabling it:** a shared draft is shared. When you save, you publish what colleagues put in the fields you can edit, validated by your form. Free-text fields have no allow-list: if only some people may change a field at all, give the others `->disabled()` or `->collaborative(false)`. Revoking access to one field takes effect within the token lifetime, 15 minutes by default; revoking access to the record takes effect on the next request.
 
 ## Performance
 
@@ -188,7 +217,22 @@ Measured with `npm run test:load` in `demo/`: real sessions, real tokens, each e
 | 50 | 55 | 15 ms | 18 ms | 50 / 50 |
 | 100 | 77 | 16 ms | 19 ms | 100 / 100 |
 
-A keystroke appears in another browser in 350 ms at the median and 560 ms at the 95th percentile (`npm run test:latency`). That is polling, not a socket: typing feels live, but it is not keystroke-instant. Crowded rooms and idle tabs poll less often. On a busy host, an earlier run at 100 editors measured a 1.9 s median.
+With polling, a keystroke appears in another browser in 350 ms at the median and 560 ms at the 95th percentile (`npm run test:latency`). Crowded rooms and idle tabs poll less often. On a busy host, an earlier run at 100 editors measured a 1.9 s median.
+
+### Polling against Reverb
+
+The same load test with `TRANSPORT=reverb`: every simulated editor listens on a real Reverb socket and applies pushes as the browser does. "Typed to seen" is from one editor's edit to every other editor having it.
+
+| Room | Transport | Requests per second | Typed to seen, median | 95th percentile |
+| --- | --- | --- | --- | --- |
+| 10 editors, all active | polling | 25 | 359 ms | 522 ms |
+| | Reverb | 26 | 61 ms | 70 ms |
+| 100 editors, 10 active | polling | 78 | 996 ms | 1,686 ms |
+| | Reverb | 21 | 54 ms | 55 ms |
+| 100 editors, all moving carets, 20 typing | polling | 81 | 1,083 ms | 1,645 ms |
+| | Reverb | 101 | 65 ms | 78 ms |
+
+Pushes make changes 6 to 20 times faster everywhere. A room where most people read gets far fewer requests, since nobody needs to poll. The worst case, everyone moving a caret at once, costs more: the server posts every change to Reverb, which raised its own 95th percentile to 780 ms on this machine while edits still arrived in 65 ms. Real browsers agree: 60 ms median with Reverb, 360 ms with polling.
 
 ![A hundred people on one article](docs/media/hundred-editors.png)
 
@@ -197,10 +241,11 @@ A keystroke appears in another browser in 350 ms at the median and 560 ms at the
 ```bash
 cd demo
 composer install && npm install
-vendor/bin/pest                # 170 tests: the package and the demo
+vendor/bin/pest                # 181 tests: the package and the demo
 vendor/bin/phpstan analyse     # level 10, package included
 npm run test:e2e               # 32 scenarios in real browsers; BROWSER=webkit for Safari's engine
-npm run test:load -- 100 45    # editors, seconds
+TRANSPORT=reverb npm run test:e2e   # the same over a real Reverb server, plus 3 push scenarios
+npm run test:load -- 100 45    # editors, seconds; TRANSPORT=reverb and ACTIVE=0.1 also apply
 npm run test:latency
 cd .. && npm test              # the CRDT: 2,000 random sessions must converge
 ```
@@ -228,7 +273,9 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 
 ## Limits
 
-- Changes arrive by polling, every 0.4 s by default. There is no WebSocket transport yet.
+- Without broadcasting, changes arrive by polling, every 0.4 s by default.
+- Pushed messages are limited to 9 KB, Reverb's default being 10 KB. A larger change, such as a long paste, is announced instead and fetched over HTTP.
+- `registerChannel()` registers the broadcast channel on the default broadcaster at boot; call it again if you switch broadcaster at runtime.
 - Repeaters, builders, uploads, Markdown and code editors, and custom rich editor blocks merge on save; they are not live.
 - Links pasted with a CSS class lose the class. Images pasted as base64 make that field merge on save.
 - Livewire makes text inputs read-only while their own form is saving; the rich editor stays editable.

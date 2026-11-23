@@ -709,6 +709,63 @@ describe('seeing each other', () => {
     })
 })
 
+describe('websockets', { skip: process.env.TRANSPORT !== 'reverb' && 'set TRANSPORT=reverb' }, () => {
+    test('changes are pushed, not polled', async () => {
+        await together()
+
+        const inspect = (page) => page.evaluate(() => window.filamentCollaboration.inspect()[0].summary)
+
+        await eventually(async () => assert.match((await inspect(bob))['Transport'], /WebSocket push/), 'Reverb did not connect')
+        assert.equal((await inspect(bob))['Sync every'], '8000 ms')
+
+        await caret(alice, field(alice, 'title'), -1)
+
+        const started = Date.now()
+
+        await alice.keyboard.type('!')
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), /!$/), 'the push did not arrive', 3000)
+
+        // Without the push this waits for an 8 second poll.
+        assert.ok(Date.now() - started < 600, `${Date.now() - started} ms`)
+    })
+
+    test('a caret moves without a request', async () => {
+        await together()
+        await caret(alice, field(alice, 'title'), 2)
+        await eventually(async () => assert.ok(await bob.locator('.fi-collab-caret').count()), 'no caret')
+
+        const requests = []
+        const count = (request) => request.url().includes('_collaboration/sync') && requests.push(request)
+
+        bob.on('request', count)
+
+        const before = (await bob.locator('.fi-collab-caret').boundingBox()).x
+
+        await caret(alice, field(alice, 'title'), 12)
+        await eventually(async () => assert.ok((await bob.locator('.fi-collab-caret').boundingBox()).x > before + 30), 'the caret did not move')
+
+        bob.off('request', count)
+        assert.equal(requests.length, 0, 'Bob fetched instead of applying the push')
+    })
+
+    test('editing carries on by polling when Reverb goes down', async () => {
+        await together()
+
+        const known = app.problems.length
+
+        app.stopReverb()
+        await eventually(async () => assert.doesNotMatch((await bob.evaluate(() => window.filamentCollaboration.inspect()[0].summary))['Transport'], /WebSocket push/), 'Bob still thinks he is connected', 15000)
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' without Reverb')
+
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / without Reverb$/), 'polling did not take over', 10000)
+
+        // Reverb being down is reported once per change by the server; the browsers are fine.
+        app.problems.length = known
+    })
+})
+
 test('there were no browser errors or failed requests', () => {
     // WebKit reports a fetch cancelled by leaving the page as an error.
     const problems = app.problems.filter((problem) => !/Fetch API cannot load http:\/\/127\.0\.0\.1:\d+\/\S+ due to access control checks/.test(problem))

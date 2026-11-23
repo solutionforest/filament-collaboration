@@ -22,7 +22,13 @@ export class HttpTransport {
                 credentials: 'same-origin',
                 keepalive,
                 signal: controller.signal,
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    // So the push for this change skips the tab that made it.
+                    ...(window.Echo?.socketId?.() ? { 'X-Socket-ID': window.Echo.socketId() } : {}),
+                },
                 body: JSON.stringify(payload),
             })
 

@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
+use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
@@ -24,6 +25,7 @@ final readonly class RoomRenderer
      * @param  array<string, FieldKind>  $fields
      * @param  array<string, string>  $labels
      * @param  list<string>  $reactive  live fields that rerender the form when they change
+     * @param  array<string, list<string>>  $allowed
      */
     public function render(
         PresenceMode $mode,
@@ -36,6 +38,7 @@ final readonly class RoomRenderer
         array $labels = [],
         array $reactive = [],
         bool $canPull = false,
+        array $allowed = [],
     ): ?View {
         $plugin = CollaborationPlugin::find();
         $panel = Filament::getCurrentOrDefaultPanel();
@@ -64,6 +67,7 @@ final readonly class RoomRenderer
             model: $record === null ? null : $record::class,
             key: $record === null ? null : Data::string($record->getKey()),
             expiresAt: now()->getTimestamp() + max(1, Data::int(config('filament-collaboration.token_lifetime'), 900)),
+            allowed: $allowed,
         );
 
         return view('filament-collaboration::room', [
@@ -83,6 +87,7 @@ final readonly class RoomRenderer
                 'reactive' => $reactive,
                 'canPull' => $canPull,
                 'interval' => $plugin->getPollingInterval(),
+                'channel' => $plugin->isBroadcasting() ? Audience::of($context)->channel() : null,
                 'avatarLimit' => $plugin->getAvatarLimit(),
                 'strings' => trans('filament-collaboration::collaboration.client'),
                 'modes' => trans('filament-collaboration::collaboration.modes'),

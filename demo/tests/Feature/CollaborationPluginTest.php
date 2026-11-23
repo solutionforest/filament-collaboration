@@ -8,7 +8,11 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Arr;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
@@ -16,6 +20,8 @@ use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\RichEditorType;
 use SolutionForest\FilamentCollaboration\Fields\Types\TextInputType;
 use SolutionForest\FilamentCollaboration\Fields\Types\ValueType;
+use Tests\Support\Editor;
+use Tests\Support\SchemaPage;
 
 it('never shares passwords', function (): void {
     expect((new TextInputType)->getKind(TextInput::make('secret')->password()))->toBeNull();
@@ -90,4 +96,25 @@ it('speaks Hong Kong Chinese and English with the same keys', function (): void 
     $keys = fn (string $locale): array => array_keys(Arr::dot(require __DIR__."/../../../resources/lang/{$locale}/collaboration.php"));
 
     expect($keys('zh_HK'))->toBe($keys('en'));
+});
+
+it('only lets a colleague pick options the user was offered', function (): void {
+    $article = Document::create(['title' => 'Options']);
+    $editor = Editor::open($this, User::factory()->create(), $article);
+    $editor->sync();
+    $editor->type('status', 'archived');
+
+    $editor->send()->assertConflict()->assertJsonPath('error', 'rejected');
+});
+
+it('leaves options that depend on other fields to the save', function (): void {
+    $resolver = CollaborationPlugin::get()->getFieldResolver();
+    $schema = Schema::make(Livewire\Livewire::test(SchemaPage::class)->instance())->components([
+        Select::make('category')->options(['a' => 'A']),
+        Select::make('subcategory')->options(fn (Get $get): array => ['x' => 'X']),
+        Toggle::make('featured'),
+    ])->statePath('data');
+
+    expect($resolver->allowedValues($schema, ['category' => FieldKind::Value, 'subcategory' => FieldKind::Value, 'featured' => FieldKind::Value]))
+        ->toBe(['category' => ['a'], 'featured' => ['0', '1']]);
 });

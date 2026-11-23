@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Fields;
 
 use Closure;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Livewire\Component;
 use LogicException;
+use ReflectionFunction;
+use ReflectionNamedType;
+use ReflectionObject;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Support\FormState;
+use Throwable;
 
 /** Decides what is live in a form. */
 final readonly class FieldResolver
 {
     public const META_KEY = 'collaborative';
+
+    private const MAX_OPTIONS = 500;
 
     /** @param list<FieldType> $types the first match wins */
     public function __construct(private array $types) {}
@@ -72,6 +82,83 @@ final readonly class FieldResolver
         }
 
         return $kinds;
+    }
+
+    /**
+     * The values a picked field may take for this user. A colleague's change is
+     * refused unless the saving user could have picked it too.
+     *
+     * @param  array<string, FieldKind>  $writable
+     * @return array<string, list<string>>
+     */
+    public function allowedValues(Schema $schema, array $writable): array
+    {
+        $allowed = [];
+
+        foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
+            $path = (string) $path;
+
+            if (($writable[$path] ?? null) !== FieldKind::Value) {
+                continue;
+            }
+
+            if ($field instanceof Toggle || $field instanceof Checkbox) {
+                $allowed[$path] = ['0', '1'];
+
+                continue;
+            }
+
+            // A relationship's options are records, which Save's validation checks; loading
+            // them on every render would run the query Filament otherwise runs on demand.
+            $hasRelationship = method_exists($field, 'getRelationshipName') && filled($field->getRelationshipName());
+
+            if (! method_exists($field, 'getEnabledOptions') || $hasRelationship || self::dependsOnOtherFields($field)) {
+                continue;
+            }
+
+            try {
+                $options = array_keys((array) $field->getEnabledOptions());
+            } catch (Throwable) {
+                continue;
+            }
+
+            // Searched remotely, or too many to carry: Save's validation still applies.
+            if ($options === [] || count($options) > self::MAX_OPTIONS) {
+                continue;
+            }
+
+            $allowed[$path] = array_map(strval(...), $options);
+        }
+
+        return $allowed;
+    }
+
+    /**
+     * Options computed from other fields change while people edit, so a list
+     * captured when the page rendered could refuse a valid choice.
+     */
+    private static function dependsOnOtherFields(Field $field): bool
+    {
+        $reflection = new ReflectionObject($field);
+
+        foreach (['options', 'modifyRelationshipQueryUsing', 'getSearchResultsUsing'] as $property) {
+            $callback = $reflection->hasProperty($property) ? $reflection->getProperty($property)->getValue($field) : null;
+
+            if (! $callback instanceof Closure) {
+                continue;
+            }
+
+            foreach ((new ReflectionFunction($callback))->getParameters() as $parameter) {
+                $type = $parameter->getType();
+                $typeName = $type instanceof ReflectionNamedType ? $type->getName() : '';
+
+                if (in_array($parameter->getName(), ['get', 'state', 'livewire'], true) || in_array($typeName, [Get::class, Component::class], true) || is_subclass_of($typeName, Component::class)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return array<string, string> */
