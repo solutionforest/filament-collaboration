@@ -4,7 +4,7 @@
 [![Chaos](https://github.com/solutionforest/filament-collaboration/actions/workflows/chaos.yml/badge.svg)](https://github.com/solutionforest/filament-collaboration/actions/workflows/chaos.yml)
 ![PHP 8.3 | 8.4](https://img.shields.io/badge/PHP-8.3%20%7C%208.4-777bb4?logo=php&logoColor=white)
 ![Laravel 12 | 13](https://img.shields.io/badge/Laravel-12%20%7C%2013-ff2d20?logo=laravel&logoColor=white)
-![Filament 4 | 5](https://img.shields.io/badge/Filament-4%20%7C%205-f59e0b)
+![Filament 5](https://img.shields.io/badge/Filament-5-f59e0b)
 ![PHPStan level 10](https://img.shields.io/badge/PHPStan-level%2010-2a5ea7)
 ![Coverage 95%](https://img.shields.io/badge/coverage-95%25-16a34a)
 ![JavaScript: strict types](https://img.shields.io/badge/JavaScript-strict%20types%20%2B%20ESLint-3178c6?logo=typescript&logoColor=white)
@@ -33,7 +33,7 @@
 | --- | --- |
 | PHP | 8.3, 8.4 |
 | Laravel | 12, 13 |
-| Filament | 4.13.3+, 5.8.3+ |
+| Filament | 5.8.3+ |
 | Database | MySQL / MariaDB, PostgreSQL, SQLite |
 | Cache | any store with atomic locks, shared by all app servers (Redis, database; file on one server) |
 
@@ -139,7 +139,7 @@ Each push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What |
 | --- | --- |
-| Pest | 270 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus Filament 4.13.3; at least 95% line coverage |
+| Pest | 270 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus the oldest supported Filament, 5.8.3; at least 95% line coverage |
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
