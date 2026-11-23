@@ -75,6 +75,7 @@ trait HasLiveEditing
             new Types\TextInputType,
             new Types\TextareaType,
             new Types\RichEditorType,
+            new Types\ItemsType,
             Types\ValueType::defaults(),
         ]);
     }

@@ -98,6 +98,9 @@ export class Room {
             )
         }
 
+        // Inputs inside repeater items have no binding of their own.
+        document.addEventListener('input', () => queueMicrotask(() => this.collect()), { signal, capture: true })
+
         document.addEventListener(
             'visibilitychange',
             () => {
@@ -284,7 +287,8 @@ export class Room {
         }
 
         if (payload.person) this.presence.move(payload.person)
-        if (payload.sync) this.syncSoon(30)
+        // Permissions changed: the next sync gets a 410 and the page renders a new token.
+        if (payload.sync || payload.refresh) this.syncSoon(30)
 
         // A crowd coming and going is fetched a little less eagerly.
         if (payload.people) this.syncSoon(Math.min(1500, Math.max(50, 10 * this.presence.activeCount)))

@@ -15,4 +15,7 @@ enum FieldKind: string
 
     /** The whole value is replaced by the most recent change. */
     case Value = 'value';
+
+    /** Repeaters and builders: items merge like text, each sub-field by latest value. */
+    case Items = 'items';
 }

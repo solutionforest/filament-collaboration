@@ -51,6 +51,21 @@ export class TextBinding extends Binding {
             { signal },
         )
 
+        // Livewire makes a submitting form's inputs read-only until the response.
+        // A live input stays editable: Save gives the browser back what it typed.
+        if (input.form) {
+            let wasReadOnly = false
+
+            input.form.addEventListener('submit', () => (wasReadOnly = input.readOnly), { signal, capture: true })
+            input.form.addEventListener(
+                'submit',
+                () => queueMicrotask(() => {
+                    if (!wasReadOnly && input.isConnected) input.readOnly = false
+                }),
+                { signal },
+            )
+        }
+
         for (const name of ['select', 'keyup', 'pointerup']) {
             input.addEventListener(name, () => this.room.cursorMoved(), { signal })
         }

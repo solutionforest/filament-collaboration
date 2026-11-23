@@ -10,7 +10,8 @@
         "test:load": "node --no-warnings tests/browser/load.mjs",
         "media": "node --no-warnings scripts/capture-media.mjs",
         "tutorial": "node --no-warnings scripts/record-tutorial.mjs",
-        "test:latency": "node --no-warnings tests/browser/latency.mjs"
+        "test:latency": "node --no-warnings tests/browser/latency.mjs",
+        "test:chaos": "node --no-warnings tests/browser/chaos.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

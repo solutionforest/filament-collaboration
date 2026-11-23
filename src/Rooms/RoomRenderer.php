@@ -12,6 +12,7 @@ use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
+use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Support\Data;
 
 /** Renders the element the browser starts a room from, with a freshly issued token. */
@@ -68,6 +69,7 @@ final readonly class RoomRenderer
             key: $record === null ? null : Data::string($record->getKey()),
             expiresAt: now()->getTimestamp() + max(1, Data::int(config('filament-collaboration.token_lifetime'), 900)),
             allowed: $allowed,
+            permissions: Permissions::version($room),
         );
 
         return view('filament-collaboration::room', [

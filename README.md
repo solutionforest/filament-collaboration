@@ -167,8 +167,9 @@ Presence storage is behind `Contracts\PresenceRepository`; bind your own, for ex
 | `TextInput` (text, search, tel, url), `Textarea` | characters |
 | `RichEditor` without custom blocks, mentions or plugins | characters, blocks and formatting |
 | `Select`, `Toggle`, `Checkbox`, `CheckboxList`, `Radio`, `ToggleButtons`, `TagsInput`, `DateTimePicker`, `ColorPicker`, `Slider`, masked, email and number inputs | latest value |
+| `Repeater` and `Builder` whose items hold simple fields | items: adding, removing and moving merge; each sub-field takes the latest value |
 | Many-to-many selects and checkbox lists | merge on save, unless marked `collaborative()` |
-| Passwords, uploads, repeaters, builders, Markdown and code editors, hidden and disabled fields | merge on save |
+| Passwords, uploads, repeaters holding uploads, rich text or nested repeaters, Markdown and code editors, hidden and disabled fields | merge on save |
 
 Pages with a locale switcher (translatable content) merge on save, as do date pickers with a personal timezone: their state differs per person.
 
@@ -204,7 +205,7 @@ The draft is a CRDT, a replicated growable array (RGA): each character has an id
 
 - A picked field only accepts the options its editor was offered. If only editors may choose "Published", a writer's browser cannot push it into the draft for an editor to save. Options computed from other fields (`fn (Get $get) => ...`) are checked by Save's validation instead, as they change while people edit.
 
-**Know this before enabling it:** a shared draft is shared. When you save, you publish what colleagues put in the fields you can edit, validated by your form. Free-text fields have no allow-list: if only some people may change a field at all, give the others `->disabled()` or `->collaborative(false)`. Revoking access to one field takes effect within the token lifetime, 15 minutes by default; revoking access to the record takes effect on the next request.
+**Know this before enabling it:** a shared draft is shared. When you save, you publish what colleagues put in the fields you can edit, validated by your form. Free-text fields have no allow-list: if only some people may change a field at all, give the others `->disabled()` or `->collaborative(false)`. Revoking access to the record takes effect on the next request. For access to single fields, call `Permissions::changed($record)` (or `Permissions::changed()` for everything, or `php artisan filament-collaboration:refresh-permissions`) after changing roles: open tabs then re-render with a new token on their next sync, pushed at once with Reverb. Without it, tokens renew every 15 minutes.
 
 ## Performance
 
@@ -241,10 +242,11 @@ Pushes make changes 6 to 20 times faster everywhere. A room where most people re
 ```bash
 cd demo
 composer install && npm install
-vendor/bin/pest                # 181 tests: the package and the demo
+vendor/bin/pest                # 193 tests: the package and the demo
 vendor/bin/phpstan analyse     # level 10, package included
-npm run test:e2e               # 32 scenarios in real browsers; BROWSER=webkit for Safari's engine
+npm run test:e2e               # 37 scenarios in real browsers; BROWSER=webkit for Safari's engine
 TRANSPORT=reverb npm run test:e2e   # the same over a real Reverb server, plus 3 push scenarios
+npm run test:chaos -- 10 42    # four browsers pressing random keys; every round must converge
 npm run test:load -- 100 45    # editors, seconds; TRANSPORT=reverb and ACTIVE=0.1 also apply
 npm run test:latency
 cd .. && npm test              # the CRDT: 2,000 random sessions must converge
@@ -276,10 +278,9 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 - Without broadcasting, changes arrive by polling, every 0.4 s by default.
 - Pushed messages are limited to 9 KB, Reverb's default being 10 KB. A larger change, such as a long paste, is announced instead and fetched over HTTP.
 - `registerChannel()` registers the broadcast channel on the default broadcaster at boot; call it again if you switch broadcaster at runtime.
-- Repeaters, builders, uploads, Markdown and code editors, and custom rich editor blocks merge on save; they are not live.
+- Repeater and builder sub-fields take the latest value: two people typing in the same sub-field of the same item do not merge character by character. Lists holding uploads, rich text or nested lists, Markdown and code editors, and custom rich editor blocks merge on save.
 - Links pasted with a CSS class lose the class. Images pasted as base64 make that field merge on save.
-- Livewire makes text inputs read-only while their own form is saving; the rich editor stays editable.
-- An image someone uploaded is only saved once they save: another person's save waits for it.
+- An uploaded image is stored as soon as it is inserted, so it stays in storage even if the draft is then discarded.
 - It relies on two internals: Livewire's update queue (`queueUpdate`) and the rich editor's `getEditor()`. Both are covered by the browser tests on Filament 4.13.3, 4.17, 5.8.3 and 5.12. Laravel 12 is covered by the PHP tests only.
 
 ## License

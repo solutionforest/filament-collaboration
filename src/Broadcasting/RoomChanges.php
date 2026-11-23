@@ -19,6 +19,8 @@ final class RoomChanges
 
     public bool $hasDocumentChanged = false;
 
+    public bool $refresh = false;
+
     public int $presence = 0;
 
     public ?Participant $participant = null;

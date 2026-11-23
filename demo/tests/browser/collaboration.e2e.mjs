@@ -272,6 +272,38 @@ describe('rich editor', () => {
         }, 'emoji were split')
     })
 
+    test("an image one person uploads is kept by another person's save", async () => {
+        const id = await together()
+        const known = app.problems.length
+
+        await endOfParagraph(alice, 0)
+        await alice.evaluate(async () => {
+            // A 1x1 PNG, pasted as a file the way a screenshot is.
+            const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+            const transfer = new DataTransfer()
+
+            transfer.items.add(new File([bytes], 'pixel.png', { type: 'image/png' }))
+            document.querySelector('.fi-page .tiptap').dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }))
+        })
+
+        await eventually(
+            async () => {
+                const ids = [...(await structure(bob)).matchAll(/"type":"image","attrs":\{[^}]*"id":"([^"]+)"/g)].map(([, id]) => id)
+
+                assert.equal(ids.length, 1)
+                assert.match(ids[0], /^articles\//, 'still a temporary upload')
+            },
+            'the stored image did not reach Bob',
+            20000,
+        )
+
+        await save(bob)
+        await eventually(() => assert.match(app.article(id).body_html, /articles\/[^"]+\.png/), "Bob's save dropped the image")
+
+        // The demo has no storage link, so the image itself is not served.
+        app.problems.splice(known, app.problems.length - known, ...app.problems.slice(known).filter((problem) => !/\/storage\//.test(problem)))
+    })
+
     test('a table is shared', async () => {
         await together()
         await endOfParagraph(alice, 1)
@@ -348,6 +380,58 @@ describe('picked values', () => {
             assert.match(row.tags, /harbour/)
             assert.equal(app.db.prepare('select count(*) as total from document_relations where document_id = ?').get(id).total, 2)
         }, 'the values were not saved')
+    })
+})
+
+describe('repeaters and builders', () => {
+    const points = (page) => page.locator('.fi-page input[id*="key_points"][id$=".point"]')
+    const values = async (page) => Promise.all((await points(page).all()).map((input) => input.inputValue()))
+
+    test('items added, edited and removed by two people', async () => {
+        const id = await together()
+
+        await alice.getByRole('button', { name: 'Add key point' }).click()
+        await eventually(async () => assert.equal(await points(alice).count(), 1), 'Alice has no item')
+        await points(alice).first().fill('From Alice')
+
+        await eventually(async () => assert.deepEqual(await values(bob), ['From Alice']), 'Bob did not get the item')
+
+        await bob.getByRole('button', { name: 'Add key point' }).click()
+        await eventually(async () => assert.equal(await points(bob).count(), 2), 'Bob has no second item')
+        await points(bob).nth(1).fill('From Bob')
+
+        await eventually(async () => assert.deepEqual(await values(alice), ['From Alice', 'From Bob']), 'Alice did not get the second item')
+
+        // Both typing at once, each in their own item.
+        await Promise.all([
+            points(alice).first().pressSequentially(' and more', { delay: 40 }),
+            points(bob).nth(1).pressSequentially(' too', { delay: 45 }),
+        ])
+
+        await eventually(async () => {
+            assert.deepEqual(await values(alice), ['From Alice and more', 'From Bob too'])
+            assert.deepEqual(await values(bob), ['From Alice and more', 'From Bob too'])
+        }, 'the items did not converge')
+
+        await alice.locator('.fi-page .fi-fo-repeater-item').nth(1).getByRole('button', { name: /delete/i }).click()
+        await eventually(async () => assert.deepEqual(await values(bob), ['From Alice and more']), 'the removal did not reach Bob')
+
+        await save(bob)
+        await eventually(() => assert.deepEqual(JSON.parse(app.article(id).key_points).map((item) => item.point), ['From Alice and more']), 'the list was not saved')
+    })
+
+    test('a builder block added by one person reaches the other', async () => {
+        await together()
+
+        await alice.getByRole('button', { name: 'Add to sidebar' }).click()
+        await alice.locator('.fi-dropdown-panel:visible').getByText('Quote', { exact: true }).click()
+
+        const quote = (page) => page.locator('.fi-page textarea[id*="sidebar"]')
+
+        await eventually(async () => assert.equal(await quote(alice).count(), 1), 'Alice has no block')
+        await quote(alice).fill('Shared quote')
+
+        await eventually(async () => assert.equal(await quote(bob).inputValue(), 'Shared quote'), 'Bob did not get the block')
     })
 })
 
@@ -455,6 +539,36 @@ describe('saving', () => {
         }, 'the list was not saved')
     })
 
+    test('text inputs stay editable while their own form saves', async () => {
+        const id = await together()
+        const original = await field(alice, 'title').inputValue()
+        const slow = async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            await route.continue()
+        }
+
+        await alice.route(/livewire.*update/, slow)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' saved')
+
+        const { saved } = await startSave(alice)
+
+        await alice.waitForTimeout(250)
+        assert.equal(await field(alice, 'title').evaluate((input) => input.readOnly), false)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' and after', { delay: 40 })
+        await saved
+        await alice.unroute(/livewire.*update/, slow)
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), `${original} saved and after`)
+            assert.equal(await field(bob, 'title').inputValue(), `${original} saved and after`)
+        }, 'typing during the save was lost')
+
+        await save(bob)
+        await eventually(() => assert.equal(app.article(id).title, `${original} saved and after`), 'the second save missed it')
+    })
+
     test('two saves at once lose nothing', async () => {
         const id = await together()
 
@@ -559,6 +673,25 @@ describe('saving', () => {
         await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / through a bad proxy$/), 'live editing gave up', 20000)
 
         await alice.unroute('**/_collaboration/sync', proxy)
+        app.problems.length = known
+    })
+
+    test('a permission change renews tokens without interrupting typing', async () => {
+        await together()
+
+        const renewed = []
+        const watch = (response) => response.url().includes('_collaboration/sync') && response.status() === 410 && renewed.push(response)
+        const known = app.problems.length
+
+        alice.on('response', watch)
+        app.artisan('filament-collaboration:refresh-permissions')
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' after the change', { delay: 40 })
+
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / after the change$/), 'typing stopped', 15000)
+
+        alice.off('response', watch)
+        assert.ok(renewed.length >= 1, 'the old token was still accepted')
         app.problems.length = known
     })
 

@@ -36,6 +36,8 @@ class Document extends Model
         'seo_keywords',
         'canonical_url',
         'robots_noindex',
+        'key_points',
+        'sidebar',
     ];
 
     protected function casts(): array
@@ -44,6 +46,8 @@ class Document extends Model
             'workspace_id' => 'integer',
             'author_id' => 'integer',
             'tags' => 'array',
+            'key_points' => 'array',
+            'sidebar' => 'array',
             'published_at' => 'datetime',
             'robots_noindex' => 'boolean',
         ];

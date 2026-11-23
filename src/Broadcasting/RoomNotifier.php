@@ -49,6 +49,14 @@ final class RoomNotifier
         });
     }
 
+    /** Tells everybody in a room to fetch a new token now. */
+    public function refresh(string $room): void
+    {
+        $this->collect($room, static function (RoomChanges $changes): void {
+            $changes->refresh = true;
+        });
+    }
+
     public function presenceChanged(string $room, ?string $scope, PresenceChange $change, ?Participant $participant = null): void
     {
         if ($change === PresenceChange::None) {
@@ -157,6 +165,10 @@ final class RoomNotifier
             ];
         } elseif ($changes->hasDocumentChanged) {
             $payload['sync'] = true;
+        }
+
+        if ($changes->refresh) {
+            $payload['refresh'] = true;
         }
 
         if ($changes->presence === PresenceChange::People->value) {

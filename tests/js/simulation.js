@@ -9,7 +9,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
     const random = () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646
     const pick = (items) => items[Math.floor(random() * items.length)]
 
-    const initial = { clock: 0, fields: { title: { k: 'text', r: [] }, body: { k: 'rich', r: [] }, status: { k: 'value', v: null, at: [0, 0] } } }
+    const initial = { clock: 0, fields: { title: { k: 'text', r: [] }, body: { k: 'rich', r: [] }, status: { k: 'value', v: null, at: [0, 0] }, items: { k: 'items', r: [], m: {} } } }
     const server = new Document(initial)
     const log = []
     const batches = []
@@ -23,6 +23,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
         ['title', 'Shared title'],
         ['status', 'draft'],
         ['body', { type: 'doc', content: [paragraph('First paragraph'), paragraph('Second paragraph')] }],
+        ['items', { [key(1)]: { title: 'One', done: false }, [key(2)]: { title: 'Two', meta: { tag: 'a' } } }],
     ]) {
         const operations = server.changes(field, value, 0)
 
@@ -63,7 +64,7 @@ export function simulate(seed, { editors = 4, steps = 90 } = {}) {
         } else if (action < 0.32) {
             flush(replica)
         } else {
-            const field = pick(['title', 'body', 'body', 'status'])
+            const field = pick(['title', 'body', 'body', 'status', 'items', 'items'])
             const value = mutate(field, replica.document.value(field), random, pick)
             const operations = replica.document.changes(field, value, replica.client)
 
@@ -84,7 +85,30 @@ export function paragraph(text) {
     return { type: 'paragraph', ...(text ? { content: [{ type: 'text', text }] } : {}) }
 }
 
+const key = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
+let nextKey = 100
+
+function mutateItems(items, random, pick) {
+    const entries = Object.entries(structuredClone(items))
+    const action = Math.floor(random() * 5)
+    const at = Math.floor(random() * (entries.length + 1))
+
+    if (action === 0 || !entries.length) entries.splice(at, 0, [key(nextKey++ + Math.floor(random() * 1e6)), { title: pick(['new', 'x', '協作']), done: random() < 0.5 }])
+    else if (action === 1) entries.splice(Math.min(at, entries.length - 1), 1)
+    else if (action === 2) entries.splice(Math.floor(random() * entries.length), 0, ...entries.splice(Math.min(at, entries.length - 1), 1))
+    else {
+        const [, item] = pick(entries)
+
+        if (action === 3) item.title = pick(['a', 'b', 'c', null, '🙂'])
+        else item.done = !item.done
+    }
+
+    return Object.fromEntries(entries)
+}
+
 function mutate(field, value, random, pick) {
+    if (field === 'items') return mutateItems(value, random, pick)
+
     const piece = () => pick(['a', 'bc', ' ', '協作', '🙂', 'hello', 'é', ' ', '/', '"'])
 
     if (field === 'status') return pick(['draft', 'review', 'published', null, ['a', 'b'], true, 3])

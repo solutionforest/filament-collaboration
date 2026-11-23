@@ -80,12 +80,12 @@ final class Sequence
     }
 
     /** @return list<Token> */
-    public function tokens(): array
+    public function tokens(bool $includeDeleted = false): array
     {
         $tokens = [];
 
         foreach ($this->runs as $run) {
-            if ($run->deleted) {
+            if ($run->deleted && ! $includeDeleted) {
                 continue;
             }
 

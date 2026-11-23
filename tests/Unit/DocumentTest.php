@@ -9,7 +9,9 @@ use SolutionForest\FilamentCollaboration\Crdt\RichTextSchema;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Support\Data;
 
-const KINDS = ['title' => FieldKind::Text, 'body' => FieldKind::RichText, 'status' => FieldKind::Value];
+const KINDS = ['title' => FieldKind::Text, 'body' => FieldKind::RichText, 'status' => FieldKind::Value, 'items' => FieldKind::Items];
+
+const ITEM_PATHS = ['items' => ['title', 'done', 'meta.tag']];
 
 /** @return array<string, mixed> */
 function richParagraph(string $text, array $marks = []): array
@@ -49,7 +51,7 @@ it('replays sessions recorded by the browser implementation to the same result',
                 $document->apply($operations);
             } else {
                 $numbers[$client] = ($numbers[$client] ?? 0) + 1;
-                $document->receive($client, $numbers[$client], $operations, KINDS);
+                $document->receive($client, $numbers[$client], $operations, KINDS, ITEM_PATHS);
             }
         }
 
@@ -194,3 +196,16 @@ it('refuses a picked value outside the options this editor was given', function 
         ->and(fn () => $document->receive(1, 2, $document->changes('status', 'published', client: 1), KINDS, $allowed))
         ->toThrow(InvalidOperation::class);
 });
+
+it('refuses a forged item operation', function (array $operation): void {
+    $document = sharedDocument();
+    $document->apply($document->changes('items', ['00000000-0000-4000-8000-000000000001' => ['title' => 'One']]));
+    $operation['id'] = [$document->clock() + 1, 7];
+
+    expect(fn () => $document->receive(7, 1, [['f' => 'items', ...$operation]], KINDS, ITEM_PATHS))->toThrow(InvalidOperation::class);
+})->with([
+    'an invented record key' => [['o' => 'ins', 'after' => null, 'v' => ['i' => 'record-99']]],
+    'a sub-field the form does not have' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000001', 'p' => 'is_admin', 'v' => true]],
+    'an item that does not exist' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000002', 'p' => 'title', 'v' => 'x']],
+    'an object as a value' => [['o' => 'put', 'i' => '00000000-0000-4000-8000-000000000001', 'p' => 'title', 'v' => ['a' => 1]]],
+]);
