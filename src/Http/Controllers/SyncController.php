@@ -28,6 +28,7 @@ use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Presence\Participant;
 use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
+use SolutionForest\FilamentCollaboration\Rooms\RelationVersions;
 use SolutionForest\FilamentCollaboration\Rooms\RoomAuthorizer;
 use SolutionForest\FilamentCollaboration\Rooms\RoomContext;
 use SolutionForest\FilamentCollaboration\Support\Data;
@@ -48,6 +49,7 @@ final readonly class SyncController
         private RoomNotifier $notifier,
         private DeletedRecords $deletions,
         private EditTrail $trail,
+        private RelationVersions $relations,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -173,6 +175,7 @@ final readonly class SyncController
             'presence' => $etag,
             'people' => ($input['presence'] ?? null) === $etag ? null : $people,
             'total' => $total,
+            'relations' => $this->relations->version($context->room),
         ]);
     }
 

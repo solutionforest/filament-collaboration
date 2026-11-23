@@ -112,5 +112,9 @@ return [
         'in_field' => '位於「:field」',
         'more' => '另外 :count 人',
         'jump' => '前往 :name',
+        'follow' => '跟隨',
+        'follow_title' => '一直前往 :name 所在的欄位',
+        'following' => '正在跟隨 :name',
+        'stop_following' => '停止跟隨',
     ],
 ];

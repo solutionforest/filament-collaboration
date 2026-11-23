@@ -66,6 +66,14 @@ final class RoomNotifier
         });
     }
 
+    /** Somebody changed the record's related records in a relation manager. */
+    public function relationsChanged(string $room, int $version): void
+    {
+        $this->collect($room, static function (RoomChanges $changes) use ($version): void {
+            $changes->relations = $version;
+        });
+    }
+
     public function presenceChanged(string $room, ?string $scope, PresenceChange $change, ?Participant $participant = null): void
     {
         if ($change === PresenceChange::None) {
@@ -178,6 +186,10 @@ final class RoomNotifier
 
         if ($changes->refresh) {
             $payload['refresh'] = true;
+        }
+
+        if ($changes->relations !== null) {
+            $payload['relations'] = $changes->relations;
         }
 
         if ($changes->presence === PresenceChange::People->value) {

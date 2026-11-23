@@ -35,6 +35,7 @@ const REPORT_BYTES = 16_000
  * @property {string | null} presence
  * @property {Person[] | null} people
  * @property {number} total
+ * @property {number} [relations] raised whenever somebody changes related records in a relation manager
  */
 
 /** @type {(milliseconds: number) => Promise<void>} */
@@ -52,6 +53,12 @@ export class Room {
     /** @type {Timer | undefined} */
     renderTimer
     syncing = false
+    /** @type {string | null} the person this page keeps going to, as they move from field to field */
+    following = null
+    /** @type {number | null} the relation version this page's relation managers show */
+    relations = null
+    /** @type {string | null} */
+    followedField = null
     /** The `data-collaboration` this room last checked, and whether it named another draft. */
     source = ''
     stale = false
@@ -153,6 +160,18 @@ export class Room {
             },
             { signal, capture: true },
         )
+
+        // Doing something yourself stops following somebody else. On click, not
+        // pointerdown: the notice going away must not move what is being clicked.
+        for (const name of ['click', 'keydown']) {
+            document.addEventListener(
+                name,
+                (event) => {
+                    if (this.following && event.isTrusted && event.target instanceof Node && this.form()?.contains(event.target)) this.follow(null)
+                },
+                { signal, capture: true },
+            )
+        }
 
         // Capture runs before Livewire, so Save always carries the latest edit.
         for (const name of ['click', 'submit', 'change', 'keydown']) {
@@ -398,8 +417,10 @@ export class Room {
         if (payload.person) {
             this.presence.move(payload.person)
             this.locks.update()
+            this.followUp()
         }
         // Permissions changed: the next sync gets a 410 and the page renders a new token.
+        if (typeof payload.relations === 'number') this.relationsChanged(payload.relations)
         if (payload.sync || payload.refresh) this.syncSoon(30)
 
         // A crowd coming and going is fetched a little less eagerly.
@@ -512,8 +533,10 @@ export class Room {
 
         this.presence.receive(response)
         this.locks.update()
+        this.followUp()
         this.dirty = response.dirty
         this.noticeRevision(response)
+        if (typeof response.relations === 'number') this.relationsChanged(response.relations)
 
         this.setStatus(this.stopped ? 'stopped' : this.outbox.isEmpty ? 'synced' : 'syncing')
     }
@@ -768,6 +791,48 @@ export class Room {
     rerenderSoon() {
         clearTimeout(this.renderTimer)
         this.renderTimer = setTimeout(() => this.wire?.$refresh(), 1500)
+    }
+
+    /**
+     * Somebody changed related records: relation managers that share their
+     * changes (`SharesRelationChanges`) render again. Not on the first answer.
+     *
+     * @param {number} version
+     */
+    relationsChanged(version) {
+        const known = this.relations
+
+        this.relations = Math.max(known ?? 0, version)
+
+        if (known !== null && version > known) window.Livewire?.dispatch('filament-collaboration-relations-changed')
+    }
+
+    /**
+     * Keeps going to this person's field as they move, until they leave or
+     * this page's user does something in the form. Null stops.
+     *
+     * @param {Person | null} person
+     */
+    follow(person) {
+        this.following = person && !person.self ? person.key : null
+        this.followedField = null
+        this.followUp()
+        this.bar.render()
+    }
+
+    followUp() {
+        if (!this.following) return
+
+        const tabs = this.presence.people.filter((person) => person.key === this.following && !person.self)
+
+        if (!tabs.length) return this.follow(null)
+
+        const person = tabs.find((tab) => tab.field && !tab.idle) ?? tabs.find((tab) => tab.field)
+
+        if (!person?.field || person.field === this.followedField) return
+
+        this.followedField = person.field
+        this.jumpTo(person)
     }
 
     /** @param {Person} person */

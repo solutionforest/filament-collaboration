@@ -993,6 +993,57 @@ describe('fields out of sight', () => {
     })
 })
 
+describe('following a colleague', () => {
+    test('the page keeps going to the field they are in, even behind a tab, until you do something yourself', async () => {
+        for (const page of [alice, bob]) {
+            await page.goto(`${app.base}/admin/pages/2/edit`)
+            await page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length), undefined, { timeout: 20000 })
+        }
+
+        await field(bob, 'title').click()
+        await eventually(async () => assert.ok(await alice.locator('.fi-collab-stack').count()), 'Alice does not see Bob')
+
+        await alice.locator('[data-collaboration-people]').click()
+        await alice.getByRole('button', { name: 'Follow', exact: true }).click()
+        await eventually(async () => assert.match(await alice.locator('.fi-collab-notice').innerText(), /Following Bob Martinez/), 'no following notice')
+
+        await bob.getByRole('tab', { name: 'Publishing' }).click()
+        await bob.locator('.fi-section-header', { hasText: 'Address' }).click()
+        await field(bob, 'slug').click()
+
+        await eventually(async () => assert.ok(await field(alice, 'slug').isVisible()), "Alice's page did not follow Bob behind the tab", 12000)
+
+        await alice.getByRole('tab', { name: 'Content' }).click()
+        await eventually(async () => assert.equal(await alice.locator('.fi-collab-notice').count(), 0), 'clicking did not stop following')
+
+        await eventually(async () => assert.ok(await field(alice, 'title').isVisible()), 'the Content tab did not open')
+
+        await bob.getByRole('tab', { name: 'Content' }).click()
+        await field(bob, 'summary').click()
+        await bob.getByRole('tab', { name: 'Publishing' }).click()
+        await field(bob, 'slug').click()
+        await alice.waitForTimeout(1500)
+        assert.equal(await field(alice, 'slug').isVisible(), false, 'still following')
+    })
+})
+
+describe('relation managers', () => {
+    test('a task one person adds to the checklist appears in the other open copy, and so does ticking it', async () => {
+        await together()
+
+        const checklist = (page) => page.locator('.fi-resource-relation-manager, [wire\\:id]').filter({ has: page.getByRole('heading', { name: 'Checklist' }) }).last()
+
+        await alice.getByRole('button', { name: 'New task' }).click()
+        await alice.locator('.fi-modal.fi-modal-open input[id$=".title"]').fill('Check every link')
+        await alice.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Create', exact: true }).click()
+
+        await eventually(async () => assert.match(await checklist(bob).innerText(), /Check every link/), 'Bob did not get the new task', 12000)
+
+        await checklist(bob).getByRole('switch').first().click()
+        await eventually(async () => assert.equal(await checklist(alice).getByRole('switch').first().getAttribute('aria-checked'), 'true'), 'Alice did not see it ticked', 12000)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()

@@ -21,6 +21,9 @@ final class RoomChanges
 
     public bool $refresh = false;
 
+    /** The room's relation version, when a relation manager changed something. */
+    public ?int $relations = null;
+
     public int $presence = 0;
 
     public ?Participant $participant = null;

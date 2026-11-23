@@ -138,7 +138,7 @@ interface Wire {
 
 interface Window {
     Alpine?: { $data(element: Element): any }
-    Livewire?: { find(id: string | null): Wire | undefined }
+    Livewire?: { find(id: string | null): Wire | undefined; dispatch(event: string, params?: Record<string, unknown>): void }
     Echo?: any
     FilamentRichEditor?: { tiptap?: { pmState?: typeof import('prosemirror-state') } }
     filamentCollaboration?: {
