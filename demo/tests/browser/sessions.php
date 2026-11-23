@@ -30,7 +30,14 @@ if (! $app->environment('local', 'testing') || ! str_starts_with($database, base
 $name = (string) config('session.cookie');
 $cookies = [];
 
-foreach (User::query()->orderBy('id')->limit((int) ($argv[1] ?? 100))->get() as $user) {
+$size = (int) ($argv[1] ?? 100);
+
+// A crowd larger than the seeded editors gets more of them.
+for ($number = User::query()->count() + 1; $number <= $size; $number++) {
+    User::query()->create(['name' => sprintf('Editor %03d', $number), 'email' => sprintf('crowd%03d@example.test', $number), 'password' => 'password']);
+}
+
+foreach (User::query()->orderBy('id')->limit($size)->get() as $user) {
     $session = $app->make(SessionManager::class)->driver();
     $session->setId(null);
     $session->flush();

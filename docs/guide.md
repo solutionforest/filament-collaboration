@@ -359,11 +359,28 @@ Publish it with `php artisan vendor:publish --tag=filament-collaboration-config`
 | --- | --- | --- | --- |
 | `connection` | `FILAMENT_COLLABORATION_CONNECTION` | default connection | where drafts and presence are stored |
 | `cache_store` | `FILAMENT_COLLABORATION_CACHE_STORE` | default store | serialises saves; needs atomic locks, shared by all servers |
+| `presence` | `FILAMENT_COLLABORATION_PRESENCE` | `database` | where presence is kept: `database`, or `redis` |
+| `redis_connection` | `FILAMENT_COLLABORATION_REDIS_CONNECTION` | `default` | the Redis connection for `redis` presence |
 | `presence_timeout` | `FILAMENT_COLLABORATION_PRESENCE_TIMEOUT` | 20 | seconds without a heartbeat before someone disappears |
 | `compact_after` | `FILAMENT_COLLABORATION_COMPACT_AFTER` | 1800 | seconds before a clean draft's edit history is discarded |
 | `token_lifetime` | `FILAMENT_COLLABORATION_TOKEN_LIFETIME` | 900 | seconds a room token is valid; open pages renew it |
 | `prune_uploads_after` | `FILAMENT_COLLABORATION_PRUNE_UPLOADS_AFTER` | 24 | hours before unsaved images are deleted; `null` turns it off |
 | `rate_limit` | `FILAMENT_COLLABORATION_RATE_LIMIT` | 2400 | sync requests per user per minute, across their tabs |
+
+### Many servers, and presence in Redis
+
+Several application servers can share one database: shared drafts are kept in it, so it does not matter which server a request reaches. Give them a shared `cache_store` with atomic locks, such as Redis or the database, so saves are serialised across servers.
+
+Presence is a heartbeat from every open tab every few seconds. In the database, that is a small write per heartbeat. For many people, keep it in Redis instead, with no database writes for presence. It uses Laravel's Redis connection, either phpredis or predis:
+
+```dotenv
+FILAMENT_COLLABORATION_PRESENCE=redis
+FILAMENT_COLLABORATION_REDIS_CONNECTION=default
+```
+
+Nothing else changes. Tabs left behind expire by themselves, and a room nobody is in takes up no space. To keep presence somewhere else, bind your own `PresenceRepository`. `demo/tests/Feature/PresenceRepositoryTest.php` lists the behaviour it needs.
+
+To measure your own setup, run the demo's load test with two servers: `SERVERS=2 PRESENCE=redis npm run test:load -- 300 45`. Add `TRANSPORT=reverb` to push over Reverb. It checks that everybody sees everybody across both servers, that every editor ends with the same text, and that no typing is lost. The **Load** workflow runs it on a CI runner.
 
 ### PHPStan
 

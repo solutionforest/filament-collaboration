@@ -21,7 +21,7 @@ const freePort = () =>
     })
 
 /** A throwaway database and server, and a browser context per editor. */
-export async function start({ viewport = { width: 1440, height: 900 }, optimized = false } = {}) {
+export async function start({ viewport = { width: 1440, height: 900 }, optimized = false, servers = 1 } = {}) {
     // A fixed port could reach somebody else's server on a shared machine.
     const port = await freePort()
     const directory = path.join(demo, 'storage/framework/testing', `browser-${port}`)
@@ -49,6 +49,11 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         QUEUE_CONNECTION: 'sync',
         BCRYPT_ROUNDS: '4',
         PHP_CLI_SERVER_WORKERS: '16',
+    }
+
+    // PRESENCE=redis keeps presence in Redis, under a prefix of this run's own.
+    if (process.env.PRESENCE === 'redis') {
+        Object.assign(env, { FILAMENT_COLLABORATION_PRESENCE: 'redis', REDIS_PREFIX: `filament-collaboration-browser-${port}:` })
     }
 
     // `php -S` only passes the environment to $_ENV when asked, and Laravel reads the storage path from there.
@@ -95,10 +100,18 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     }
 
     // `artisan serve` forwards only some variables, so start PHP's server directly.
-    const server = spawn(
-        'php',
-        [...options, '-S', `127.0.0.1:${port}`, path.join(demo, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')],
-        { cwd: path.join(demo, 'public'), env, stdio: 'ignore', detached: true },
+    // More than one is several application servers on one database, as behind a load balancer.
+    const ports = [port]
+
+    for (let extra = 1; extra < servers; extra++) ports.push(await freePort())
+
+    const processes = ports.map((listen) =>
+        spawn('php', [...options, '-S', `127.0.0.1:${listen}`, path.join(demo, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], {
+            cwd: path.join(demo, 'public'),
+            env,
+            stdio: 'ignore',
+            detached: true,
+        }),
     )
 
     const websockets = reverb
@@ -115,7 +128,7 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
 
     const stopReverb = () => websockets && kill(websockets)
     const stopServer = () => {
-        kill(server)
+        processes.forEach(kill)
         stopReverb()
     }
 
@@ -125,6 +138,7 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => process.exit(1))
 
     const base = env.APP_URL
+    const bases = ports.map((listen) => `http://127.0.0.1:${listen}`)
 
     for (let attempt = 0; reverb && attempt < 120; attempt++) {
         const open = await new Promise((resolve) => {
@@ -139,11 +153,13 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         await new Promise((resolve) => setTimeout(resolve, 250))
     }
 
-    for (let attempt = 0; attempt < 120; attempt++) {
-        if (await fetch(`${base}/up`).then((response) => response.ok, () => false)) break
-        if (attempt === 119) throw new Error('The demo server did not start.')
+    for (const server of bases) {
+        for (let attempt = 0; attempt < 120; attempt++) {
+            if (await fetch(`${server}/up`).then((response) => response.ok, () => false)) break
+            if (attempt === 119) throw new Error('The demo server did not start.')
 
-        await new Promise((resolve) => setTimeout(resolve, 250))
+            await new Promise((resolve) => setTimeout(resolve, 250))
+        }
     }
 
     // BROWSER=webkit runs everything in Safari's engine.
@@ -241,5 +257,5 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     /** Runs Artisan against this server's database and caches. */
     const artisan = (...args) => execFileSync('php', ['artisan', ...args], { cwd: demo, env, stdio: 'ignore' })
 
-    return { artisan, base, browser, article, db, edit, env, log, problems, reverb, sessions, signIn, stop, stopReverb }
+    return { artisan, base, bases, browser, article, db, edit, env, log, problems, reverb, sessions, signIn, stop, stopReverb }
 }

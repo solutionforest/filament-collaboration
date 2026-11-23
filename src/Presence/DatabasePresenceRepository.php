@@ -20,41 +20,20 @@ class DatabasePresenceRepository implements PresenceRepository
 
     public function touch(Participant $participant): PresenceChange
     {
-        $identity = [
-            'scope' => $participant->scope,
-            'user_key' => $participant->userKey,
-            'name' => mb_substr($participant->name, 0, 255),
-            'avatar' => $participant->avatar,
-            'mode' => $participant->mode->value,
-            'audience' => $participant->audience?->key(),
-            'readable' => $participant->audience === null ? null : Data::encode($participant->audience->toArray()),
-        ];
-        $state = [
-            'field' => $participant->field,
-            'cursor' => $participant->cursor === null ? null : Data::encode($participant->cursor),
-            'idle' => $participant->idle,
-        ];
-
         $row = Data::map(Database::table('participants')
             ->where('room', $participant->room)
             ->where('client', $participant->client)
             ->first());
 
         $now = now()->getTimestamp();
-        $seenAt = Data::int($row['seen_at'] ?? null);
-
-        $change = match (true) {
-            $row === [] || $seenAt < $now - $this->timeout() || self::differs($row, $identity) => PresenceChange::People,
-            self::differs($row, $state) => PresenceChange::State,
-            default => PresenceChange::None,
-        };
+        $change = ParticipantRecord::change($participant, $row, $now, $this->timeout());
 
         // An unchanged heartbeat only has to be written before it would time out.
-        if ($change === PresenceChange::None && $seenAt > $now - intdiv($this->timeout(), 4)) {
+        if ($change === PresenceChange::None && Data::int($row['seen_at'] ?? null) > $now - intdiv($this->timeout(), 4)) {
             return $change;
         }
 
-        $values = [...$identity, ...$state];
+        $values = [...ParticipantRecord::identity($participant), ...ParticipantRecord::state($participant)];
 
         Database::table('participants')->upsert(
             [['room' => $participant->room, 'client' => $participant->client, ...$values, 'seen_at' => $now]],
@@ -67,23 +46,6 @@ class DatabasePresenceRepository implements PresenceRepository
         })->choose();
 
         return $change;
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @param  array<string, mixed>  $values
-     */
-    private static function differs(array $row, array $values): bool
-    {
-        foreach ($values as $column => $value) {
-            $stored = $row[$column] ?? null;
-
-            if (is_bool($value) ? (bool) $stored !== $value : $stored !== $value) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     public function leave(string $room, int $client): void
@@ -150,7 +112,7 @@ class DatabasePresenceRepository implements PresenceRepository
 
     private function timeout(): int
     {
-        return max(8, Data::int(config('filament-collaboration.presence_timeout'), 20));
+        return ParticipantRecord::timeout();
     }
 
     /** @return list<Participant> */
@@ -159,21 +121,7 @@ class DatabasePresenceRepository implements PresenceRepository
         $people = [];
 
         foreach ($query->orderBy('id')->limit($limit)->get() as $row) {
-            $row = Data::map($row);
-            $cursor = Data::decode($row['cursor'] ?? null);
-
-            $people[] = new Participant(
-                room: Data::string($row['room'] ?? null),
-                scope: Data::nullableString($row['scope'] ?? null),
-                client: Data::int($row['client'] ?? null),
-                userKey: Data::string($row['user_key'] ?? null),
-                name: Data::string($row['name'] ?? null),
-                avatar: Data::nullableString($row['avatar'] ?? null),
-                mode: PresenceMode::tryFrom(Data::string($row['mode'] ?? null)) ?? PresenceMode::Viewing,
-                field: Data::nullableString($row['field'] ?? null),
-                cursor: $cursor === [] ? null : $cursor,
-                idle: (bool) ($row['idle'] ?? false),
-            );
+            $people[] = ParticipantRecord::participant(Data::map($row));
         }
 
         return $people;
