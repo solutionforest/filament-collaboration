@@ -453,6 +453,8 @@ window.filamentCollaboration
     : window.addEventListener('filament-collaboration:init', (event) => register(event.detail), { once: true })
 ```
 
+`attach()` may also return `false` to say the editor cannot be live in this browser; the field then merges on save. The CodeMirror 6 adapter does this in Safari, where a change arriving mid-keystroke can lose that keystroke.
+
 Only `read` and `write` are required; without the selection methods, edits still merge but carets are not kept or shown. Write only what differs, so the editor keeps its own undo history: `minimalChange(old, next)` in `resources/js/adapters/registry.js` gives the range to replace.
 
 If the adapter is missing, or throws, the field simply merges on save as before.

@@ -207,6 +207,6 @@ interface AdapterHandle {
 interface AdapterDefinition {
     /** `text` merges characters, `html` merges characters, blocks and marks, `value` takes the latest. */
     format: 'text' | 'html' | 'value'
-    /** Returns null while the editor is not ready yet; it is asked again shortly. */
-    attach(context: AdapterContext): AdapterHandle | null
+    /** Null while the editor is not ready yet: it is asked again shortly. False: it cannot be live here, and merges on save. */
+    attach(context: AdapterContext): AdapterHandle | null | false
 }

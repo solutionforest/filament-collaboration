@@ -199,7 +199,7 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
             () => {
                 const room = window.filamentCollaboration?.inspect().find((item) => item.fields.length)
 
-                return room && room.fields.every(([, , state]) => state.startsWith('live'))
+                return room && room.fields.every(([, , state]) => state.startsWith('live') || state.endsWith('(not live here)'))
             },
             undefined,
             { timeout: 25000 },

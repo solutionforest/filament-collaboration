@@ -68,12 +68,18 @@ export function registerFilamentAdapters(register) {
     register('filament-code-editor', {
         format: 'text',
         attach({ element, changed, moved }) {
+            // In WebKit, CodeMirror 6 can lose a keystroke when a remote change lands while it
+            // defers reading the DOM, so the field merges on save there.
+            if (/^((?!chrome|chromium|android).)*safari/i.test(navigator.userAgent)) return false
+
             const view = alpineData(element, 'codeEditorFormComponent')?.editor
 
             if (!view?.dom) return null
 
             // CodeMirror 6 has no change events; its DOM does.
             const events = new AbortController()
+            /** Typing CodeMirror will only read on the next frame (WebKit). */
+            const pending = () => (view.observer?.delayedFlush ?? -1) >= 0
 
             view.dom.addEventListener('input', () => queueMicrotask(changed), { signal: events.signal })
             view.dom.addEventListener('keyup', () => moved(), { signal: events.signal })
@@ -83,6 +89,8 @@ export function registerFilamentAdapters(register) {
                 read: () => view.state.doc.toString(),
                 write(value) {
                     // Take in typing the editor has not read from its DOM yet, or the two collide.
+                    // WebKit delays that reading, so force it.
+                    view.observer?.forceFlush?.()
                     view.observer?.flush?.()
 
                     const change = minimalChange(view.state.doc.toString(), value)
@@ -96,12 +104,16 @@ export function registerFilamentAdapters(register) {
                 },
                 setSelection: ({ anchor, head }) => view.dispatch({ selection: { anchor, head } }),
                 caretRect(offset) {
+                    // Measuring makes CodeMirror read typing it has deferred, mid-keystroke in WebKit.
+                    if (pending()) return null
+
                     const rect = view.coordsAtPos(Math.min(offset, view.state.doc.length))
 
                     return rect ? new DOMRect(rect.left, rect.top, 2, rect.bottom - rect.top) : null
                 },
                 isFocused: () => view.hasFocus,
-                isBusy: () => view.composing,
+                // Composing, or typing the editor will only read on the next frame (WebKit).
+                isBusy: () => view.composing || pending(),
                 isAlive: () => view.dom.isConnected,
                 destroy: () => events.abort(),
             }
