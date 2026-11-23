@@ -6,10 +6,12 @@ namespace SolutionForest\FilamentCollaboration\Concerns;
 
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
 use Filament\Notifications\Notification;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\SharedField;
@@ -158,6 +160,36 @@ trait InteractsWithCollaboration
             ->body(is_string($body) ? $body : null)
             ->success()
             ->send();
+    }
+
+    /**
+     * Stores an image as soon as it is uploaded into a live rich editor. A
+     * temporary upload exists only in its uploader's component, so until now
+     * nobody else's save could keep it.
+     *
+     * @return array{id: string, src: ?string}|null
+     */
+    #[Exposed]
+    #[Renderless]
+    public function storeCollaborationAttachment(string $field, string $id): ?array
+    {
+        $this->authorizeAccess();
+
+        $component = FormState::fields($this->form, withHidden: false)[$field] ?? null;
+
+        if (! $component instanceof RichEditor || ! isset($this->getCollaborationLiveFields()[$field])) {
+            return null;
+        }
+
+        // Validated against the field's size and type rules by Filament.
+        $file = $component->getUploadedFileAttachment($id);
+        $stored = $file === null ? null : $component->saveUploadedFileAttachment($file);
+
+        if (! is_string($stored) && ! is_int($stored)) {
+            return null;
+        }
+
+        return ['id' => (string) $stored, 'src' => $component->getFileAttachmentUrl($stored)];
     }
 
     public function discardSharedDraftAction(): Action

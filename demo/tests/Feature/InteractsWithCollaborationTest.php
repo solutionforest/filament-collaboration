@@ -3,7 +3,9 @@
 use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Models\Document;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
@@ -314,4 +316,22 @@ describe('merge on save', function (): void {
         ['collaborationBase', []],
         ['collaborationTheirs', []],
     ])->throws(CannotUpdateLockedPropertyException::class);
+});
+
+it('stores an upload at once so anybody can save it', function (): void {
+    arrangeEditing($this);
+    Storage::fake('public');
+    $this->actingAs($this->alice);
+
+    $page = Livewire::test(EditDocument::class, ['record' => $this->article->id])
+        ->set('componentFileAttachments.data.body_html.7f9c24e8-3b12-4fef-91e0-5f8e3a2b1c4d', UploadedFile::fake()->image('pixel.png'));
+
+    $stored = $page->instance()->storeCollaborationAttachment('body_html', '7f9c24e8-3b12-4fef-91e0-5f8e3a2b1c4d');
+
+    expect($stored['id'])->toStartWith('articles/')
+        ->and($stored['src'])->toContain($stored['id']);
+    Storage::disk('public')->assertExists($stored['id']);
+
+    expect($page->instance()->storeCollaborationAttachment('body_html', 'not-an-upload'))->toBeNull()
+        ->and($page->instance()->storeCollaborationAttachment('title', '7f9c24e8-3b12-4fef-91e0-5f8e3a2b1c4d'))->toBeNull();
 });

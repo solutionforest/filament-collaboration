@@ -11,6 +11,7 @@ const REMOTE = 'filamentCollaboration'
 export class RichTextBinding extends Binding {
     changed = false
     unsupported = false
+    storing = new Set()
 
     get isBusy() {
         return !!this.editor && !this.editor.isDestroyed && this.editor.view.composing
@@ -34,6 +35,7 @@ export class RichTextBinding extends Binding {
             this.changed = true
             this.collect()
             this.sendWhole()
+            this.storeUploads()
         }
         this.onSelection = () => this.room.cursorMoved()
 
@@ -149,6 +151,41 @@ export class RichTextBinding extends Binding {
         if (!this.editor || this.editor.isDestroyed) return
 
         this.room.wire.__instance?.queueUpdate?.(this.path, this.editor.getJSON())
+    }
+
+    /**
+     * An upload is temporary until saved, and only its uploader's page has it.
+     * Store it at once, so whoever saves the shared draft keeps the image.
+     */
+    storeUploads() {
+        const uploads = this.room.wire.$get(`componentFileAttachments.${this.path}`, false) ?? {}
+
+        this.editor.state.doc.descendants((node) => {
+            const id = node.type.name === 'image' ? node.attrs.id : null
+
+            if (!id || this.storing.has(id) || !uploads[id]) return
+
+            this.storing.add(id)
+            this.room.wire.$call('storeCollaborationAttachment', this.field, id).then((stored) => {
+                if (stored) this.replaceImage(id, stored)
+            }, () => this.storing.delete(id))
+        })
+    }
+
+    replaceImage(id, stored) {
+        if (!this.editor || this.editor.isDestroyed) return
+
+        const { state, view } = this.editor
+        const transaction = state.tr
+
+        state.doc.descendants((node, position) => {
+            if (node.type.name === 'image' && node.attrs.id === id) {
+                transaction.setNodeMarkup(position, null, { ...node.attrs, id: stored.id, src: stored.src ?? node.attrs.src })
+            }
+        })
+
+        // An ordinary local change: it is shared like any other edit.
+        if (transaction.docChanged) view.dispatch(transaction.setMeta('addToHistory', false))
     }
 
     /**

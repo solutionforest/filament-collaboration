@@ -272,6 +272,38 @@ describe('rich editor', () => {
         }, 'emoji were split')
     })
 
+    test("an image one person uploads is kept by another person's save", async () => {
+        const id = await together()
+        const known = app.problems.length
+
+        await endOfParagraph(alice, 0)
+        await alice.evaluate(async () => {
+            // A 1x1 PNG, pasted as a file the way a screenshot is.
+            const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+            const transfer = new DataTransfer()
+
+            transfer.items.add(new File([bytes], 'pixel.png', { type: 'image/png' }))
+            document.querySelector('.fi-page .tiptap').dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }))
+        })
+
+        await eventually(
+            async () => {
+                const ids = [...(await structure(bob)).matchAll(/"type":"image","attrs":\{[^}]*"id":"([^"]+)"/g)].map(([, id]) => id)
+
+                assert.equal(ids.length, 1)
+                assert.match(ids[0], /^articles\//, 'still a temporary upload')
+            },
+            'the stored image did not reach Bob',
+            20000,
+        )
+
+        await save(bob)
+        await eventually(() => assert.match(app.article(id).body_html, /articles\/[^"]+\.png/), "Bob's save dropped the image")
+
+        // The demo has no storage link, so the image itself is not served.
+        app.problems.splice(known, app.problems.length - known, ...app.problems.slice(known).filter((problem) => !/\/storage\//.test(problem)))
+    })
+
     test('a table is shared', async () => {
         await together()
         await endOfParagraph(alice, 1)

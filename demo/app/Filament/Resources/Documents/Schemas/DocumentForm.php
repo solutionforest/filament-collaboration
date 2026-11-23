@@ -34,7 +34,7 @@ class DocumentForm
                             ->toolbarButtons([
                                 ['bold', 'italic', 'underline', 'strike', 'link'],
                                 ['h2', 'h3'],
-                                ['blockquote', 'bulletList', 'orderedList', 'table'],
+                                ['blockquote', 'bulletList', 'orderedList', 'table', 'attachFiles'],
                                 ['undo', 'redo'],
                             ])
                             ->extraInputAttributes(['style' => 'min-height: 22rem']),
