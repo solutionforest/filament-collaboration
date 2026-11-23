@@ -5,7 +5,12 @@
     "scripts": {
         "build": "vite build && npm --prefix .. run build",
         "build:package": "npm --prefix .. run build",
-        "dev": "vite"
+        "dev": "vite",
+        "test:e2e": "node --no-warnings --test --test-concurrency=1 --test-timeout=540000 tests/browser/collaboration.e2e.mjs",
+        "test:load": "node --no-warnings tests/browser/load.mjs",
+        "media": "node --no-warnings scripts/capture-media.mjs",
+        "tutorial": "node --no-warnings scripts/record-tutorial.mjs",
+        "test:latency": "node --no-warnings tests/browser/latency.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

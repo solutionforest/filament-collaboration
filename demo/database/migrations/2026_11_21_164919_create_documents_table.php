@@ -8,30 +8,45 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->unsignedBigInteger('workspace_id')->default(1)->index();
+        });
+
         Schema::create('documents', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('workspace_id')->default(1)->index();
+            $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('title');
+            $table->string('slug')->nullable();
+            $table->string('category')->default('News');
+            $table->string('status')->default('draft')->index();
+            $table->text('excerpt')->nullable();
+            $table->longText('body_html')->nullable();
+            $table->string('featured_image_url', 2048)->nullable();
+            $table->json('tags')->nullable();
+            $table->timestamp('published_at')->nullable()->index();
+            $table->string('seo_title')->nullable();
+            $table->text('seo_description')->nullable();
+            $table->string('seo_keywords')->nullable();
+            $table->string('canonical_url', 2048)->nullable();
+            $table->boolean('robots_noindex')->default(false);
             $table->timestamps();
         });
-        Schema::create('collaboration_updates', function (Blueprint $table): void {
+
+        Schema::create('document_relations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('document_id')->constrained()->cascadeOnDelete();
-            $table->text('update');
+            $table->foreignId('related_document_id')->constrained('documents')->cascadeOnDelete();
+            $table->unsignedSmallInteger('position')->default(0);
             $table->timestamps();
-        });
-        Schema::create('collaboration_presence', function (Blueprint $table): void {
-            $table->string('session_id')->primary();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('document_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->string('page', 20);
-            $table->timestamp('seen_at')->index();
+            $table->unique(['document_id', 'related_document_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('collaboration_presence');
-        Schema::dropIfExists('collaboration_updates');
+        Schema::dropIfExists('document_relations');
         Schema::dropIfExists('documents');
+        Schema::table('users', fn (Blueprint $table) => $table->dropColumn('workspace_id'));
     }
 };

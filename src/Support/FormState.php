@@ -6,103 +6,78 @@ namespace SolutionForest\FilamentCollaboration\Support;
 
 use Filament\Forms\Components\Field;
 use Filament\Schemas\Schema;
-use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
+/** @internal */
 final class FormState
 {
     /**
-     * Normalize Schema::getRawState() (array|Arrayable) into a plain form bag.
+     * The outermost fields of a form, keyed by their path inside it. A repeater
+     * or builder is one field; its items have no identity between two fills.
      *
-     * @return array<string, mixed>
+     * @param  list<string>  $ignored
+     * @return array<string, Field>
      */
-    public static function array(mixed $state): array
+    public static function fields(Schema $schema, array $ignored = [], bool $withHidden = true): array
     {
-        if ($state instanceof Arrayable) {
-            $state = $state->toArray();
+        $prefix = Data::string($schema->getStatePath());
+        $found = [];
+
+        foreach ($schema->getFlatFields(withHidden: $withHidden) as $field) {
+            $path = Data::string($field->getStatePath());
+
+            if ($prefix !== '') {
+                $path = Str::after($path, $prefix.'.');
+            }
+
+            $found[$path] ??= $field;
         }
 
-        if (! is_array($state)) {
-            return [];
-        }
+        $fields = [];
 
-        $result = [];
-        foreach ($state as $key => $value) {
-            if (is_string($key)) {
-                $result[$key] = $value;
+        foreach ($found as $path => $field) {
+            $path = (string) $path;
+
+            foreach ([...$ignored, ...array_map(strval(...), array_keys($found))] as $other) {
+                if (str_starts_with($path, $other.'.')) {
+                    continue 2;
+                }
+            }
+
+            if (! in_array($path, $ignored, true)) {
+                $fields[$path] = $field;
             }
         }
 
-        return $result;
+        return $fields;
     }
 
     /**
-     * @param  list<string>  $ignore
-     * @return list<string>
-     */
-    public static function names(Schema $schema, array $ignore = []): array
-    {
-        $paths = array_values(array_unique(array_map(
-            fn (Field $field): string => self::path($field),
-            array_values($schema->getFlatFields(withHidden: true)),
-        )));
-
-        $ignored = array_flip($ignore);
-
-        return array_values(array_filter(
-            $paths,
-            function (string $path) use ($paths, $ignored): bool {
-                if (isset($ignored[$path])) {
-                    return false;
-                }
-
-                foreach ($ignored as $ignoredPath => $_) {
-                    if (str_starts_with($path, $ignoredPath.'.')) {
-                        return false;
-                    }
-                }
-
-                foreach ($paths as $other) {
-                    if ($other !== $path && str_starts_with($path, $other.'.')) {
-                        return false;
-                    }
-                }
-
-                return true;
-            },
-        ));
-    }
-
-    /**
-     * @param  array<string, mixed>  $state
-     * @param  list<string>  $ignore
+     * @param  list<string>  $ignored
      * @return array<string, mixed>
      */
-    public static function only(Schema $schema, array $state, array $ignore = []): array
+    public static function values(Schema $schema, array $ignored = []): array
     {
+        $state = Data::map($schema->getRawState());
         $values = [];
-        foreach (self::names($schema, $ignore) as $name) {
-            $values[$name] = Arr::get($state, $name);
+
+        foreach (array_keys(self::fields($schema, $ignored)) as $path) {
+            $values[(string) $path] = Arr::get($state, (string) $path);
         }
 
         return $values;
     }
 
     /**
-     * @param  array<string, mixed>  $state
-     * @param  array<int, string>  $keys
+     * @param  array<string, mixed>  $values
+     * @param  list<string>  $paths
      * @return array<string, mixed>
      */
-    public static function onlyKeys(array $state, array $keys): array
+    public static function only(array $values, array $paths): array
     {
-        $values = [];
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $state)) {
-                $values[$key] = $state[$key];
-            }
-        }
-
-        return $values;
+        return array_intersect_key($values, array_flip($paths));
     }
 
     /**
@@ -113,77 +88,57 @@ final class FormState
     public static function write(array $state, array $values): array
     {
         foreach ($values as $path => $value) {
-            $state = self::setPath($state, $path, $value);
+            data_set($state, (string) $path, $value);
         }
 
-        return $state;
+        return Data::map($state);
     }
 
-    public static function key(string $name): string
+    /** A path as a safe schema name. */
+    public static function key(string $path): string
     {
-        return strtr($name, ['_' => '_u', '.' => '_d', '@' => '_a']);
+        return strtr($path, ['_' => '_u', '.' => '_d', '@' => '_a']);
     }
 
     public static function label(Schema $schema, string $path): string
     {
-        $field = $schema->getFlatFields(withHidden: true)[$path] ?? null;
+        $label = (self::fields($schema)[$path] ?? null)?->getLabel();
+        $label = trim(strip_tags($label instanceof Htmlable ? $label->toHtml() : (string) $label));
 
-        if ($field instanceof Field) {
-            $label = $field->getLabel();
-
-            if (is_string($label) && $label !== '') {
-                return $label;
-            }
-        }
-
-        return str_replace(['.', '_'], ' ', $path);
+        return $label !== '' ? $label : str_replace(['.', '_'], ' ', $path);
     }
 
+    /** A value as plain text, for a person choosing between two of them. */
     public static function display(mixed $value): string
     {
-        if ($value === null || $value === '' || $value === []) {
-            return '(empty)';
-        }
+        $text = match (true) {
+            $value === null || $value === '' || $value === [] => '',
+            is_bool($value) => __('filament-collaboration::collaboration.values.'.($value ? 'yes' : 'no')),
+            is_scalar($value) => trim(strip_tags((string) $value)),
+            default => self::flatten(Data::decode(Data::encode(['value' => $value]))['value'] ?? null),
+        };
 
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
+        return $text === '' ? __('filament-collaboration::collaboration.values.empty') : Str::limit($text, 300);
+    }
 
+    private static function flatten(mixed $value): string
+    {
         if (is_scalar($value)) {
-            return is_string($value) ? $value : (string) $value;
+            return (string) $value;
         }
 
-        $encoded = json_encode($value);
+        $node = Data::map($value);
 
-        return is_string($encoded) ? $encoded : '(complex)';
-    }
+        if (isset($node['type']) && (isset($node['content']) || isset($node['text']) || $node['type'] === 'doc')) {
+            if (isset($node['text'])) {
+                return Data::string($node['text']);
+            }
 
-    /**
-     * @param  array<string, mixed>  $state
-     * @return array<string, mixed>
-     */
-    private static function setPath(array $state, string $path, mixed $value): array
-    {
-        if (! str_contains($path, '.')) {
-            $state[$path] = $value;
+            $separator = in_array($node['type'], ['paragraph', 'heading'], true) ? '' : ' ';
 
-            return $state;
+            return trim(implode($separator, array_map(self::flatten(...), Data::list($node['content'] ?? null))));
         }
 
-        $segments = explode('.', $path);
-        $head = array_shift($segments);
-        $rest = implode('.', $segments);
-        $child = $state[$head] ?? [];
-
-        $state[$head] = self::setPath(self::array($child), $rest, $value);
-
-        return $state;
-    }
-
-    private static function path(Field $field): string
-    {
-        $statePath = $field->getStatePath(isAbsolute: false);
-
-        return ($statePath !== null && $statePath !== '') ? $statePath : $field->getName();
+        return implode(', ', array_filter(array_map(self::flatten(...), array_values($node)), static fn (string $item): bool => $item !== ''));
     }
 }

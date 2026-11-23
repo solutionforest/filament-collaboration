@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { Document } from '../../resources/js/crdt/document.js'
+import { toDocument, toTokens } from '../../resources/js/crdt/rich-text.js'
+import { paragraph, simulate } from './simulation.js'
+
+const pair = (kind, value) => {
+    const base = new Document({ fields: { field: { k: kind, r: [] } } })
+    const seed = base.changes('field', value, 0)
+    const replicas = [1, 2].map(() => {
+        const replica = new Document({ fields: { field: { k: kind, r: [] } } })
+
+        replica.apply(seed)
+
+        return replica
+    })
+
+    return replicas
+}
+
+const concurrently = ([alice, bob], aliceEdit, bobEdit) => {
+    const fromAlice = alice.changes('field', aliceEdit.value, 1, aliceEdit.caret)
+    const fromBob = bob.changes('field', bobEdit.value, 2, bobEdit.caret)
+
+    alice.apply([...fromAlice, ...fromBob])
+    bob.apply([...fromBob, ...fromAlice])
+    assert.deepEqual(alice.value('field'), bob.value('field'))
+
+    return alice.value('field')
+}
+
+test('2,000 random sessions converge on every replica', () => {
+    for (let seed = 1; seed <= 2000; seed++) {
+        const { server, replicas } = simulate(seed * 7919)
+
+        for (const { document, client } of replicas) {
+            for (const field of ['title', 'body', 'status']) {
+                assert.deepEqual(document.value(field), server.value(field), `seed ${seed}, editor ${client}, ${field}`)
+            }
+        }
+    }
+})
+
+test('words typed at different places are both kept', () => {
+    const result = concurrently(pair('text', 'the fox'), { value: 'the quick fox' }, { value: 'the fox jumps' })
+
+    assert.equal(result, 'the quick fox jumps')
+})
+
+test('words typed at the same place do not interleave', () => {
+    const result = concurrently(pair('text', ''), { value: 'hello' }, { value: 'world' })
+
+    assert.ok(['helloworld', 'worldhello'].includes(result))
+})
+
+test('a caret says which of two equal letters is new', () => {
+    const [alice] = pair('text', 'aa')
+    const [operation] = alice.changes('field', 'aaa', 1, 1)
+
+    assert.equal(operation.after, null)
+})
+
+test('emoji and CJK count as single items', () => {
+    const result = concurrently(pair('text', '協作🙂'), { value: '即時協作🙂' }, { value: '協作🙂👍' })
+
+    assert.equal(result, '即時協作🙂👍')
+})
+
+test('pressing Enter does not steal what someone types in the next paragraph', () => {
+    const replicas = pair('rich', { content: [paragraph('A'), paragraph('B')] })
+    const result = concurrently(
+        replicas,
+        // [¶ A ¶ | ¶ B]
+        { value: { content: [paragraph('A'), paragraph(''), paragraph('B')] }, caret: 3 },
+        { value: { content: [paragraph('A'), paragraph('>B')] }, caret: 4 },
+    )
+
+    assert.deepEqual(result.content, [paragraph('A'), paragraph(''), paragraph('>B')])
+})
+
+test('bold by one person and typing by another both survive', () => {
+    const replicas = pair('rich', { content: [paragraph('hello world')] })
+    const bold = { content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello', marks: [{ type: 'bold' }] }, { type: 'text', text: ' world' }] }] }
+    const result = concurrently(replicas, { value: bold }, { value: { content: [paragraph('hello world!')] } })
+
+    assert.equal(result.content[0].content[0].marks[0].type, 'bold')
+    assert.equal(result.content[0].content[1].text, ' world!')
+})
+
+test('changing a paragraph into a heading keeps concurrent typing', () => {
+    const result = concurrently(
+        pair('rich', { content: [paragraph('Title')] }),
+        { value: { content: [{ ...paragraph('Title'), type: 'heading', attrs: { level: 2 } }] } },
+        { value: { content: [paragraph('Title two')] } },
+    )
+
+    assert.deepEqual(result.content[0], { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Title two' }] })
+})
+
+test('nested structures survive a round trip', () => {
+    const cell = (text) => ({ type: 'tableCell', content: [paragraph(text)] })
+    const document = {
+        type: 'doc',
+        content: [
+            { type: 'table', content: [{ type: 'tableRow', content: [cell('1'), cell('2')] }, { type: 'tableRow', content: [cell('3'), cell('4')] }] },
+            { type: 'bulletList', content: [{ type: 'listItem', content: [paragraph('a'), { type: 'bulletList', content: [{ type: 'listItem', content: [paragraph('b')] }] }] }] },
+            { type: 'details', content: [{ type: 'detailsSummary', content: [{ type: 'text', text: 's' }] }, { type: 'detailsContent', content: [paragraph('c')] }] },
+            { type: 'horizontalRule' },
+        ],
+    }
+
+    assert.deepEqual(toDocument(toTokens(document)), document)
+})
+
+test('half an emoji never reaches the wire', () => {
+    const [alice] = pair('text', 'Hi ')
+    const [operation] = alice.changes('field', 'Hi \ud83d', 1)
+
+    assert.equal(operation.v, '\ufffd')
+    assert.equal(toTokens({ content: [paragraph('\udc4d')] })[1].value, '\ufffd')
+})
+
+test('unsafe attributes never enter the shared document', () => {
+    for (const href of ['javascript:alert(1)', 'JAVA\tSCRIPT:alert(1)', ' javascript:alert(1)', 'data:text/html,x', 'java&colon;:x']) {
+        const [, token] = toTokens({ content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href, onclick: 'x' } }] }] }] })
+
+        assert.deepEqual(token.formatting, { 'm:link': '1' }, href)
+    }
+})

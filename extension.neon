@@ -1,0 +1,6 @@
+# Makes PHPStan understand `->collaborative()` and `->collaborate()`.
+services:
+    -
+        class: SolutionForest\FilamentCollaboration\PHPStan\MacroMethodsExtension
+        tags:
+            - phpstan.broker.methodsClassReflectionExtension

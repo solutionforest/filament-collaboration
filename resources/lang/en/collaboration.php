@@ -5,26 +5,74 @@ declare(strict_types=1);
 return [
     'someone' => 'Someone',
     'busy' => 'Someone else is saving this record. Try again in a moment.',
-    'presence' => [
-        'others' => 'People on this record',
-        'count' => '{1} :count other person|[2,*] :count other people',
-        'focus' => ':name is in :field',
+    'foreign_upload' => 'An image is still waiting to be saved by the person who uploaded it. Ask them to save first.',
+
+    'modes' => [
+        'browsing' => 'Browsing',
+        'creating' => 'Creating',
+        'viewing' => 'Viewing',
+        'editing' => 'Editing',
     ],
-    'save_notice' => ':name saved this record',
+
+    'values' => [
+        'empty' => '(empty)',
+        'yes' => 'Yes',
+        'no' => 'No',
+    ],
+
+    'column' => [
+        'label' => 'People on record',
+        'empty' => 'Nobody else is here',
+    ],
+
     'pull' => [
-        'action' => 'Get their changes',
         'title' => 'Form updated',
-        'taken' => 'Pulled changes for: :fields',
-        'conflicts' => 'Some fields still conflict: :fields',
+        'taken' => 'Updated: :fields',
+        'conflicts' => 'You will choose a version when you save: :fields',
     ],
+
     'conflict' => [
         'heading' => 'Resolve changes with :name',
         'description' => '{1} You and :name both changed this field.|[2,*] You and :name both changed these fields.',
+        'modal' => ':name saved different values. Save again to keep yours, or cancel to keep theirs.',
         'mine' => 'Keep mine',
-        'theirs' => 'Use :name\'s',
+        'theirs' => 'Use the version from :name',
+        'submit' => 'Save my choices',
         'stale' => 'The record changed again. Close this dialog and save once more.',
     ],
-    'column' => [
-        'label' => 'People on record',
+
+    'discard' => [
+        'heading' => 'Discard the shared draft?',
+        'description' => 'Unsaved changes from everyone in the fields you can edit go back to the last saved version.',
+        'action' => 'Discard draft',
+    ],
+
+    'debug' => [
+        'label' => 'Collaboration inspector',
+        'heading' => 'Collaboration inspector',
+        'description' => 'What this tab is syncing. Field contents are never shown.',
+        'close' => 'Close',
+    ],
+
+    // Sent to the browser.
+    'client' => [
+        'connecting' => 'Connecting…',
+        'synced' => 'All changes shared',
+        'syncing' => 'Sharing…',
+        'unsaved' => 'Draft not saved',
+        'offline' => 'Offline — retrying',
+        'stopped' => 'Live editing stopped — changes merge when you save',
+        'denied' => 'You no longer have access',
+        'saved' => ':name saved',
+        'not_recovered' => 'Some unsent edits from before the reload could not be recovered',
+        'pull' => 'Get changes',
+        'discard' => 'Discard shared draft',
+        'people' => 'People here',
+        'alone' => 'Nobody else is here',
+        'you' => 'You, another tab',
+        'idle' => 'Away',
+        'in_field' => 'In :field',
+        'more' => ':count more',
+        'jump' => 'Go to :name',
     ],
 ];

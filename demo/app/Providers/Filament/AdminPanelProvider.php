@@ -10,7 +10,6 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -19,6 +18,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -30,7 +30,12 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->brandName('Fieldnotes CMS')
             ->login()
-            ->renderHook(PanelsRenderHook::BODY_END, fn () => view('collaboration.panel'))
+            ->plugin(
+                CollaborationPlugin::make()
+                    // The demo separates workspaces by a column rather than Filament tenancy.
+                    ->scopeRoomsUsing(fn (): mixed => auth()->user()?->workspace_id)
+                    ->debug(fn (): bool => app()->environment('local')),
+            )
             ->colors([
                 'primary' => Color::Amber,
             ])

@@ -1,0 +1,717 @@
+import assert from 'node:assert/strict'
+import { after, before, describe, test } from 'node:test'
+import { start } from './harness.mjs'
+
+// Real browsers against the real server: npm run test:e2e
+
+let app
+let alice
+let bob
+let nextArticle = 4
+
+const field = (page, name) => page.locator(`[id="form.${name}"]`)
+const body = (page) => page.locator('.fi-page .tiptap').first()
+const text = async (page) => (await body(page).innerText()).replace(/\n+/g, '\n').trim()
+
+const structure = (page) =>
+    page.evaluate(() => {
+        const root = document.querySelector('.fi-page [x-data*="richEditorFormComponent"]')
+
+        return JSON.stringify(window.Alpine.$data(root).getEditor().getJSON())
+    })
+
+const state = (page, path) =>
+    page.evaluate((path) => {
+        const id = document.querySelector('.fi-page').closest('[wire\\:id]').getAttribute('wire:id')
+
+        return JSON.parse(JSON.stringify(window.Livewire.find(id).$get(`data.${path}`, false) ?? null))
+    }, path)
+
+async function eventually(check, message, timeout = 10000) {
+    const deadline = Date.now() + timeout
+    let failure
+
+    while (Date.now() < deadline) {
+        try {
+            return await check()
+        } catch (error) {
+            failure = error
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+
+    throw new Error(`${message}: ${failure?.message}`)
+}
+
+async function caret(page, locator, offset) {
+    await locator.click()
+    await locator.evaluate((input, offset) => {
+        const at = offset < 0 ? input.value.length : offset
+
+        input.setSelectionRange(at, at)
+    }, offset)
+}
+
+async function endOfParagraph(page, index) {
+    await body(page).click()
+    await page.waitForTimeout(150) // ProseMirror settles a click's selection after mouseup
+    await body(page).locator('p').nth(index).evaluate((paragraph) => {
+        const editor = window.Alpine.$data(paragraph.closest('[x-data*="richEditorFormComponent"]')).getEditor()
+        const position = editor.view.posAtDOM(paragraph, paragraph.childNodes.length)
+
+        editor.chain().focus().setTextSelection(position).run()
+    })
+    // TipTap moves focus on the next frame.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+}
+
+/** Each test gets an article of its own, open in both browsers. */
+async function together() {
+    const id = nextArticle++
+
+    await Promise.all([app.edit(alice, id), app.edit(bob, id)])
+
+    return id
+}
+
+async function save(page) {
+    await (await startSave(page)).saved
+}
+
+/** Returns once clicked, while the save is still running. */
+async function startSave(page) {
+    const saved = page.waitForResponse(
+        (response) => response.request().method() === 'POST' && /livewire/.test(response.url()) && (response.request().postData() ?? '').includes('"save"'),
+    )
+
+    await page.getByRole('button', { name: 'Save changes' }).first().click()
+
+    // Wrapped, or returning it would wait for the response.
+    return { saved }
+}
+
+before(async () => {
+    app = await start()
+    ;[alice, bob] = await Promise.all([app.signIn('alice'), app.signIn('bob')])
+})
+
+after(async () => app?.stop())
+
+describe('text', () => {
+    test('two people type in one input at the same time', async () => {
+        await together()
+
+        const original = await field(alice, 'title').inputValue()
+
+        await Promise.all([caret(alice, field(alice, 'title'), 0), caret(bob, field(bob, 'title'), -1)])
+        await Promise.all([
+            alice.keyboard.type('Breaking news: ', { delay: 55 }),
+            bob.keyboard.type(' (updated today)', { delay: 47 }),
+        ])
+
+        const expected = `Breaking news: ${original} (updated today)`
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), expected)
+            assert.equal(await field(bob, 'title').inputValue(), expected)
+        }, 'the title did not converge')
+    })
+
+    test('typing in the middle of the same textarea keeps every character', async () => {
+        await together()
+
+        await field(alice, 'excerpt').fill('one two three')
+        await eventually(async () => assert.equal(await field(bob, 'excerpt').inputValue(), 'one two three'), 'the seed did not arrive')
+
+        await Promise.all([caret(alice, field(alice, 'excerpt'), 4), caret(bob, field(bob, 'excerpt'), 8)])
+        await Promise.all([alice.keyboard.type('ALPHA ', { delay: 70 }), bob.keyboard.type('BRAVO ', { delay: 60 })])
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'excerpt').inputValue(), 'one ALPHA two BRAVO three')
+            assert.equal(await field(bob, 'excerpt').inputValue(), 'one ALPHA two BRAVO three')
+        }, 'the textarea did not converge')
+    })
+
+    test('undo only undoes your own typing', async () => {
+        await together()
+
+        const original = await field(alice, 'title').inputValue()
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' mine')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), `${original} mine`), 'typing did not arrive')
+
+        await caret(bob, field(bob, 'title'), 0)
+        await bob.keyboard.type('Bob ')
+        await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), `Bob ${original} mine`), 'typing did not arrive')
+
+        await alice.keyboard.press('Control+z')
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), `Bob ${original}`)
+            assert.equal(await field(bob, 'title').inputValue(), `Bob ${original}`)
+        }, 'undo was wrong')
+
+        await alice.keyboard.press('Control+Shift+z')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), `Bob ${original} mine`), 'redo was wrong')
+    })
+
+    test('IME composition is not broken by remote edits', { skip: (process.env.BROWSER ?? 'chromium') !== 'chromium' && 'needs the Chrome DevTools protocol' }, async () => {
+        await together()
+
+        const original = await field(alice, 'title').inputValue()
+        const session = await alice.context().newCDPSession(alice)
+
+        await caret(alice, field(alice, 'title'), -1)
+        await session.send('Input.imeSetComposition', { text: 'hip', selectionStart: 3, selectionEnd: 3 })
+        await caret(bob, field(bob, 'title'), 0)
+        await bob.keyboard.type('快訊 ')
+        await alice.waitForTimeout(1200)
+        await session.send('Input.imeSetComposition', { text: '協作', selectionStart: 2, selectionEnd: 2 })
+        await session.send('Input.insertText', { text: '協作' })
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), `快訊 ${original}協作`)
+            assert.equal(await field(bob, 'title').inputValue(), `快訊 ${original}協作`)
+        }, 'composition was lost')
+    })
+})
+
+describe('rich editor', () => {
+    test('two people type in different paragraphs', async () => {
+        await together()
+        await Promise.all([endOfParagraph(alice, 0), endOfParagraph(bob, 1)])
+        await Promise.all([alice.keyboard.type(' Alice was here.', { delay: 50 }), bob.keyboard.type(' Bob was here.', { delay: 58 })])
+
+        await eventually(async () => {
+            const [first, second] = [await body(alice).locator('p').nth(0).innerText(), await body(alice).locator('p').nth(1).innerText()]
+
+            assert.ok(first.endsWith(' Alice was here.'), first)
+            assert.ok(second.endsWith(' Bob was here.'), second)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'the editor did not converge')
+    })
+
+    test('two people type in one paragraph', async () => {
+        await together()
+        await endOfParagraph(alice, 0)
+        await body(bob).click()
+        await bob.waitForTimeout(150)
+        await body(bob).locator('p').first().evaluate((paragraph) => {
+            const editor = window.Alpine.$data(paragraph.closest('[x-data*="richEditorFormComponent"]')).getEditor()
+
+            editor.chain().focus().setTextSelection(editor.view.posAtDOM(paragraph, 0)).run()
+        })
+        // TipTap moves focus on the next frame.
+        await bob.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        await Promise.all([alice.keyboard.type(' at the end', { delay: 60 }), bob.keyboard.type('At the start ', { delay: 52 })])
+
+        await eventually(async () => {
+            const first = await body(bob).locator('p').first().innerText()
+
+            assert.ok(first.startsWith('At the start Opening') && first.endsWith(' at the end'), first)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'the paragraph did not converge')
+    })
+
+    test('Enter, bold, headings and lists all travel', async () => {
+        await together()
+        await endOfParagraph(alice, 0)
+        await alice.keyboard.press('Enter')
+        await alice.keyboard.type('A new line ')
+        await alice.keyboard.press('Control+b')
+        await alice.keyboard.type('in bold')
+        await endOfParagraph(bob, (await body(bob).locator('p').count()) - 1)
+        await bob.keyboard.press('Control+Shift+8')
+
+        await eventually(async () => {
+            assert.equal(await body(bob).locator('strong').innerText(), 'in bold')
+            assert.equal(await body(alice).locator('ul li').count(), 1)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'formatting did not converge')
+
+        await body(alice).locator('p').nth(1).click()
+        await alice.locator('.fi-page .fi-fo-rich-editor-toolbar button[x-on\\:click*="level: 2"], .fi-page [data-rich-editor-tool="h2"]').first().click()
+
+        await eventually(async () => {
+            assert.equal(await body(bob).locator('h2').count(), 1)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'the heading did not converge')
+    })
+
+    test('half an emoji breaks neither sync nor Save', async () => {
+        const id = await together()
+
+        await endOfParagraph(alice, 0)
+        await alice.keyboard.type('🙂')
+        await alice.evaluate(() => {
+            const editor = window.Alpine.$data(document.querySelector('.fi-page [x-data*="richEditorFormComponent"]')).getEditor()
+            const to = editor.state.selection.from
+
+            // Delete one UTF-16 unit, as a selection inside the pair would.
+            editor.view.dispatch(editor.state.tr.delete(to - 1, to))
+        })
+        await alice.keyboard.type(' after')
+
+        await eventually(async () => assert.match(await text(bob), /\uFFFD after/), 'sync stopped')
+        await save(alice)
+        await eventually(() => assert.match(app.article(id).body_html, / after/), 'Save was refused')
+    })
+
+    test('emoji typed at once by two people stay whole', async () => {
+        await together()
+        await Promise.all([endOfParagraph(alice, 0), endOfParagraph(bob, 0)])
+        await Promise.all([alice.keyboard.type('🙂🙂🙂', { delay: 90 }), bob.keyboard.type('🙃🙃🙃', { delay: 80 })])
+
+        await eventually(async () => {
+            const value = await body(alice).locator('p').first().innerText()
+
+            assert.equal([...value].filter((character) => ['🙂', '🙃'].includes(character)).length, 6, value)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'emoji were split')
+    })
+
+    test('a table is shared', async () => {
+        await together()
+        await endOfParagraph(alice, 1)
+        await alice.evaluate(() => {
+            window.Alpine.$data(document.querySelector('.fi-page [x-data*="richEditorFormComponent"]')).getEditor().chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run()
+        })
+        await alice.waitForTimeout(100) // TipTap focuses on the next frame
+        await alice.keyboard.type('Header')
+        assert.equal(await body(alice).locator('th').first().innerText(), 'Header')
+
+        await eventually(async () => {
+            assert.equal(await body(bob).locator('th').first().innerText(), 'Header')
+            assert.equal(await body(bob).locator('td').count(), 2)
+            assert.equal(await structure(alice), await structure(bob))
+        }, 'the table did not converge')
+    })
+
+    test('undo leaves the other person alone', async () => {
+        await together()
+        await endOfParagraph(alice, 0)
+        await alice.keyboard.type(' undo-me')
+        await eventually(async () => assert.match(await text(bob), /undo-me/), 'typing did not arrive')
+        await endOfParagraph(bob, 1)
+        await bob.keyboard.type(' keep-me')
+        await eventually(async () => assert.match(await text(alice), /keep-me/), 'typing did not arrive')
+        await alice.keyboard.press('Control+z')
+
+        await eventually(async () => {
+            for (const page of [alice, bob]) {
+                const value = await text(page)
+
+                assert.doesNotMatch(value, /undo-me/)
+                assert.match(value, /keep-me/)
+            }
+        }, 'undo was wrong')
+    })
+})
+
+describe('picked values', () => {
+    test('selects, toggles, tags and dates are shared', async () => {
+        const id = await together()
+
+        await field(alice, 'robots_noindex').click()
+        await alice.evaluate(() => {
+            const wire = window.Livewire.find(document.querySelector('.fi-page').closest('[wire\\:id]').getAttribute('wire:id'))
+
+            wire.$set('data.category', 'Stories', false)
+            wire.$set('data.relatedPosts', ['1', '2'], false)
+        })
+
+        const tags = alice.locator('.fi-fo-tags-input input').first()
+
+        await tags.fill('harbour')
+        await tags.press('Enter')
+        await field(alice, 'published_at').fill('2026-12-01T09:30')
+
+        await eventually(async () => {
+            assert.equal(await state(bob, 'robots_noindex'), true)
+            assert.equal(await state(bob, 'category'), 'Stories')
+            assert.deepEqual((await state(bob, 'relatedPosts')).map(String), ['1', '2'])
+            assert.ok((await state(bob, 'tags')).includes('harbour'))
+            assert.match(String(await state(bob, 'published_at')), /^2026-12-01.09:30/)
+            assert.equal(await field(bob, 'robots_noindex').getAttribute('aria-checked'), 'true')
+            assert.match(await bob.locator('.fi-page').innerText(), /harbour/)
+        }, 'the values did not converge')
+
+        await save(bob)
+
+        await eventually(() => {
+            const row = app.article(id)
+
+            assert.equal(row.category, 'Stories')
+            assert.equal(row.robots_noindex, 1)
+            assert.match(row.tags, /harbour/)
+            assert.equal(app.db.prepare('select count(*) as total from document_relations where document_id = ?').get(id).total, 2)
+        }, 'the values were not saved')
+    })
+})
+
+describe('saving', () => {
+    test('opening a record does not create a draft', async () => {
+        await together()
+        await alice.waitForTimeout(2000)
+
+        const [room] = await alice.evaluate(() => window.filamentCollaboration.inspect())
+
+        assert.equal(room.summary['Unsaved fields'], 0)
+        assert.equal(room.summary['Waiting to send'], 0)
+    })
+
+    test('Save includes the last keystroke and what others typed', async () => {
+        const id = await together()
+
+        await caret(bob, field(bob, 'excerpt'), -1)
+        await bob.keyboard.type(' From Bob.')
+        await bob.waitForTimeout(700)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type('!')
+        await save(alice)
+
+        await eventually(() => {
+            assert.match(app.article(id).title, /!$/)
+            assert.match(app.article(id).excerpt, / From Bob\.$/)
+        }, 'the draft was not saved')
+
+        await eventually(async () => {
+            for (const page of [alice, bob]) {
+                assert.equal(await page.locator('.fi-collab-status').getAttribute('data-status'), 'synced')
+            }
+        }, 'the draft still says unsaved')
+    })
+
+    test('typing while a save is running is kept', async () => {
+        const id = await together()
+        const original = await field(alice, 'title').inputValue()
+
+        await alice.route(/livewire.*update/, async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            await route.continue()
+        })
+
+        await endOfParagraph(bob, 0)
+        await bob.keyboard.type(' before the save')
+        await caret(bob, field(bob, 'title'), -1)
+        await bob.waitForTimeout(700)
+
+        await endOfParagraph(alice, 1)
+        await alice.keyboard.type(' saved')
+
+        // Livewire makes inputs read-only while submitting, but not the editor.
+        const { saved } = await startSave(alice)
+
+        await alice.waitForTimeout(250)
+        await endOfParagraph(alice, 1)
+        await Promise.all([alice.keyboard.type(' and after', { delay: 45 }), bob.keyboard.type(' by Bob', { delay: 45 })])
+        await saved
+        await alice.unroute(/livewire.*update/)
+
+        await eventually(async () => {
+            for (const page of [alice, bob]) {
+                assert.equal(await field(page, 'title').inputValue(), `${original} by Bob`)
+
+                const value = await text(page)
+
+                assert.match(value, /paragraph\. before the save/)
+                assert.match(value, / saved and after/)
+            }
+        }, 'typing during the save was lost')
+
+        assert.match(app.article(id).body_html, /before the save/)
+
+        await save(bob)
+        await eventually(() => {
+            assert.equal(app.article(id).title, `${original} by Bob`)
+            assert.match(app.article(id).body_html, / saved and after/)
+        }, 'the second save was incomplete')
+    })
+
+    test('edits deep inside a list can be saved', async () => {
+        await app.edit(alice, 3)
+        await app.edit(bob, 3)
+
+        for (const page of [alice, bob]) {
+            await page.evaluate(() => {
+                const editor = window.Alpine.$data(document.querySelector('.fi-page [x-data*="richEditorFormComponent"]')).getEditor()
+                const item = editor.view.dom.querySelector('li p')
+
+                editor.chain().focus().setTextSelection(editor.view.posAtDOM(item, item.childNodes.length)).run()
+            })
+            await page.waitForTimeout(100)
+            await page.keyboard.type(page === alice ? ' (soon)' : ' [beta]')
+            await page.waitForTimeout(700)
+        }
+
+        await save(bob)
+        await save(alice)
+
+        await eventually(() => {
+            assert.match(app.article(3).body_html, /\(soon\)/)
+            assert.match(app.article(3).body_html, /\[beta\]/)
+        }, 'the list was not saved')
+    })
+
+    test('two saves at once lose nothing', async () => {
+        const id = await together()
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' A')
+        await caret(bob, field(bob, 'excerpt'), -1)
+        await bob.keyboard.type(' B')
+        await Promise.all([save(alice), save(bob)])
+
+        await eventually(() => {
+            assert.match(app.article(id).title, / A$/)
+            assert.match(app.article(id).excerpt, / B$/)
+        }, 'a save was lost')
+
+        assert.equal(await bob.locator('.fi-modal.fi-modal-open:visible').count(), 0)
+    })
+
+    test('an unsaved draft survives a reload', async () => {
+        await together()
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' unsaved')
+        await alice.waitForTimeout(900)
+        await app.edit(alice, nextArticle - 1)
+
+        await eventually(async () => assert.match(await field(alice, 'title').inputValue(), / unsaved$/), 'the draft was lost')
+    })
+
+    test('offline typing is sent on reconnect', async () => {
+        await together()
+
+        const known = app.problems.length
+
+        await alice.context().setOffline(true)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' offline')
+        await eventually(async () => assert.equal(await alice.locator('.fi-collab-status').getAttribute('data-status'), 'offline'), 'offline was not shown')
+
+        await caret(bob, field(bob, 'title'), 0)
+        await bob.keyboard.type('online ')
+        await alice.context().setOffline(false)
+
+        await eventually(
+            async () => {
+                const value = await field(bob, 'title').inputValue()
+
+                assert.match(value, /^online .* offline$/)
+                assert.equal(await field(alice, 'title').inputValue(), value)
+            },
+            'reconnecting did not converge',
+            20000,
+        )
+
+        app.problems.length = known
+    })
+
+    test('unsent edits survive a reload', async () => {
+        const id = await together()
+        const known = app.problems.length
+        const block = (route) => route.abort()
+        const accept = (dialog) => dialog.accept().catch(() => {})
+
+        await alice.route('**/_collaboration/sync', block)
+        alice.on('dialog', accept)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' pending through reload')
+        await eventually(async () => assert.equal(await alice.locator('.fi-collab-status').getAttribute('data-status'), 'offline'), 'offline was not shown')
+        await alice.reload()
+        await alice.unroute('**/_collaboration/sync', block)
+
+        await eventually(
+            async () => {
+                assert.match(await field(alice, 'title').inputValue(), / pending through reload$/)
+                assert.match(await field(bob, 'title').inputValue(), / pending through reload$/)
+            },
+            'unsent edits were lost',
+            25000,
+        )
+
+        await app.edit(alice, id)
+        assert.equal((await field(alice, 'title').inputValue()).match(/pending through reload/g).length, 1, 'recovered twice')
+
+        alice.off('dialog', accept)
+        app.problems.length = known
+    })
+
+    test('a refusal that is not ours is retried', async () => {
+        await together()
+
+        const known = app.problems.length
+        let refused = 0
+        const proxy = (route) => {
+            if (refused++ < 3) return route.fulfill({ status: refused === 1 ? 403 : 404, contentType: 'text/html', body: '<h1>proxy</h1>' })
+
+            return route.continue()
+        }
+
+        await alice.route('**/_collaboration/sync', proxy)
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' through a bad proxy')
+
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), / through a bad proxy$/), 'live editing gave up', 20000)
+
+        await alice.unroute('**/_collaboration/sync', proxy)
+        app.problems.length = known
+    })
+
+    test('discard returns everybody to the saved version', async () => {
+        await together()
+
+        const original = await field(alice, 'title').inputValue()
+
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' junk')
+        await eventually(async () => assert.equal(await bob.locator('.fi-collab-status').getAttribute('data-status'), 'unsaved'), 'unsaved was not shown')
+
+        await bob.locator('.fi-collab-status').click()
+        await bob.locator('.fi-collab-discard').click()
+        await bob.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Discard draft' }).click()
+
+        await eventually(async () => {
+            assert.equal(await field(alice, 'title').inputValue(), original)
+            assert.equal(await field(bob, 'title').inputValue(), original)
+        }, 'the draft was not discarded')
+    })
+})
+
+describe('seeing each other', () => {
+    test('avatar, field outline, caret and name follow the other editor', async () => {
+        await together()
+        await caret(alice, field(alice, 'title'), 5)
+
+        await eventually(async () => {
+            assert.equal(await bob.locator('button.fi-collab-stack .fi-collab-avatar').innerText(), 'AC')
+            assert.equal(await bob.locator('.fi-collab-tag').innerText(), 'Alice Chen')
+            assert.equal(await bob.locator('.fi-collab-flag').innerText(), 'Alice')
+
+            const input = await field(bob, 'title').boundingBox()
+            const remote = await bob.locator('.fi-collab-caret').boundingBox()
+
+            assert.ok(remote.x > input.x + 20 && remote.x < input.x + 90, `caret at ${remote.x - input.x}`)
+            assert.ok(remote.y >= input.y - 1 && remote.y + remote.height <= input.y + input.height + 1)
+        }, 'presence was not drawn')
+    })
+
+    test('carets in several inputs are each measured in their own input', async () => {
+        await together()
+
+        const carol = await app.signIn('editor002')
+
+        await app.edit(carol, nextArticle - 1)
+        await caret(alice, field(alice, 'title'), 4)
+        await caret(carol, field(carol, 'excerpt'), 2)
+
+        await eventually(async () => {
+            const carets = await bob.locator('.fi-collab-caret').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top))
+            const boxes = [await field(bob, 'title').boundingBox(), await field(bob, 'excerpt').boundingBox()]
+
+            for (const box of boxes) {
+                assert.ok(carets.some((top) => top >= box.y - 1 && top < box.y + box.height), JSON.stringify({ carets, box }))
+            }
+        }, 'a caret was measured in the wrong input')
+
+        await carol.context().close()
+    })
+
+    test('a remote caret in the rich editor matches the real one', async () => {
+        await together()
+        await endOfParagraph(alice, 1)
+
+        await eventually(async () => {
+            const expected = await body(bob).locator('p').nth(1).evaluate((paragraph) => {
+                const editor = window.Alpine.$data(paragraph.closest('[x-data*="richEditorFormComponent"]')).getEditor()
+                const box = editor.view.coordsAtPos(editor.view.posAtDOM(paragraph, paragraph.childNodes.length))
+
+                return { x: box.left, y: box.top }
+            })
+            const actual = await bob.locator('.fi-collab-caret').boundingBox()
+
+            assert.ok(Math.abs(actual.x - expected.x) < 2 && Math.abs(actual.y - expected.y) < 2, JSON.stringify({ actual, expected }))
+        }, 'the caret was misplaced')
+    })
+
+    test('the list shows who is on each record', async () => {
+        await app.edit(alice, 3)
+        await bob.goto(`${app.base}/admin/documents`)
+
+        await eventually(async () => {
+            const row = bob.locator('tr', { hasText: 'Spring product update' })
+
+            assert.match(await row.locator('.fi-collab-stack').getAttribute('aria-label'), /Alice Chen/)
+            assert.ok((await bob.locator('.fi-header .fi-collab-avatar').allInnerTexts()).includes('AC'))
+        }, 'the list did not show Alice')
+    })
+
+    test('the create page shows colleagues', async () => {
+        await app.edit(alice, 3)
+        await bob.goto(`${app.base}/admin/documents/create`)
+
+        await eventually(async () => assert.ok((await bob.locator('.fi-header .fi-collab-avatar').allInnerTexts()).includes('AC')), 'create had no presence')
+    })
+
+    test('a view page refreshes after somebody saves', async () => {
+        const id = nextArticle++
+
+        await app.edit(alice, id)
+        await bob.goto(`${app.base}/admin/documents/${id}`)
+        await bob.waitForTimeout(2500)
+        await field(alice, 'title').fill('Visible to viewers')
+        await save(alice)
+
+        await eventually(async () => assert.match(await bob.locator('.fi-page').innerText(), /Visible to viewers/), 'the view was stale')
+    })
+
+    test('the quick-edit modal has presence and lands in open editors', async () => {
+        await app.edit(alice, 3)
+        await caret(alice, field(alice, 'excerpt'), -1)
+        await bob.goto(`${app.base}/admin/documents`)
+
+        const row = bob.locator('tr', { hasText: 'Spring product update' })
+
+        await row.locator('.fi-dropdown-trigger button').click()
+        await row.getByText('Quick edit').click()
+
+        const modal = bob.locator('.fi-modal.fi-modal-open')
+
+        await eventually(async () => assert.ok((await modal.locator('.fi-collab-avatar').allInnerTexts()).includes('AC')), 'the modal had no presence')
+
+        await modal.locator('input[id$=".title"]').fill('Edited in a modal')
+        await modal.getByRole('button', { name: /save/i }).click()
+
+        await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Edited in a modal'), 'the open editor was not updated')
+    })
+
+    test('the inspector opens from the header', async () => {
+        await app.edit(alice, 3)
+        await alice.getByRole('button', { name: 'Collaboration inspector' }).click()
+
+        await eventually(async () => assert.match(await alice.locator('.fi-collab-debug').innerText(), /Round trip[\s\S]*body_html/), 'the inspector was empty')
+    })
+
+    test('a phone has no horizontal overflow', async () => {
+        const phone = await app.signIn('carol', { viewport: { width: 390, height: 844 } })
+
+        await app.edit(phone, 3)
+
+        const overflow = await phone.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+
+        assert.ok(overflow <= 0, `${overflow}px`)
+
+        await phone.context().close()
+    })
+})
+
+test('there were no browser errors or failed requests', () => {
+    // WebKit reports a fetch cancelled by leaving the page as an error.
+    const problems = app.problems.filter((problem) => !/Fetch API cannot load http:\/\/127\.0\.0\.1:\d+\/\S+ due to access control checks/.test(problem))
+
+    assert.deepEqual(problems, [])
+})

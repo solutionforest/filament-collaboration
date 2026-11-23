@@ -1,0 +1,186 @@
+import { execFileSync, spawn } from 'node:child_process'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
+import path from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
+import { fileURLToPath } from 'node:url'
+import * as playwright from 'playwright'
+
+export const demo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+
+const freePort = () =>
+    new Promise((resolve, reject) => {
+        const probe = createServer()
+
+        probe.once('error', reject)
+        probe.listen(0, '127.0.0.1', () => {
+            const { port } = probe.address()
+
+            probe.close(() => resolve(port))
+        })
+    })
+
+/** A throwaway database and server, and a browser context per editor. */
+export async function start({ viewport = { width: 1440, height: 900 }, optimized = false } = {}) {
+    // A fixed port could reach somebody else's server on a shared machine.
+    const port = await freePort()
+    const directory = path.join(demo, 'storage/framework/testing', `browser-${port}`)
+    const database = path.join(directory, 'database.sqlite')
+
+    rmSync(directory, { recursive: true, force: true })
+
+    // Its own storage too, or the login limit of one run would lock out the next.
+    for (const folder of ['app', 'logs', 'framework/cache/data', 'framework/sessions', 'framework/views']) {
+        mkdirSync(path.join(directory, 'storage', folder), { recursive: true })
+    }
+
+    writeFileSync(database, '')
+
+    const env = {
+        ...process.env,
+        APP_ENV: 'local',
+        LARAVEL_STORAGE_PATH: path.join(directory, 'storage'),
+        APP_URL: `http://127.0.0.1:${port}`,
+        DB_CONNECTION: 'sqlite',
+        DB_DATABASE: database,
+        DB_JOURNAL_MODE: 'wal',
+        SESSION_DRIVER: 'file',
+        CACHE_STORE: 'file',
+        QUEUE_CONNECTION: 'sync',
+        BCRYPT_ROUNDS: '4',
+        PHP_CLI_SERVER_WORKERS: '16',
+    }
+
+    // `php -S` only passes the environment to $_ENV when asked, and Laravel reads the storage path from there.
+    const options = ['-d', 'variables_order=EGPCS']
+
+    if (optimized) {
+        // Configured like production, with the caches kept out of the working app.
+        Object.assign(env, {
+            APP_DEBUG: 'false',
+            LOG_LEVEL: 'error',
+            BOOST_ENABLED: 'false',
+            APP_CONFIG_CACHE: path.join(directory, 'config.php'),
+            APP_ROUTES_CACHE: path.join(directory, 'routes.php'),
+            APP_EVENTS_CACHE: path.join(directory, 'events.php'),
+        })
+
+        options.push('-d', 'opcache.enable=1', '-d', 'opcache.validate_timestamps=0', '-d', 'opcache.max_accelerated_files=30000', '-d', 'opcache.memory_consumption=256')
+    }
+
+    execFileSync('php', ['artisan', 'migrate', '--seed', '--force'], { cwd: demo, env, stdio: 'ignore' })
+
+    if (optimized) {
+        for (const command of ['config:cache', 'route:cache', 'event:cache']) {
+            execFileSync('php', ['artisan', command], { cwd: demo, env, stdio: 'ignore' })
+        }
+    }
+
+    // `artisan serve` forwards only some variables, so start PHP's server directly.
+    const server = spawn(
+        'php',
+        [...options, '-S', `127.0.0.1:${port}`, path.join(demo, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')],
+        { cwd: path.join(demo, 'public'), env, stdio: 'ignore', detached: true },
+    )
+
+    const stopServer = () => {
+        try {
+            process.kill(-server.pid)
+        } catch {
+            // Already stopped.
+        }
+    }
+
+    process.once('exit', stopServer)
+
+    // An interrupted process does not emit `exit` by itself.
+    for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => process.exit(1))
+
+    const base = env.APP_URL
+
+    for (let attempt = 0; attempt < 120; attempt++) {
+        if (await fetch(`${base}/up`).then((response) => response.ok, () => false)) break
+        if (attempt === 119) throw new Error('The demo server did not start.')
+
+        await new Promise((resolve) => setTimeout(resolve, 250))
+    }
+
+    // BROWSER=webkit runs everything in Safari's engine.
+    const browser = await playwright[process.env.BROWSER ?? 'chromium'].launch()
+    const setup = new DatabaseSync(database, { timeout: 5000 })
+    const insert = setup.prepare(
+        `insert into documents (workspace_id, title, slug, category, status, excerpt, body_html, robots_noindex, created_at, updated_at)
+         values (1, ?, ?, 'News', 'draft', 'Summary', ?, 0, datetime('now'), datetime('now'))`,
+    )
+
+    // The first three articles are for presence tests; every other test gets its own.
+    for (let number = 1; number <= 30; number++) {
+        insert.run(`Scenario ${number}`, `scenario-${number}`, '<p>Opening paragraph.</p><p>Second paragraph.</p>')
+    }
+
+    setup.close()
+
+    const db = new DatabaseSync(database, { readOnly: true, timeout: 5000 })
+    const problems = []
+
+    async function signIn(name, options = {}) {
+        const context = await browser.newContext({
+            viewport,
+            deviceScaleFactor: 1,
+            timezoneId: 'UTC',
+            reducedMotion: 'reduce',
+            ...options,
+        })
+        const page = await context.newPage()
+
+        page.on('pageerror', (error) => problems.push(`${name}: ${error.stack ?? error.message}`))
+        page.on('console', (message) => {
+            if (/^\[filament-collaboration\]/.test(message.text())) problems.push(`${name}: ${message.text()}`)
+        })
+        page.on('response', (response) => {
+            if (response.status() >= 400 && !response.url().endsWith('favicon.ico')) {
+                problems.push(`${name}: HTTP ${response.status()} ${response.url()}`)
+            }
+        })
+
+        await page.goto(`${base}/admin/login`)
+        await page.locator('[id="form.email"]').fill(`${name}@example.test`)
+        await page.locator('[id="form.password"]').fill('password')
+        await page.getByRole('button', { name: /sign in/i }).click()
+        await page.waitForURL(/\/admin(?!\/login)/, { timeout: 30000 })
+
+        return page
+    }
+
+    async function edit(page, id = 3) {
+        await page.goto(`${base}/admin/documents/${id}/edit`)
+        await page.waitForFunction(
+            () => {
+                const room = window.filamentCollaboration?.inspect().find((item) => item.fields.length)
+
+                return room && room.fields.every(([, , state]) => state.startsWith('live'))
+            },
+            undefined,
+            { timeout: 25000 },
+        )
+    }
+
+    async function stop() {
+        await browser.close()
+        db.close()
+        stopServer()
+        rmSync(directory, { recursive: true, force: true })
+    }
+
+    /** Session cookies for the seeded editors, without using the login form. */
+    const sessions = (size) =>
+        JSON.parse(
+            execFileSync('php', ['tests/browser/sessions.php', String(size)], { cwd: demo, env, maxBuffer: 10_000_000 })
+                .toString()
+                .match(/\[\{.*\}\]/s)[0],
+        )
+
+    const article = (id = 3) => db.prepare('select * from documents where id = ?').get(id)
+
+    return { base, browser, article, db, edit, problems, sessions, signIn, stop }
+}

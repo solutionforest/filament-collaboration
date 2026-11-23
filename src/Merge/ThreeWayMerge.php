@@ -6,6 +6,10 @@ namespace SolutionForest\FilamentCollaboration\Merge;
 
 use BackedEnum;
 use DateTimeInterface;
+use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
+use SolutionForest\FilamentCollaboration\Crdt\RichText;
+use SolutionForest\FilamentCollaboration\Crdt\Token;
+use stdClass;
 use Stringable;
 use UnitEnum;
 
@@ -93,6 +97,10 @@ final class ThreeWayMerge
             return $value ? '1' : '0';
         }
 
+        if ($value instanceof stdClass) {
+            $value = get_object_vars($value);
+        }
+
         if ($value === null || $value === '' || $value === []) {
             return null;
         }
@@ -110,15 +118,37 @@ final class ThreeWayMerge
         }
 
         if (is_array($value)) {
-            $normalized = [];
-            foreach ($value as $key => $item) {
-                if (self::isStructuralKey($key)) {
-                    continue;
+            if (($value['type'] ?? null) === 'doc') {
+                try {
+                    // The browser adds default attributes that PHP leaves out.
+                    return array_map(static fn (Token $token): array => [$token->value, $token->formatting], RichText::tokens($value));
+                } catch (InvalidOperation) {
+                    // Content that cannot be live is compared as it is.
                 }
-                $normalized[$key] = self::normalize($item, $exact || is_string($item) || is_array($item));
             }
 
-            ksort($normalized);
+            $keys = array_keys($value);
+            $normalized = [];
+
+            // Repeaters and uploads get new keys on every fill, so their order is their identity.
+            $hasTemporaryKeys = array_filter($keys, static fn (int|string $key): bool => ! self::isTemporaryKey($key)) === [];
+            $hasRecordKeys = array_filter($keys, static fn (int|string $key): bool => ! self::isTemporaryKey($key) && ! self::isRecordKey($key)) === [];
+
+            foreach ($value as $key => $item) {
+                $item = self::normalize($item, $exact || is_string($item) || is_array($item) || $item instanceof stdClass);
+
+                if ($hasTemporaryKeys) {
+                    $normalized[] = $item;
+                } elseif ($hasRecordKeys) {
+                    $normalized[] = [self::isRecordKey($key) ? $key : null, $item];
+                } else {
+                    $normalized[$key] = $item;
+                }
+            }
+
+            if (! $hasRecordKeys && ! array_is_list($normalized)) {
+                ksort($normalized);
+            }
 
             return $normalized;
         }
@@ -126,11 +156,16 @@ final class ThreeWayMerge
         return $value;
     }
 
-    private static function isStructuralKey(mixed $key): bool
+    private static function isTemporaryKey(int|string $key): bool
     {
         return is_string($key) && preg_match(
-            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD',
             $key,
         ) === 1;
+    }
+
+    private static function isRecordKey(int|string $key): bool
+    {
+        return is_string($key) && str_starts_with($key, 'record-');
     }
 }
