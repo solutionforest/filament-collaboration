@@ -11,6 +11,7 @@ use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
 use SolutionForest\FilamentCollaboration\Actions\CollaborationDebugAction;
+use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
 use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
 
 class EditDocument extends EditRecord
@@ -23,6 +24,7 @@ class EditDocument extends EditRecord
     {
         return [
             CollaborationDebugAction::make(),
+            CollaborationPanelAction::make(),
             $this->getSaveFormAction()
                 ->formId('form'),
             ActionGroup::make([

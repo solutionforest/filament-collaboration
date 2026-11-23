@@ -45,7 +45,22 @@ final readonly class RoomContext
         public int $expiresAt = 0,
         public array $allowed = [],
         public string $permissions = '',
+        public ?string $locale = null,
     ) {}
+
+    /**
+     * Where the shared draft is kept. A translated page has one per language,
+     * in the same room: everybody sees everybody, and edits stay in their language.
+     */
+    public function draft(): string
+    {
+        return self::draftFor($this->room, $this->locale);
+    }
+
+    public static function draftFor(string $room, ?string $locale): string
+    {
+        return $locale === null ? $room : hash('sha256', $room."\0".$locale);
+    }
 
     public function toToken(): string
     {
@@ -65,6 +80,7 @@ final readonly class RoomContext
             'k' => $this->key,
             'e' => $this->expiresAt,
             'o' => $this->allowed,
+            'l' => $this->locale,
             'a' => $this->permissions,
         ]));
     }
@@ -112,6 +128,7 @@ final readonly class RoomContext
             expiresAt: Data::int($data['e'] ?? null),
             allowed: array_map(Data::strings(...), Data::map($data['o'] ?? null)),
             permissions: Data::string($data['a'] ?? null),
+            locale: Data::nullableString($data['l'] ?? null),
         );
     }
 
@@ -124,6 +141,7 @@ final readonly class RoomContext
     public function canResume(self $earlier): bool
     {
         return $earlier->room === $this->room
+            && $earlier->locale === $this->locale
             && $earlier->user === $this->user
             && $earlier->panel === $this->panel
             && $earlier->mode === PresenceMode::Editing

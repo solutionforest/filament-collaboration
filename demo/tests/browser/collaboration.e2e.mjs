@@ -924,6 +924,43 @@ describe('live uploads', () => {
     })
 })
 
+describe('translated pages', () => {
+    const switchTo = (page, locale) =>
+        page.evaluate((locale) => {
+            const id = document.querySelector('.fi-page').closest('[wire\\:id]').getAttribute('wire:id')
+
+            return window.Livewire.find(id).$set('activeLocale', locale)
+        }, locale)
+    const waitLive = (page) =>
+        page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length && room.fields.every(([, , state]) => state.startsWith('live'))), undefined, { timeout: 20000 })
+
+    test('two languages are edited at once, each in its own draft, by people who see each other', async () => {
+        for (const page of [alice, bob]) {
+            await page.goto(`${app.base}/admin/pages/1/edit`)
+            await waitLive(page)
+        }
+
+        await switchTo(bob, 'zh_HK')
+        await eventually(async () => assert.match(await field(bob, 'title').inputValue(), /[\u4e00-\u9fff]/), 'Bob is not on Chinese')
+        await waitLive(bob)
+
+        await eventually(async () => assert.ok(await alice.locator('.fi-collab-stack .fi-collab-avatar').count()), 'Alice does not see Bob')
+
+        await caret(bob, field(bob, 'title'), -1)
+        await bob.keyboard.type('（草稿）')
+        await caret(alice, field(alice, 'title'), -1)
+        await alice.keyboard.type(' (draft)')
+
+        await bob.waitForTimeout(1500)
+        assert.doesNotMatch(await field(alice, 'title').inputValue(), /草稿/, 'Chinese typing reached the English draft')
+        assert.doesNotMatch(await field(bob, 'title').inputValue(), /draft/, 'English typing reached the Chinese draft')
+
+        // Alice switches to Chinese, and finds Bob's unsaved typing.
+        await switchTo(alice, 'zh_HK')
+        await eventually(async () => assert.match(await field(alice, 'title').inputValue(), /（草稿）$/), 'Alice did not get the Chinese draft', 15000)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()
@@ -1095,6 +1132,29 @@ describe('seeing each other', () => {
         await modal.getByRole('button', { name: /save/i }).click()
 
         await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Edited in a modal'), 'the open editor was not updated')
+    })
+
+    test('the history restores an earlier draft for everybody', async () => {
+        await together()
+
+        await field(alice, 'title').fill('Version one')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version one'), 'Bob did not get version one')
+        await save(alice)
+
+        await field(alice, 'title').fill('Version two')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version two'), 'Bob did not get version two')
+
+        await bob.getByRole('button', { name: 'Comments & history' }).click()
+
+        const history = bob.locator('[data-collaboration-history]')
+
+        await eventually(async () => assert.match(await history.innerText(), /Saved by Alice Chen[\s\S]*Edited by Alice Chen/), 'the history was empty')
+
+        bob.once('dialog', (dialog) => dialog.accept())
+        await history.getByRole('button', { name: /Restore the draft from/ }).last().click()
+
+        await eventually(async () => assert.equal(await field(alice, 'title').inputValue(), 'Version one'), 'Alice did not get the restored draft')
+        await eventually(async () => assert.equal(await field(bob, 'title').inputValue(), 'Version one'), 'Bob did not get the restored draft')
     })
 
     test('the inspector opens from the header', async () => {

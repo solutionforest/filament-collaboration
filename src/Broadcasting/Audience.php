@@ -21,6 +21,7 @@ final readonly class Audience
         public string $room,
         public array $readable,
         public array $visible,
+        public ?string $locale = null,
     ) {}
 
     public static function of(RoomContext $context): self
@@ -30,12 +31,13 @@ final readonly class Audience
         $visible = $context->visible;
         sort($visible);
 
-        return new self($context->room, $readable, $visible);
+        // Each language has its own draft, so its pushes go to its own tabs.
+        return new self($context->room, $readable, $visible, $context->locale);
     }
 
     public function key(): string
     {
-        return substr(hash('sha256', Data::encode([$this->room, $this->readable, $this->visible])), 0, 16);
+        return substr(hash('sha256', Data::encode([$this->room, $this->readable, $this->visible, ...($this->locale === null ? [] : [$this->locale])])), 0, 16);
     }
 
     public function channel(): string

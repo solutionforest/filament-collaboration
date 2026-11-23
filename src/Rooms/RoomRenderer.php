@@ -30,6 +30,7 @@ final readonly class RoomRenderer
      * @param  list<string>  $locks  fields that are read-only for others while somebody is in them
      * @param  array<string, string>  $adapters  the JavaScript adapter each live field is edited through
      * @param  list<string>  $uploads  live fields whose items are uploaded files
+     * @param  string|null  $locale  the language being edited: each has its own draft
      */
     public function render(
         PresenceMode $mode,
@@ -46,6 +47,7 @@ final readonly class RoomRenderer
         array $locks = [],
         array $adapters = [],
         array $uploads = [],
+        ?string $locale = null,
     ): ?View {
         $plugin = CollaborationPlugin::find();
         $panel = Filament::getCurrentOrDefaultPanel();
@@ -76,6 +78,7 @@ final readonly class RoomRenderer
             expiresAt: now()->getTimestamp() + max(1, Data::int(config('filament-collaboration.token_lifetime'), 900)),
             allowed: $allowed,
             permissions: Permissions::version($room),
+            locale: $record === null ? null : $locale,
         );
 
         return view('filament-collaboration::room', [
@@ -95,6 +98,7 @@ final readonly class RoomRenderer
                 'locks' => array_values(array_intersect($locks, array_keys($labels))),
                 'adapters' => (object) array_intersect_key($adapters, $fields),
                 'uploads' => array_values(array_intersect($uploads, array_keys($fields))),
+                'draft' => $context->draft(),
                 'reactive' => $reactive,
                 'canPull' => $canPull,
                 'interval' => $plugin->getPollingInterval(),

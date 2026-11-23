@@ -427,3 +427,48 @@ button.fi-collab-person-row:hover {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* The comments and history slide-over. */
+.fi-collab-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgb(0 0 0 / 10%);
+}
+
+.fi-collab-tab {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #71717a;
+    border-bottom: 2px solid transparent;
+}
+
+.fi-collab-tab[aria-selected='true'] {
+    color: inherit;
+    border-bottom-color: currentColor;
+}
+
+.fi-collab-version {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgb(0 0 0 / 6%);
+    font-size: 0.875rem;
+}
+
+.fi-collab-version-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.fi-collab-version-head time,
+.fi-collab-version-fields {
+    color: #71717a;
+}
+
+.dark .fi-collab-tabs,
+.dark .fi-collab-version {
+    border-color: rgb(255 255 255 / 10%);
+}

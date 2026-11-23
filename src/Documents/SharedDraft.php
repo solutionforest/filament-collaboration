@@ -18,6 +18,9 @@ final class SharedDraft
 
     public string $room = '';
 
+    /** For one language's draft: the record's room. */
+    public ?string $parentRoom = null;
+
     /**
      * @param  array<string, string>  $savedHashes
      * @param  list<string>  $dirty
@@ -54,6 +57,7 @@ final class SharedDraft
         );
 
         $draft->room = Data::string($row['room'] ?? null);
+        $draft->parentRoom = Data::nullableString($row['parent_room'] ?? null);
 
         foreach (Data::decode($row['contributors'] ?? null) as $field => $people) {
             foreach (Data::list($people) as $person) {
