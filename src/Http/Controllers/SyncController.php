@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Http\Controllers;
 
 use Filament\Facades\Filament;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,8 +17,10 @@ use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Crdt\Id;
 use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
+use SolutionForest\FilamentCollaboration\Documents\Contributor;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\DraftUpdate;
+use SolutionForest\FilamentCollaboration\Documents\EditTrail;
 use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
 use SolutionForest\FilamentCollaboration\Enums\PresenceChange;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
@@ -42,6 +46,7 @@ final readonly class SyncController
         private PresenceRepository $presence,
         private RoomNotifier $notifier,
         private DeletedRecords $deletions,
+        private EditTrail $trail,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -98,12 +103,13 @@ final readonly class SyncController
 
         $this->report($context, $identity, Data::list($input['problems'] ?? null));
 
-        $resumed = $this->resume($context, Data::map($input['resume'] ?? null));
+        $resumed = $this->resume($context, $access->record, Data::map($input['resume'] ?? null));
         $epoch = Data::int($input['epoch'] ?? null);
 
         try {
             if ($context->mode === PresenceMode::Editing && $context->fields !== []) {
-                $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed, Filament::auth()->user());
+                $changed = $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed, $user = Filament::auth()->user());
+                $this->audit($context, $access->record, $user, $changed);
             }
         } catch (InvalidOperation $exception) {
             return new JsonResponse(['error' => 'rejected', 'message' => $exception->getMessage()], 409);
@@ -164,6 +170,14 @@ final readonly class SyncController
         ]);
     }
 
+    /** @param list<string> $fields */
+    private function audit(RoomContext $context, ?Model $record, ?Authenticatable $user, array $fields): void
+    {
+        if ($fields !== [] && $record !== null && $user !== null && CollaborationPlugin::get()->isAuditing()) {
+            $this->trail->record($context->room, $record, Contributor::of($user), $fields);
+        }
+    }
+
     /**
      * Editor errors the browser recovered from, for developers to replay.
      *
@@ -209,7 +223,7 @@ final readonly class SyncController
      *
      * @param  array<string, mixed>  $resume
      */
-    private function resume(RoomContext $context, array $resume): ?bool
+    private function resume(RoomContext $context, ?Model $record, array $resume): ?bool
     {
         if ($resume === []) {
             return null;
@@ -222,18 +236,20 @@ final readonly class SyncController
         }
 
         try {
-            $this->documents->receive(
+            $changed = $this->documents->receive(
                 $context->room,
                 $earlier->client,
                 Data::int($resume['epoch'] ?? null),
                 Data::list($resume['batches'] ?? null),
                 array_intersect_key($context->fields, $earlier->fields),
                 $context->allowed,
-                Filament::auth()->user(),
+                $user = Filament::auth()->user(),
             );
         } catch (InvalidOperation) {
             return false;
         }
+
+        $this->audit($context, $record, $user, $changed);
 
         return true;
     }

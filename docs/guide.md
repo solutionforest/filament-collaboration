@@ -131,6 +131,7 @@ This works for deletions anywhere in your app that go through Eloquent, not only
 | `ChangesMerged` | a save took someone else's changes in fields this user did not touch | `record`, `user`, `fields`, `theirName` |
 | `ConflictDetected` | a save stopped to ask which value to keep | `record`, `user`, `fields`, `theirName` |
 | `ConflictResolved` | the user chose in the conflict dialog | `record`, `user`, `choices` |
+| `DraftEdited` | with `audit()` on, someone changed a field, once per minute | `record`, `by`, `field`, `minute` |
 
 ### Auditing who changed what
 
@@ -159,6 +160,23 @@ Event::listen(function (SharedDraftSaved $event): void {
 ```
 
 With [`owen-it/laravel-auditing`](https://github.com/owen-it/laravel-auditing), add the names to the audit the save creates, in the model's `transformAudit()`, or record a custom audit from the same listener.
+
+### An edit trail, saved or not
+
+Turn on `audit()` to also keep a trail of every change to the draft, including drafts that are discarded and never saved. It is one row per person, field and minute, not one per keystroke, in `filament_collaboration_edits`:
+
+```php
+CollaborationPlugin::make()->audit();
+```
+
+```php
+use SolutionForest\FilamentCollaboration\Documents\EditTrail;
+
+app(EditTrail::class)->for($post);
+// [['user_name' => 'Alice Chen', 'user_type' => User::class, 'user_id' => '7', 'field' => 'title', 'at' => CarbonImmutable], ...]
+```
+
+Each new row also dispatches `DraftEdited` (`record`, `by`, `field`, `minute`), to send wherever you like. The trail is kept until you delete it, for example with a scheduled `DB::table('filament_collaboration_edits')->where('minute', '<', now()->subYear()->getTimestamp())->delete()`.
 
 ## 4. Presence in tables and modals
 
@@ -266,6 +284,7 @@ CollaborationPlugin::make()
 | `fieldTypes()` | none | your own field types, tried before the built-in ones; see [Extending](#9-extending) |
 | `debug()` | off | shows `CollaborationDebugAction`; see [Debugging](#10-debugging) |
 | `reportEditorErrors()` | off | logs rich editor errors with their content; see [Debugging](#10-debugging) |
+| `audit()` | off | keeps a per-minute trail of who changed which field; see [Auditing](#an-edit-trail-saved-or-not) |
 
 ### In `config/filament-collaboration.php`
 

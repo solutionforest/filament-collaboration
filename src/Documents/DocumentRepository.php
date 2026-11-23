@@ -116,16 +116,17 @@ final class DocumentRepository
      * @param  array<string, FieldKind>  $writable
      * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
+     * @return list<string> the fields that changed
      *
      * @throws InvalidOperation
      */
-    public function receive(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): void
+    public function receive(string $room, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): array
     {
         if ($batches === []) {
-            return;
+            return [];
         }
 
-        $this->transaction($room, fn (SharedDraft $draft) => $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed, $by));
+        return $this->transaction($room, fn (SharedDraft $draft): array => $this->receiveInto($draft, $client, $epoch, $batches, $writable, $allowed, $by));
     }
 
     /**
@@ -311,11 +312,12 @@ final class DocumentRepository
      * @param  array<string, FieldKind>  $writable
      * @param  array<string, list<string>>  $allowed
      * @param  list<mixed>  $batches
+     * @return list<string> the fields that changed
      */
-    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): void
+    private function receiveInto(SharedDraft $draft, int $client, int $epoch, array $batches, array $writable, array $allowed = [], ?Authenticatable $by = null): array
     {
         if ($batches === []) {
-            return;
+            return [];
         }
 
         if ($draft->epoch !== $epoch) {
@@ -355,6 +357,8 @@ final class DocumentRepository
                 $draft->contributed(Contributor::of($by), ...array_map(strval(...), array_keys($touched)));
             }
         }
+
+        return array_map(strval(...), array_keys($touched));
     }
 
     /** @param list<array<string, mixed>> $operations */
