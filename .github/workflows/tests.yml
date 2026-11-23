@@ -37,6 +37,8 @@ jobs:
           php-version: ${{ matrix.php }}
           extensions: pdo_sqlite, intl
           coverage: pcov
+          # The tests run in demo/, but the package's code is one level up.
+          ini-values: pcov.directory=${{ github.workspace }}
 
       - name: Install Laravel ${{ matrix.laravel }} and Filament ${{ matrix.filament }}
         run: |
