@@ -11,6 +11,8 @@ import { HttpTransport } from './transport.js'
 
 const IDLE_AFTER = 120_000
 const NOTICE_FOR = 5000
+const REPORTS_PER_SYNC = 3
+const REPORT_BYTES = 16_000
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
@@ -29,6 +31,9 @@ export class Room {
         this.bindings = new Map()
         this.bound = new Set()
         this.failed = new Set()
+        this.problems = []
+        this.reports = []
+        this.lastKey = null
 
         this.epoch = 0
         this.sequence = -1
@@ -90,7 +95,9 @@ export class Room {
         for (const name of ['click', 'submit', 'change', 'keydown']) {
             document.addEventListener(
                 name,
-                () => {
+                (event) => {
+                    if (name === 'keydown') this.lastKey = [event.ctrlKey && 'Control', event.metaKey && 'Meta', event.altKey && 'Alt', event.shiftKey && 'Shift', event.key].filter(Boolean).join('+')
+
                     this.active()
                     this.collect()
                 },
@@ -336,6 +343,7 @@ export class Room {
             idle: this.isIdle(),
             batches,
             resume,
+            problems: this.reports.splice(0, REPORTS_PER_SYNC),
         }
         const started = performance.now()
         const fieldsVersion = this.fieldsVersion
@@ -530,6 +538,27 @@ export class Room {
         this.publish()
     }
 
+    /**
+     * A binding recovered from an editor error. Listeners can forward it, for
+     * example to Sentry; the server logs it when `reportEditorErrors()` is on.
+     */
+    reportProblem(field, error, details = {}) {
+        const problem = { field, error: `${error?.name ?? 'Error'}: ${error?.message ?? error}`, at: new Date().toISOString() }
+
+        this.problems = [...this.problems, problem].slice(-20)
+        console.warn(`[filament-collaboration] "${field}" recovered from an error.`, error)
+        window.dispatchEvent(new CustomEvent('filament-collaboration:recovered', { detail: { ...problem, ...details, room: this.config.id } }))
+
+        if (this.config.reportErrors && this.reports.length < 10) {
+            let report = { ...problem, ...details }
+
+            if (JSON.stringify(report).length > REPORT_BYTES) report = { ...problem, key: details.key, selection: details.selection }
+
+            this.reports.push(report)
+            this.syncSoon(0)
+        }
+    }
+
     setStatus(status) {
         if (this.status === status) return
 
@@ -575,6 +604,7 @@ export class Room {
                 'Waiting to send': this.outbox.batches.length,
                 'Unsaved fields': this.dirty.length,
                 'People here': this.presence.total,
+                'Recovered errors': this.problems.length,
             },
             fields: Object.entries(this.config.fields).map(([field, kind]) => [
                 field,
@@ -582,6 +612,7 @@ export class Room {
                 this.bound.has(field) ? (this.dirty.includes(field) ? 'live, unsaved' : 'live') : 'merge on save',
             ]),
             people: this.presence.users().map((person) => [person.name, person.mode, person.field ?? '—']),
+            problems: this.problems.map(({ field, error, at }) => [new Date(at).toLocaleTimeString(), field, error]),
         }
     }
 

@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createConnection, createServer } from 'node:net'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -221,8 +221,14 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
 
     const article = (id = 3) => db.prepare('select * from documents where id = ?').get(id)
 
+    /** Everything this server logged. */
+    const log = () =>
+        readdirSync(path.join(directory, 'storage/logs'))
+            .map((file) => readFileSync(path.join(directory, 'storage/logs', file), 'utf8'))
+            .join('\n')
+
     /** Runs Artisan against this server's database and caches. */
     const artisan = (...args) => execFileSync('php', ['artisan', ...args], { cwd: demo, env, stdio: 'ignore' })
 
-    return { artisan, base, browser, article, db, edit, env, problems, reverb, sessions, signIn, stop, stopReverb }
+    return { artisan, base, browser, article, db, edit, env, log, problems, reverb, sessions, signIn, stop, stopReverb }
 }

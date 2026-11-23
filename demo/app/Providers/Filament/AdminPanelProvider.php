@@ -35,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
                     // The demo separates workspaces by a column rather than Filament tenancy.
                     ->scopeRoomsUsing(fn (): mixed => auth()->user()?->workspace_id)
                     ->debug(fn (): bool => app()->environment('local'))
+                    ->reportEditorErrors(fn (): bool => app()->environment('local'))
                     // Pushed over Reverb when it is configured; polling otherwise.
                     ->broadcasting(fn (): bool => config('broadcasting.default') === 'reverb'),
             )

@@ -12,6 +12,7 @@ const editor = '.fi-page [x-data*="richEditorFormComponent"]'
 const app = await start()
 const pages = []
 let failures = 0
+let recovered = 0
 
 for (const name of ['alice', 'bob', 'carol', 'editor001']) {
     const page = await app.signIn(name)
@@ -28,6 +29,13 @@ for (const name of ['alice', 'bob', 'carol', 'editor001']) {
             true,
         )
     }, editor)
+    // The editor recovers by itself, and says so; the state it failed on comes with it.
+    page.on('console', async (message) => {
+        if (!/recovered from an error/.test(message.text())) return
+
+        console.log(`RECOVERED in ${name}: ${message.text()}`)
+        console.log(JSON.stringify(await page.evaluate(() => window.__beforeKey).catch(() => null)))
+    })
     page.on('pageerror', async (error) => {
         failures++
         console.log(`ERROR in ${name}: ${error.message}`)
@@ -99,6 +107,7 @@ const snapshot = (page) =>
             body: JSON.stringify(strip(window.Alpine.$data(document.querySelector(selector)).getEditor().getJSON())),
             waiting: room.summary['Waiting to send'],
             notLive: room.fields.filter(([, , state]) => !state.startsWith('live')).length,
+            recovered: room.summary['Recovered errors'],
         }
     }, editor)
 
@@ -122,6 +131,8 @@ try {
 
         if (!converged) failures++
 
+        recovered += states.reduce((total, state) => total + state.recovered, 0)
+
         console.log(`round ${round + 1}: ${converged ? 'converged' : 'DIVERGED'}`)
     }
 } finally {
@@ -130,5 +141,5 @@ try {
 
 const problems = app.problems.filter((problem) => !/Fetch API cannot load .* due to access control checks/.test(problem))
 
-console.log(JSON.stringify({ rounds: ROUNDS, failures, problems: problems.slice(0, 10) }))
-process.exitCode = failures || problems.length ? 1 : 0
+console.log(JSON.stringify({ rounds: ROUNDS, failures, recovered, problems: problems.slice(0, 10) }))
+process.exitCode = failures || recovered || problems.length ? 1 : 0

@@ -19,6 +19,7 @@ export function renderInspector(rooms) {
                 ),
                 table(['Field', 'Kind', 'State'], report.fields),
                 table(['Person', 'Mode', 'Field'], report.people.slice(0, 30)),
+                table(['Recovered', 'Field', 'Error'], report.problems),
             ])
         })
 

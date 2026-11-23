@@ -115,6 +115,24 @@ CollaborationPlugin::make()->debug(fn (): bool => app()->isLocal())
 
 ![The inspector](docs/media/inspector.png)
 
+### When the rich editor fails
+
+Should ProseMirror refuse a change, the editor shows the shared draft again, with the caret where it was. Nothing typed is lost, as every edit is already in the draft. It gives up and merges on save only after four failures in ten seconds. Each recovery is counted in the inspector and sent as a browser event, which you can forward to Sentry or similar:
+
+```js
+window.addEventListener('filament-collaboration:recovered', ({ detail }) => {
+    // detail: { field, error, key, selection, doc, at, room }
+})
+```
+
+To log a warning on the server with the document and selection it failed on, ready to replay:
+
+```php
+CollaborationPlugin::make()->reportEditorErrors(fn (): bool => app()->isLocal())
+```
+
+The log then holds field contents, so enable it only where that is acceptable. It is limited to fields the editor can write, 20 reports per user an hour.
+
 ## Configuration
 
 ```php
@@ -242,15 +260,17 @@ Pushes make changes 6 to 20 times faster everywhere. A room where most people re
 ```bash
 cd demo
 composer install && npm install
-vendor/bin/pest                # 193 tests: the package and the demo
+vendor/bin/pest                # 195 tests: the package and the demo
 vendor/bin/phpstan analyse     # level 10, package included
-npm run test:e2e               # 37 scenarios in real browsers; BROWSER=webkit for Safari's engine
+npm run test:e2e               # 38 scenarios in real browsers; BROWSER=webkit for Safari's engine
 TRANSPORT=reverb npm run test:e2e   # the same over a real Reverb server, plus 3 push scenarios
-npm run test:chaos -- 10 42    # four browsers pressing random keys; every round must converge
+npm run test:chaos -- 10 42    # four browsers pressing random keys; every round must converge, with no recovery needed
 npm run test:load -- 100 45    # editors, seconds; TRANSPORT=reverb and ACTIVE=0.1 also apply
 npm run test:latency
 cd .. && npm test              # the CRDT: 2,000 random sessions must converge
 ```
+
+`.github/workflows/chaos.yml` runs the chaos test every night with a new seed; a failure prints the editor state just before the failing key.
 
 The browser scenarios cover both people typing in one input and one paragraph, IME composition, undo, tables, picked values, saving while others type, two saves at once, offline and reload, discard, carets, the list, view and create pages, modals, a phone and dark mode. Every screenshot in this README comes from `npm run media`, which signs in real sessions and refuses to save an image until what it shows is on screen.
 

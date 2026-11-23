@@ -3,6 +3,8 @@ import { toDocument, toTokens } from '../crdt/rich-text.js'
 import { Binding } from './binding.js'
 
 const REMOTE = 'filamentCollaboration'
+const RECOVERIES = 3
+const RECOVERY_WINDOW = 10_000
 
 /**
  * Filament's own rich editor, untouched: its toolbar, schema and validation.
@@ -12,6 +14,7 @@ export class RichTextBinding extends Binding {
     changed = false
     unsupported = false
     storing = new Set()
+    recoveries = []
 
     get isBusy() {
         return !!this.editor && !this.editor.isDestroyed && this.editor.view.composing
@@ -41,6 +44,16 @@ export class RichTextBinding extends Binding {
 
         editor.on('update', this.onUpdate)
         editor.on('selectionUpdate', this.onSelection)
+
+        // ProseMirror throws from its own key handlers, so only the page sees it.
+        this.onError = (event) => {
+            if (this.isOwnError(event.error ?? event.reason)) {
+                event.preventDefault()
+                this.recover(event.error ?? event.reason)
+            }
+        }
+        window.addEventListener('error', this.onError)
+        window.addEventListener('unhandledrejection', this.onError)
 
         if (editor.isFocused && this.hasTypedBeforeConnecting()) {
             this.changed = true
@@ -102,44 +115,70 @@ export class RichTextBinding extends Binding {
 
             if (isWellFormed && canonical(toTokens(target)) === canonical(toTokens(state.doc.toJSON()))) return
 
-            const next = buildDocument(schema, target)
-            let start = state.doc.content.findDiffStart(next.content)
+            const transaction = replacement(state, buildDocument(schema, target))
 
-            if (start === null) return
-
-            let { a: oldEnd, b: newEnd } = state.doc.content.findDiffEnd(next.content)
-            const overlap = start - Math.min(oldEnd, newEnd)
-
-            if (overlap > 0) {
-                oldEnd += overlap
-                newEnd += overlap
-            }
-
-            // The diff counts UTF-16 units. Cutting an emoji in two would leave a caret inside it.
-            if (splitsPair(state.doc, start)) start--
-
-            if (splitsPair(state.doc, oldEnd)) {
-                oldEnd++
-                newEnd++
-            }
-
-            let transaction = state.tr
-
-            try {
-                transaction.replace(start, oldEnd, next.slice(start, newEnd))
-            } catch {
-                transaction = state.tr
-            }
-
-            if (!transaction.doc.eq(next)) transaction = state.tr.replaceWith(0, state.doc.content.size, next.content)
+            if (!transaction.docChanged) return
 
             this.restoreSelection(transaction)
             view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
             this.keepCaretTypable()
             this.sendWhole()
         } catch (error) {
-            this.giveUp(error)
+            this.recover(error)
         }
+    }
+
+    /** Only errors raised while this editor has the caret, from ProseMirror's own transforms. */
+    isOwnError(error) {
+        if (!error || !this.editor || this.editor.isDestroyed || !this.editor.isFocused) return false
+
+        return error.name === 'TransformError' || error instanceof RangeError
+    }
+
+    /**
+     * The editor refused a change. Nothing typed is lost, as every edit is in
+     * the shared draft already: report the state that failed, then show the
+     * draft again with the caret where it was. Repeated failures give up.
+     */
+    recover(error) {
+        if (!this.editor || this.editor.isDestroyed) return
+
+        const now = Date.now()
+
+        this.recoveries = [...this.recoveries.filter((at) => now - at < RECOVERY_WINDOW), now]
+        this.room.reportProblem(this.field, error, this.diagnostics())
+
+        if (this.recoveries.length > RECOVERIES) {
+            this.giveUp(error)
+
+            return
+        }
+
+        try {
+            this.reset()
+        } catch (failure) {
+            this.giveUp(failure)
+        }
+    }
+
+    /** What a developer needs to replay the failure. Field contents are only sent where reporting is enabled. */
+    diagnostics() {
+        const { doc, selection } = this.editor.state
+
+        return { key: this.room.lastKey, selection: selection.toJSON(), doc: doc.toJSON() }
+    }
+
+    /** Show the draft again. Only what differs is replaced, so the caret stays in place. */
+    reset() {
+        const { state, view, schema } = this.editor
+        const transaction = replacement(state, buildDocument(schema, toDocument(this.document.sequence(this.field).tokens())))
+
+        if (!transaction.docChanged) return
+
+        this.mapped = null
+        view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
+        this.keepCaretTypable()
+        this.sendWhole()
     }
 
     /**
@@ -329,6 +368,12 @@ export class RichTextBinding extends Binding {
             this.editor.off('selectionUpdate', this.onSelection)
         }
 
+        if (this.onError) {
+            window.removeEventListener('error', this.onError)
+            window.removeEventListener('unhandledrejection', this.onError)
+            this.onError = null
+        }
+
         this.editor = null
         this.mapped = null
     }
@@ -355,6 +400,39 @@ function splitsPair(doc, position) {
     const before = doc.textBetween(position - 1, position)
 
     return /^[\uD800-\uDBFF]$/.test(before) && /^[\uDC00-\uDFFF]$/.test(after)
+}
+
+/** A transaction turning the editor's document into `next`, touching as little as it can. */
+function replacement(state, next) {
+    let start = state.doc.content.findDiffStart(next.content)
+
+    if (start === null) return state.tr
+
+    let { a: oldEnd, b: newEnd } = state.doc.content.findDiffEnd(next.content)
+    const overlap = start - Math.min(oldEnd, newEnd)
+
+    if (overlap > 0) {
+        oldEnd += overlap
+        newEnd += overlap
+    }
+
+    // The diff counts UTF-16 units. Cutting an emoji in two would leave a caret inside it.
+    if (splitsPair(state.doc, start)) start--
+
+    if (splitsPair(state.doc, oldEnd)) {
+        oldEnd++
+        newEnd++
+    }
+
+    let transaction = state.tr
+
+    try {
+        transaction.replace(start, oldEnd, next.slice(start, newEnd))
+    } catch {
+        transaction = state.tr
+    }
+
+    return transaction.doc.eq(next) ? transaction : state.tr.replaceWith(0, state.doc.content.size, next.content)
 }
 
 function positionAt(ends, index) {

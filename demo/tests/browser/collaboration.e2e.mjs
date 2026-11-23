@@ -272,6 +272,62 @@ describe('rich editor', () => {
         }, 'emoji were split')
     })
 
+    test('an editor error is reported and the editor recovers from the draft', async () => {
+        await together()
+
+        const known = app.problems.length
+
+        await endOfParagraph(alice, 0)
+        await alice.keyboard.type(' shared')
+        await eventually(async () => assert.match(await text(bob), / shared/), 'typing did not arrive')
+
+        await alice.evaluate(() => {
+            const editor = window.Alpine.$data(document.querySelector('.fi-page [x-data*="richEditorFormComponent"]')).getEditor()
+            const { Plugin } = window.FilamentRichEditor.tiptap.pmState
+
+            window.__recovered = []
+            window.addEventListener('filament-collaboration:recovered', (event) => window.__recovered.push(event.detail))
+
+            // Text the draft never saw, then a key ProseMirror fails on, as in the TransformError seen in testing.
+            editor.view.dispatch(editor.state.tr.insertText(' unshared').setMeta('filamentCollaboration', true))
+            editor.registerPlugin(
+                new Plugin({
+                    props: {
+                        handleKeyDown: (view, event) => {
+                            if (event.key !== 'F8') return false
+
+                            throw Object.assign(new Error('Structure replace would overwrite content'), { name: 'TransformError' })
+                        },
+                    },
+                }),
+                (plugin, plugins) => [plugin, ...plugins],
+            )
+        })
+        await alice.keyboard.press('F8')
+
+        await eventually(async () => assert.doesNotMatch(await text(alice), /unshared/), 'the editor kept a state the draft never had')
+
+        const recovered = await alice.evaluate(() => window.__recovered)
+
+        assert.equal(recovered.length, 1)
+        assert.equal(recovered[0].field, 'body_html')
+        assert.equal(recovered[0].key, 'F8')
+        assert.match(recovered[0].error, /^TransformError: /)
+        assert.match(JSON.stringify(recovered[0].doc), /unshared/, 'the report has the state that failed')
+
+        const inspected = await alice.evaluate(() => window.filamentCollaboration.inspect()[0])
+
+        assert.equal(inspected.summary['Recovered errors'], 1)
+        assert.ok(inspected.fields.some(([name, , live]) => name === 'body_html' && live.startsWith('live')), 'the editor stopped being live')
+
+        // Typing carries on, live.
+        await alice.keyboard.type(' again')
+        await eventually(async () => assert.match(await text(bob), / shared again/), 'typing after recovery did not arrive')
+        await eventually(async () => assert.match(app.log(), /An editor recovered from an error/), 'the server did not log the report')
+
+        app.problems.splice(known, app.problems.length - known, ...app.problems.slice(known).filter((problem) => !/Structure replace would overwrite content|"body_html" recovered from an error/.test(problem)))
+    })
+
     test("an image one person uploads is kept by another person's save", async () => {
         const id = await together()
         const known = app.problems.length

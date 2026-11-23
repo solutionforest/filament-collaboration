@@ -1,0 +1,41 @@
+name: Chaos
+
+# Four browsers pressing random keys in one article, every night with a new seed.
+# A failure prints the editor state just before the failing key, ready to replay.
+on:
+  schedule:
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Rounds to run
+        default: '30'
+
+jobs:
+  chaos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, intl
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: cp .env.example .env && php artisan key:generate --no-interaction
+      - run: npm run build
+
+      - name: Run
+        run: npm run test:chaos -- "${{ inputs.rounds || '30' }}" "$GITHUB_RUN_ID"

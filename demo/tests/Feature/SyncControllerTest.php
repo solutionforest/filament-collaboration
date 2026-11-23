@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
@@ -294,4 +295,36 @@ it('pushes a refresh to the room when its permissions change', function (): void
     Permissions::changed($this->article);
 
     Event::assertDispatched(RoomChanged::class, fn (RoomChanged $event): bool => $event->channel === $alice->config['channel'] && $event->payload === ['refresh' => true]);
+});
+
+it('logs an editor error the browser recovered from, when reporting is on', function (): void {
+    arrangeSync($this);
+    CollaborationPlugin::get()->reportEditorErrors();
+    Log::spy();
+    $alice = Editor::open($this, $this->alice, $this->article);
+
+    expect($alice->config['reportErrors'])->toBeTrue();
+
+    $alice->sync(['problems' => [
+        ['field' => 'body_html', 'error' => 'TransformError: Structure replace would overwrite content', 'key' => 'Enter', 'selection' => ['type' => 'text', 'anchor' => 3, 'head' => 3], 'doc' => ['type' => 'doc']],
+        ['field' => 'workspace_id', 'error' => 'RangeError: not a field this editor can write'],
+    ]]);
+
+    Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context): bool => $context['field'] === 'body_html'
+        && $context['pressed'] === 'Enter'
+        && $context['document'] === ['type' => 'doc']
+        && $context['record'] === (string) $this->article->getKey());
+});
+
+it('logs nothing about editor errors unless reporting is on', function (): void {
+    arrangeSync($this);
+    CollaborationPlugin::get()->reportEditorErrors(false);
+    Log::spy();
+    $alice = Editor::open($this, $this->alice, $this->article);
+
+    expect($alice->config['reportErrors'])->toBeFalse();
+
+    $alice->sync(['problems' => [['field' => 'body_html', 'error' => 'TransformError: x']]]);
+
+    Log::shouldNotHaveReceived('warning');
 });
