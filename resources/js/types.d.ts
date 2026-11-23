@@ -93,6 +93,8 @@ interface RoomConfig {
     statePath: string
     fields: Record<string, FieldKind>
     labels: Record<string, string>
+    /** Fields that are not live and are read-only for others while somebody is in them. */
+    locks: string[]
     reactive: string[]
     canPull: boolean
     interval: number

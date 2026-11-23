@@ -1,6 +1,7 @@
 import { bindings as bindingTypes } from '../bindings/index.js'
 import { Document } from '../crdt/document.js'
 import { FormDom, plain } from '../dom.js'
+import { FieldLocks } from '../ui/field-locks.js'
 import { Overlay } from '../ui/overlay.js'
 import { PresenceBar } from '../ui/presence-bar.js'
 import { Outbox } from './outbox.js'
@@ -114,6 +115,7 @@ export class Room {
         this.dom = new FormDom(this)
         this.bar = new PresenceBar(this)
         this.overlay = new Overlay(this)
+        this.locks = new FieldLocks(this)
 
         this.listen()
         this.bar.render()
@@ -230,6 +232,7 @@ export class Room {
         this.collect()
         this.bar.render()
         this.overlay.schedule()
+        this.locks.update()
     }
 
     bind() {
@@ -366,7 +369,10 @@ export class Room {
             }
         }
 
-        if (payload.person) this.presence.move(payload.person)
+        if (payload.person) {
+            this.presence.move(payload.person)
+            this.locks.update()
+        }
         // Permissions changed: the next sync gets a 410 and the page renders a new token.
         if (payload.sync || payload.refresh) this.syncSoon(30)
 
@@ -479,6 +485,7 @@ export class Room {
         }
 
         this.presence.receive(response)
+        this.locks.update()
         this.dirty = response.dirty
         this.noticeRevision(response)
 
@@ -792,6 +799,7 @@ export class Room {
         this.realtime.destroy()
         this.bar.destroy()
         this.overlay.destroy()
+        this.locks.destroy()
     }
 }
 

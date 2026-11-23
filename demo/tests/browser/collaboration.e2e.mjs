@@ -803,6 +803,34 @@ describe('saving', () => {
     })
 })
 
+describe('fields that are not live', () => {
+    test('while somebody is in one, the others are told and cannot change it', async () => {
+        await together()
+
+        const notes = (page) => page.locator('.fi-page textarea[id="form.editor_notes"]')
+        const note = (page) => page.locator('.fi-collab-field-note')
+
+        await notes(bob).click()
+        await eventually(async () => {
+            assert.match(await note(alice).innerText(), /Bob .* is editing this field/)
+            assert.equal(await alice.locator('.fi-collab-locked').count(), 1)
+        }, 'Alice was not told', 12000)
+
+        await notes(alice).click({ force: true, timeout: 2000 }).catch(() => {})
+        assert.notEqual(await alice.evaluate(() => document.activeElement?.id), 'form.editor_notes', 'Alice could still type in it')
+
+        await field(bob, 'title').click()
+        await eventually(async () => {
+            assert.equal(await note(alice).count(), 0)
+            assert.equal(await alice.locator('.fi-collab-locked').count(), 0)
+        }, 'the field stayed locked', 12000)
+
+        await notes(alice).click()
+        await alice.keyboard.type('Mine now')
+        assert.equal(await notes(alice).inputValue(), 'Mine now')
+    })
+})
+
 describe('a deleted record', () => {
     test('the others are told who deleted it, can copy their text, and can restore it', async () => {
         const id = await together()

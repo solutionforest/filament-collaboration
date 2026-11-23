@@ -111,6 +111,10 @@ final readonly class MacroMethod implements MethodReflection
             return [new MacroParameter('condition', TypeCombinator::union(new BooleanType, new ClosureType, new StringType))];
         }
 
+        if ($this->name === 'lockWhileEditing') {
+            return [new MacroParameter('condition', new BooleanType)];
+        }
+
         return [
             new MacroParameter('ignore', new ArrayType(new IntegerType, new StringType)),
             new MacroParameter('presence', new BooleanType),

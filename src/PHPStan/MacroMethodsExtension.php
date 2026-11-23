@@ -16,7 +16,7 @@ use PHPStan\Reflection\MethodsClassReflectionExtension;
  */
 final class MacroMethodsExtension implements MethodsClassReflectionExtension
 {
-    private const MACROS = ['collaborative' => Field::class, 'collaborate' => EditAction::class];
+    private const MACROS = ['collaborative' => Field::class, 'lockWhileEditing' => Field::class, 'collaborate' => EditAction::class];
 
     public function hasMethod(ClassReflection $classReflection, string $methodName): bool
     {

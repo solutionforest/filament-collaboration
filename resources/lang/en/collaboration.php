@@ -64,6 +64,8 @@ return [
         'stopped' => 'Live editing stopped — changes merge when you save',
         'denied' => 'You no longer have access',
         'deleted' => 'This record was deleted',
+        'busy_field' => ':name is editing this field. Changes merge when saved.',
+        'locked_field' => ':name is editing this field',
         'deleted_by' => ':name deleted this record',
         'copy' => 'Copy my text',
         'copied' => 'Copied',

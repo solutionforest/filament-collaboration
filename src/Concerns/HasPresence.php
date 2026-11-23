@@ -44,6 +44,7 @@ trait HasPresence
             reactive: $this->getCollaborationReactiveFields(),
             canPull: $this->canPullCollaborationChanges(),
             allowed: $this->getCollaborationAllowedValues(),
+            locks: $this->getCollaborationLocks(),
         );
 
         return $view?->render() ?? '';
@@ -90,6 +91,12 @@ trait HasPresence
 
     /** @return array<string, list<string>> */
     protected function getCollaborationAllowedValues(): array
+    {
+        return [];
+    }
+
+    /** @return list<string> */
+    protected function getCollaborationLocks(): array
     {
         return [];
     }

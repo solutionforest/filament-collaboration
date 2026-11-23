@@ -94,5 +94,9 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
         Field::macro('collaborative', function (bool|Closure|string $condition = true): Field {
             return FieldResolver::markField($this, $condition);
         });
+
+        Field::macro('lockWhileEditing', function (bool $condition = true): Field {
+            return FieldResolver::markLock($this, $condition);
+        });
     }
 }
