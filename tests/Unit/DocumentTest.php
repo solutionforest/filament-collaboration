@@ -183,3 +183,14 @@ it('only shares rich content it can keep intact', function (array $node, bool $s
     'a link with a class' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'link', 'attrs' => ['href' => '/x', 'class' => 'cta']]]]]], false],
     'a base64 image' => [['type' => 'image', 'attrs' => ['src' => 'data:image/png;base64,AAAA']], false],
 ]);
+
+it('refuses a picked value outside the options this editor was given', function (): void {
+    $document = sharedDocument();
+    $allowed = ['status' => ['draft', 'review']];
+
+    $document->receive(1, 1, $document->changes('status', 'review', client: 1), KINDS, $allowed);
+
+    expect($document->value('status'))->toBe('review')
+        ->and(fn () => $document->receive(1, 2, $document->changes('status', 'published', client: 1), KINDS, $allowed))
+        ->toThrow(InvalidOperation::class);
+});

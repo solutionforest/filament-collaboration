@@ -43,6 +43,7 @@ trait HasPresence
             labels: $this->getCollaborationLabels(),
             reactive: $this->getCollaborationReactiveFields(),
             canPull: $this->canPullCollaborationChanges(),
+            allowed: $this->getCollaborationAllowedValues(),
         );
 
         return $view?->render() ?? '';
@@ -83,6 +84,12 @@ trait HasPresence
 
     /** @return list<string> */
     protected function getCollaborationReactiveFields(): array
+    {
+        return [];
+    }
+
+    /** @return array<string, list<string>> */
+    protected function getCollaborationAllowedValues(): array
     {
         return [];
     }
