@@ -10,6 +10,9 @@ use SolutionForest\FilamentCollaboration\Support\Data;
 /** A locked row of the documents table, hydrated. */
 final class SharedDraft
 {
+    /** @var list<array{sequence: int, operations: list<array<string, mixed>>}> appended in this transaction */
+    public array $appended = [];
+
     /**
      * @param  array<string, string>  $savedHashes
      * @param  list<string>  $dirty

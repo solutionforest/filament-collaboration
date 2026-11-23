@@ -7,6 +7,8 @@ namespace SolutionForest\FilamentCollaboration\Http\Controllers;
 use Filament\Facades\Filament;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
+use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Crdt\Id;
@@ -14,6 +16,7 @@ use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\DraftUpdate;
 use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
+use SolutionForest\FilamentCollaboration\Enums\PresenceChange;
 use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Presence\Participant;
@@ -30,9 +33,16 @@ final readonly class SyncController
         private RoomAuthorizer $authorizer,
         private DocumentRepository $documents,
         private PresenceRepository $presence,
+        private RoomNotifier $notifier,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
+    {
+        // One push per request, whatever changed.
+        return $this->notifier->batch(fn (): JsonResponse => $this->sync($request));
+    }
+
+    private function sync(Request $request): JsonResponse
     {
         $body = $request->getContent();
 
@@ -72,7 +82,7 @@ final readonly class SyncController
 
         try {
             if ($context->mode === PresenceMode::Editing && $context->fields !== []) {
-                $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields);
+                $this->documents->receive($context->room, $context->client, $epoch, Data::list($input['batches'] ?? null), $context->fields, $context->allowed);
             }
         } catch (InvalidOperation $exception) {
             return new JsonResponse(['error' => 'rejected', 'message' => $exception->getMessage()], 409);
@@ -80,6 +90,7 @@ final readonly class SyncController
 
         if (($input['leave'] ?? false) === true) {
             $this->presence->leave($context->room, $context->client);
+            $this->notifier->presenceChanged($context->room, $context->scope, PresenceChange::People);
 
             return new JsonResponse(['left' => true]);
         }
@@ -87,7 +98,7 @@ final readonly class SyncController
         $field = Data::nullableString($input['field'] ?? null);
         $field = in_array($field, $context->visible, true) ? $field : null;
 
-        $this->presence->touch(new Participant(
+        $change = $this->presence->touch($participant = new Participant(
             room: $context->room,
             scope: $context->scope,
             client: $context->client,
@@ -98,7 +109,10 @@ final readonly class SyncController
             field: $field,
             cursor: $field !== null && isset($context->fields[$field]) ? $this->cursor($input['cursor'] ?? null) : null,
             idle: ($input['idle'] ?? false) === true,
+            audience: Audience::of($context),
         ));
+
+        $this->notifier->presenceChanged($context->room, $context->scope, $change, $participant);
 
         $update = $context->key === null
             ? new DraftUpdate
@@ -154,6 +168,7 @@ final readonly class SyncController
                 Data::int($resume['epoch'] ?? null),
                 Data::list($resume['batches'] ?? null),
                 array_intersect_key($context->fields, $earlier->fields),
+                $context->allowed,
             );
         } catch (InvalidOperation) {
             return false;

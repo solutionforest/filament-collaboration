@@ -10,10 +10,15 @@ use Filament\Forms\Components\Field;
 use Filament\Support\Assets\Css;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Broadcast;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
+use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
+use SolutionForest\FilamentCollaboration\Presence\Identity;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -33,6 +38,23 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
     public function packageRegistered(): void
     {
         $this->app->bindIf(PresenceRepository::class, DatabasePresenceRepository::class);
+
+        // One per request, so a request's changes are pushed once.
+        $this->app->scoped(RoomNotifier::class);
+    }
+
+    /**
+     * Only people syncing in a room, in the same audience, may hear it: they
+     * passed the room's authorisation to get there. Registered on the default
+     * broadcaster, so call this again if you switch broadcaster at runtime.
+     */
+    public static function registerChannel(): void
+    {
+        Broadcast::channel(
+            RoomChanged::channel('{room}').'.{audience}',
+            fn (Authenticatable $user, string $room, string $audience): bool => app(PresenceRepository::class)
+                ->isPresent($room, Identity::for($user)->key, $audience),
+        );
     }
 
     public function packageBooted(): void
@@ -48,6 +70,8 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
         EditAction::macro('collaborate', function (array $ignore = [], bool $presence = true): EditAction {
             return CollaborateAction::fromMacro($this, $ignore, $presence);
         });
+
+        static::registerChannel();
 
         Field::macro('collaborative', function (bool|Closure $condition = true): Field {
             return FieldResolver::markField($this, $condition);
