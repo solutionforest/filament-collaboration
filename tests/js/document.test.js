@@ -4,20 +4,35 @@ import { Document } from '../../resources/js/crdt/document.js'
 import { toDocument, toTokens } from '../../resources/js/crdt/rich-text.js'
 import { paragraph, simulate } from './simulation.js'
 
+/**
+ * Two replicas of a document with one field, holding `value`.
+ *
+ * @param {FieldKind} kind
+ * @param {any} value
+ * @param {string[]} texts
+ * @returns {[Document, Document]}
+ */
 const pair = (kind, value, texts = []) => {
     const base = new Document({ fields: { field: { k: kind, r: [], m: {}, t: texts } } })
     const seed = base.changes('field', value, 0)
-    const replicas = [1, 2].map(() => {
+    const replicas = /** @type {[Document, Document]} */ ([1, 2].map(() => {
         const replica = new Document({ fields: { field: { k: kind, r: [], m: {}, t: texts } } })
 
         replica.apply(seed)
 
         return replica
-    })
+    }))
 
     return replicas
 }
 
+/**
+ * Both edit at once, then each receives the other's edit.
+ *
+ * @param {[Document, Document]} replicas
+ * @param {{value: any, caret?: any}} aliceEdit
+ * @param {{value: any, caret?: any}} bobEdit
+ */
 const concurrently = ([alice, bob], aliceEdit, bobEdit) => {
     const fromAlice = alice.changes('field', aliceEdit.value, 1, aliceEdit.caret)
     const fromBob = bob.changes('field', bobEdit.value, 2, bobEdit.caret)
@@ -98,6 +113,7 @@ test('changing a paragraph into a heading keeps concurrent typing', () => {
 })
 
 test('nested structures survive a round trip', () => {
+    /** @param {string} text */
     const cell = (text) => ({ type: 'tableCell', content: [paragraph(text)] })
     const document = {
         type: 'doc',
@@ -128,6 +144,7 @@ test('unsafe attributes never enter the shared document', () => {
     }
 })
 
+/** @type {(number: number) => string} */
 const itemKey = (number) => `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`
 
 test('two people adding items at once both keep them', () => {

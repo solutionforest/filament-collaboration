@@ -1,5 +1,16 @@
 import { characters } from '../crdt/id.js'
 
+/**
+ * One edit: at a character index, what was removed and what was inserted.
+ *
+ * @typedef {{at: number, removed: string[], inserted: string[]}} Entry
+ */
+
+/**
+ * @param {string[]} before
+ * @param {string[]} after
+ * @returns {Entry}
+ */
 function change(before, after, caret = after.length) {
     let oldEnd = before.length
     let newEnd = after.length
@@ -26,10 +37,17 @@ function change(before, after, caret = after.length) {
  * from script, and Ctrl+Z must only undo your edits, not your colleagues'.
  */
 export class History {
+    /** @type {Entry[]} */
     undoStack = []
+    /** @type {Entry[]} */
     redoStack = []
     changedAt = 0
 
+    /**
+     * @param {string} before
+     * @param {string} after
+     * @param {number | null} caret
+     */
     local(before, after, caret) {
         const entry = change(characters(before), characters(after), caret ?? undefined)
         const last = this.undoStack.at(-1)
@@ -51,6 +69,10 @@ export class History {
         this.changedAt = now
     }
 
+    /**
+     * @param {string} before
+     * @param {string} after
+     */
     remote(before, after) {
         const { at, removed, inserted } = change(characters(before), characters(after))
 
@@ -59,10 +81,19 @@ export class History {
         this.rebase(this.redoStack, at, removed.length, inserted.length - removed.length, 'removed', 'inserted')
     }
 
-    /** Moves every entry past somebody else's edit, newest first. */
+    /**
+     * Moves every entry past somebody else's edit, newest first.
+     *
+     * @param {Entry[]} stack
+     * @param {number} position
+     * @param {number} length
+     * @param {number} delta
+     * @param {'inserted' | 'removed'} present
+     * @param {'inserted' | 'removed'} absent
+     */
     rebase(stack, position, length, delta, present, absent) {
         for (let index = stack.length - 1; index >= 0; index--) {
-            const entry = stack[index]
+            const entry = /** @type {Entry} */ (stack[index])
             const end = entry.at + entry[present].length
 
             if (position >= end) {
@@ -77,14 +108,24 @@ export class History {
         }
     }
 
+    /** @param {string} value */
     undo(value) {
         return this.replay(value, this.undoStack, this.redoStack, 'inserted', 'removed')
     }
 
+    /** @param {string} value */
     redo(value) {
         return this.replay(value, this.redoStack, this.undoStack, 'removed', 'inserted')
     }
 
+    /**
+     * @param {string} value
+     * @param {Entry[]} from
+     * @param {Entry[]} to
+     * @param {'inserted' | 'removed'} present
+     * @param {'inserted' | 'removed'} absent
+     * @returns {{value: string, caret: number} | null}
+     */
     replay(value, from, to, present, absent) {
         const entry = from.pop()
 

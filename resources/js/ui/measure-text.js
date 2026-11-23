@@ -1,15 +1,22 @@
+/** The styles that decide where text is laid out. */
 const COPIED = [
-    'boxSizing', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-    'fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'fontVariant', 'fontFeatureSettings', 'fontVariationSettings',
-    'lineHeight', 'letterSpacing', 'wordSpacing', 'textAlign', 'textIndent', 'textTransform', 'tabSize', 'direction',
+    'box-sizing', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width', 'padding-top',
+    'padding-right', 'padding-bottom', 'padding-left', 'font-family', 'font-size', 'font-style', 'font-weight',
+    'font-variant', 'font-feature-settings', 'font-variation-settings', 'line-height', 'letter-spacing', 'word-spacing',
+    'text-align', 'text-indent', 'text-transform', 'tab-size', 'direction',
 ]
 
+/** @type {HTMLDivElement | null} */
 let mirror = null
 
 /**
  * Inputs do not report where a character is, so lay the same text out in a
  * hidden copy and measure that.
+ *
+ * @param {HTMLInputElement | HTMLTextAreaElement} input
+ * @param {number} anchor a UTF-16 offset
+ * @param {number} head a UTF-16 offset
+ * @returns {Geometry | null}
  */
 export function measureText(input, anchor, head) {
     const bounds = input.getBoundingClientRect()
@@ -37,7 +44,7 @@ export function measureText(input, anchor, head) {
     style.margin = '0'
     style.borderStyle = 'solid'
 
-    for (const property of COPIED) style[property] = computed[property]
+    for (const property of COPIED) style.setProperty(property, computed.getPropertyValue(property))
 
     const inner =
         input.clientHeight - parseFloat(computed.paddingTop) - parseFloat(computed.paddingBottom)
@@ -56,15 +63,16 @@ export function measureText(input, anchor, head) {
     style.minWidth = `${bounds.width - scrollbar}px`
 
     // The zero-width space gives an empty last line a box to measure.
-    mirror.textContent = `${input.value}​`
+    mirror.textContent = `${input.value}\u200b`
 
-    const text = mirror.firstChild
+    const text = /** @type {Text} */ (mirror.firstChild)
     const point = document.createRange()
 
     point.setStart(text, Math.min(head, text.length - 1))
     point.collapse(true)
 
     const box = point.getClientRects()[0] ?? point.getBoundingClientRect()
+    /** @type {DOMRect[]} */
     let selection = []
 
     if (anchor !== head) {

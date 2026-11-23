@@ -6,6 +6,18 @@ import { Sequence } from './sequence.js'
 
 /** The shared draft in the browser. Mirrors `src/Crdt/Document.php`. */
 
+/**
+ * @typedef {{kind: 'value', value: any, at: Id}
+ *   | {kind: 'items', list: ItemList}
+ *   | {kind: 'text' | 'rich', sequence: Sequence}} SharedField
+ */
+
+/**
+ * Empty is nothing, and text is well formed, as on the PHP side.
+ *
+ * @param {any} value
+ * @returns {any}
+ */
 export const normalizeValue = (value) =>
     value === '' || value === undefined
         ? null
@@ -15,11 +27,14 @@ export const normalizeValue = (value) =>
             ? value.map(normalizeValue)
             : value
 
+/** @type {(a: unknown, b: unknown) => boolean} */
 export const sameValue = (a, b) => canonical(normalizeValue(a)) === canonical(normalizeValue(b))
 
 export class Document {
+    /** @param {DocumentState} state */
     constructor(state = {}) {
         this.clock = state.clock ?? 0
+        /** @type {Map<string, SharedField>} */
         this.fields = new Map(
             Object.entries(state.fields ?? {}).map(([name, field]) => [
                 name,
@@ -32,14 +47,37 @@ export class Document {
         )
     }
 
+    /** @param {string} name */
     kind(name) {
         return this.fields.get(name)?.kind ?? null
     }
 
+    /**
+     * A text or rich text field's characters.
+     *
+     * @param {string} name
+     */
     sequence(name) {
-        return this.fields.get(name)?.sequence ?? null
+        const field = this.fields.get(name)
+
+        return field && 'sequence' in field ? field.sequence : null
     }
 
+    /**
+     * A repeater's or builder's items.
+     *
+     * @param {string} name
+     */
+    list(name) {
+        const field = this.fields.get(name)
+
+        return field?.kind === 'items' ? field.list : null
+    }
+
+    /**
+     * @param {string} name
+     * @returns {any} text, a rich document, items or a value
+     */
     value(name) {
         const field = this.fields.get(name)
 
@@ -51,6 +89,15 @@ export class Document {
         return toDocument(field.sequence.tokens())
     }
 
+    /**
+     * The operations that turn the field into `value`.
+     *
+     * @param {string} name
+     * @param {any} value
+     * @param {number} client
+     * @param {any} caret for text, the index after the edit; for items, `{key, path, index}`
+     * @returns {Operation[]}
+     */
     changes(name, value, client, caret = null) {
         const field = this.fields.get(name)
 
@@ -64,7 +111,9 @@ export class Document {
 
         if (field.kind === 'items') return field.list.changes(name, value ?? {}, this.clock, client, caret)
 
+        /** @type {Token[]} */
         let old = field.sequence.tokens()
+        /** @type {Token[]} */
         let next
 
         if (field.kind === 'rich') {
@@ -73,7 +122,7 @@ export class Document {
             const normal = toTokens(toDocument(old))
 
             if (normal.length === old.length) {
-                old = old.map((token, index) => ({ ...token, formatting: normal[index].formatting }))
+                old = old.map((token, index) => ({ ...token, formatting: normal[index]?.formatting ?? token.formatting }))
             }
         } else {
             next = characters(String(value ?? '').replace(/\r\n?/g, '\n')).map((character) => ({
@@ -85,33 +134,39 @@ export class Document {
         return diff(name, old, next, this.clock, client, caret)
     }
 
-    /** @returns {Set<string>} the fields that were touched */
+    /**
+     * @param {Operation[]} operations
+     * @returns {Set<string>} the fields that were touched
+     */
     apply(operations) {
+        /** @type {Set<string>} */
         const touched = new Set()
 
         for (const operation of operations) {
-            const { o, f, id, ids, v } = operation
+            const { o, f, id, v } = operation
+            const ids = operation.ids ?? []
             const field = this.fields.get(f)
 
             if (!field) continue
 
             if (field.kind === 'items') {
-                const sequence = o !== 'put' && operation.p !== undefined ? field.list.text(operation.i, operation.p) : field.list.order
+                const { i: key = '', p: path } = operation
+                const sequence = o !== 'put' && path !== undefined ? field.list.text(key, path) : field.list.order
 
-                if (o === 'put') field.list.put(operation.i, operation.p, v, id)
-                else if (o === 'ins') sequence.insert(id, operation.after, v)
+                if (o === 'put' && id) field.list.put(key, path ?? '', v, id)
+                else if (o === 'ins' && id) sequence.insert(id, operation.after, v)
                 else if (o === 'del') ids.forEach((range) => sequence.delete(range))
-            } else if (o === 'set') {
-                if (isAfter(id, field.at)) {
+            } else if (field.kind === 'value') {
+                if (o === 'set' && id && isAfter(id, field.at)) {
                     field.value = v
                     field.at = id
                 }
-            } else if (o === 'ins') {
+            } else if (o === 'ins' && id) {
                 field.sequence.insert(id, operation.after, v, operation.a)
             } else if (o === 'del') {
                 ids.forEach((range) => field.sequence.delete(range))
-            } else if (o === 'fmt') {
-                ids.forEach((range) => field.sequence.format(range, operation.k, v, id))
+            } else if (o === 'fmt' && id) {
+                ids.forEach((range) => field.sequence.format(range, operation.k ?? '', v, id))
             }
 
             if (id) {

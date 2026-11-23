@@ -1,44 +1,71 @@
 /** The only place that knows how Filament and Livewire mark up a form. */
 
+/**
+ * @typedef {object} ElementAttributes
+ * @property {string | number | null} [text]
+ * @property {Record<string, string>} [style]
+ * @property {Record<string, EventListener>} [on]
+ */
+
+/**
+ * @param {string} tag
+ * @param {ElementAttributes & Record<string, any>} attributes
+ * @param {Array<Node | string | null | undefined | false>} children
+ * @returns {HTMLElement}
+ */
 export function element(tag, attributes = {}, children = []) {
     const node = document.createElement(tag)
 
     for (const [name, value] of Object.entries(attributes)) {
         if (value === null || value === undefined || value === false) continue
 
-        if (name === 'text') node.textContent = value
+        if (name === 'text') node.textContent = String(value)
         else if (name === 'style') for (const [key, item] of Object.entries(value)) node.style.setProperty(key, item)
         else if (name === 'on') for (const [event, handler] of Object.entries(value)) node.addEventListener(event, handler)
-        else node.setAttribute(name, value === true ? '' : value)
+        else node.setAttribute(name, value === true ? '' : String(value))
     }
 
-    node.append(...children.filter(Boolean))
+    node.append(.../** @type {Array<Node | string>} */ (children.filter(Boolean)))
 
     return node
 }
 
+/** @type {(template: string | null | undefined, replacements?: Record<string, string | number>) => string} */
 export const translate = (template, replacements = {}) =>
     Object.entries(replacements).reduce(
-        (text, [key, value]) => text.replace(`:${key}`, () => value),
+        (text, [key, value]) => text.replace(`:${key}`, () => String(value)),
         String(template ?? ''),
     )
 
-/** Livewire proxies in, plain JSON out. */
+/**
+ * Livewire proxies in, plain JSON out.
+ *
+ * @type {(value: any) => any}
+ */
 export const plain = (value) => (value === undefined ? null : JSON.parse(JSON.stringify(value)))
 
-export function modelOf(element) {
-    const name = element.getAttributeNames().find((attribute) => attribute === 'wire:model' || attribute.startsWith('wire:model.'))
+/**
+ * The state path an input is bound to, as in `data.title`.
+ *
+ * @param {Element} node
+ */
+export function modelOf(node) {
+    const name = node.getAttributeNames().find((attribute) => attribute === 'wire:model' || attribute.startsWith('wire:model.'))
 
-    return name ? element.getAttribute(name) : null
+    return name ? node.getAttribute(name) : null
 }
 
 /**
  * Finds a room's fields, on the page or in the modal it belongs to.
  */
 export class FormDom {
+    /** @param {import('./room/room.js').Room} room */
     constructor(room) {
         this.room = room
-        this.forget()
+        /** @type {Map<string, HTMLInputElement | HTMLTextAreaElement> | null} */
+        this.models = null
+        /** @type {Map<string, Element>} */
+        this.wrappers = new Map()
     }
 
     forget() {
@@ -50,20 +77,26 @@ export class FormDom {
         return this.room.config.statePath === 'data' ? null : this.room.el.closest('.fi-modal')
     }
 
+    /** @returns {Element} */
     get root() {
         return this.modal ?? this.room.component ?? document.body
     }
 
-    /** A page's room ignores the modals that happen to be inside it. */
+    /**
+     * A page's room ignores the modals that happen to be inside it.
+     *
+     * @param {Element} node
+     */
     belongs(node) {
         return this.modal ? this.modal.contains(node) : !node.closest('.fi-modal')
     }
 
+    /** @param {string} field */
     model(field) {
         if (!this.models) {
             this.models = new Map()
 
-            for (const input of this.root.querySelectorAll('input, textarea')) {
+            for (const input of this.root.querySelectorAll(/** @type {'input'} */ ('input, textarea'))) {
                 const path = modelOf(input)
 
                 if (path && !this.models.has(path) && this.belongs(input)) this.models.set(path, input)
@@ -73,6 +106,7 @@ export class FormDom {
         return this.models.get(`${this.room.config.statePath}.${field}`) ?? null
     }
 
+    /** @param {string} field */
     richEditor(field) {
         const statePath = `statePath: '${this.room.config.statePath}.${field}'`
 
@@ -83,6 +117,7 @@ export class FormDom {
         return null
     }
 
+    /** @param {string} field */
     wrapper(field) {
         const known = this.wrappers.get(field)
 
@@ -99,8 +134,11 @@ export class FormDom {
         return wrapper
     }
 
+    /** @param {EventTarget | null} target */
     fieldContaining(target) {
-        const wrapper = target?.closest?.('[data-field-wrapper]')
+        if (!(target instanceof Element)) return null
+
+        const wrapper = target.closest('[data-field-wrapper]')
 
         if (!wrapper || !this.belongs(wrapper)) return null
 

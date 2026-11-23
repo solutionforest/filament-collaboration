@@ -14,35 +14,88 @@ const NOTICE_FOR = 5000
 const REPORTS_PER_SYNC = 3
 const REPORT_BYTES = 16_000
 
+/** @typedef {ReturnType<typeof setTimeout>} Timer */
+
+/**
+ * What the sync endpoint answers.
+ *
+ * @typedef {object} SyncResponse
+ * @property {boolean | null} resumed
+ * @property {number} epoch
+ * @property {number} sequence
+ * @property {DocumentState | null} state
+ * @property {number} acknowledged
+ * @property {Operation[]} operations
+ * @property {string[]} dirty
+ * @property {string | null} revision
+ * @property {{version: number, name: string | null, own: boolean}} saved
+ * @property {string | null} presence
+ * @property {Person[] | null} people
+ * @property {number} total
+ */
+
+/** @type {(milliseconds: number) => Promise<void>} */
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 /** One collaboration room in this tab. */
 export class Room {
+    /** @type {Timer | null} */
+    timer = null
+    dueAt = 0
+    /** @type {Timer | undefined} */
+    pullTimer
+    /** @type {Timer | undefined} */
+    noticeTimer
+    /** @type {Timer | undefined} */
+    renderTimer
+    syncing = false
+    /** @type {AbortController | undefined} */
+    events
+    /** @type {string | undefined} what `collaborationSync` was last set to */
+    published
+
+    /**
+     * @param {HTMLElement} el
+     * @param {RoomConfig} config
+     * @param {{name?: string, send: HttpTransport['send']}} transport
+     */
     constructor(el, config, transport = new HttpTransport()) {
         this.el = el
         this.config = config
         this.transport = transport
 
+        /** @type {Document | null} */
         this.document = null
         this.outbox = new Outbox()
         this.presence = new Presence()
         this.recovery = new Recovery(config.canPull ? config.storageKey : null)
         this.realtime = new Realtime(this)
+        /** @type {Map<string, import('../bindings/binding.js').Binding>} */
         this.bindings = new Map()
+        /** @type {Set<string>} fields that are live right now */
         this.bound = new Set()
+        /** @type {Set<string>} fields whose binding gave up */
         this.failed = new Set()
+        /** @type {Array<{field: string, error: string, at: string}>} */
         this.problems = []
+        /** @type {Array<Record<string, unknown>>} waiting to be sent to the server */
         this.reports = []
+        /** @type {string | null} */
         this.lastKey = null
 
         this.epoch = 0
         this.sequence = -1
         this.fieldsVersion = 0
+        /** @type {string | null} */
         this.revision = null
+        /** @type {number | null} */
         this.version = null
+        /** @type {string[]} */
         this.dirty = []
+        /** @type {{text?: string, name?: string, pull?: boolean} | null} */
         this.notice = null
         this.status = 'connecting'
+        /** @type {string | null} the field with this user's caret */
         this.field = null
         this.lastActive = Date.now()
         this.failures = 0
@@ -69,8 +122,9 @@ export class Room {
         return Object.keys(this.config.fields).length > 0
     }
 
+    /** @param {string} field */
     initialValue(field) {
-        return field.split('.').reduce((value, key) => value?.[key], this.initial) ?? null
+        return field.split('.').reduce((/** @type {any} */ value, key) => value?.[key], this.initial) ?? null
     }
 
     listen() {
@@ -96,7 +150,7 @@ export class Room {
             document.addEventListener(
                 name,
                 (event) => {
-                    if (name === 'keydown') this.lastKey = [event.ctrlKey && 'Control', event.metaKey && 'Meta', event.altKey && 'Alt', event.shiftKey && 'Shift', event.key].filter(Boolean).join('+')
+                    if (event instanceof KeyboardEvent) this.lastKey = [event.ctrlKey && 'Control', event.metaKey && 'Meta', event.altKey && 'Alt', event.shiftKey && 'Shift', event.key].filter(Boolean).join('+')
 
                     this.active()
                     this.collect()
@@ -141,7 +195,12 @@ export class Room {
         )
     }
 
-    /** Called with the element's latest config, as every Livewire render issues a new token. */
+    /**
+     * Called with the element's latest config, as every Livewire render issues a new token.
+     *
+     * @param {HTMLElement} el
+     * @param {RoomConfig} config
+     */
     update(el, config) {
         const fieldsChanged = JSON.stringify(this.config.fields) !== JSON.stringify(config.fields)
 
@@ -178,9 +237,12 @@ export class Room {
 
         for (const [field, kind] of Object.entries(this.config.fields)) {
             if (this.failed.has(field) || this.document.kind(field) !== kind || !bindingTypes[kind]) continue
-            if (!this.bindings.has(field)) this.bindings.set(field, new bindingTypes[kind](this, field))
 
-            const attached = this.bindings.get(field).attach()
+            const binding = this.bindings.get(field) ?? new bindingTypes[kind](this, field)
+
+            this.bindings.set(field, binding)
+
+            const attached = binding.attach()
 
             if (attached === this.bound.has(field) || this.failed.has(field)) continue
 
@@ -199,6 +261,13 @@ export class Room {
         this.bindings.forEach((binding) => binding.collect())
     }
 
+    /**
+     * Records a local edit and sends it soon.
+     *
+     * @param {string} field
+     * @param {any} value the field's whole new value
+     * @param {any} caret see `Document.changes()`
+     */
     change(field, value, caret = null) {
         if (this.stopped || !this.document) return
 
@@ -275,6 +344,8 @@ export class Room {
     /**
      * A change pushed by the server. Operations that follow on from what this
      * tab has are applied directly; anything else is fetched.
+     *
+     * @param {Record<string, any>} payload
      */
     pushed(payload = {}) {
         if (this.destroyed) return
@@ -316,7 +387,7 @@ export class Room {
 
         if (this.timer && this.dueAt <= at) return
 
-        clearTimeout(this.timer)
+        clearTimeout(this.timer ?? undefined)
         this.dueAt = at
         this.timer = setTimeout(() => {
             this.timer = null
@@ -331,7 +402,7 @@ export class Room {
         this.collect()
 
         const batches = this.stopped ? [] : this.outbox.next()
-        const binding = this.stopped ? null : this.bindings.get(this.field)
+        const binding = this.stopped || !this.field ? null : this.bindings.get(this.field)
         const resume = this.stopped ? null : this.recovery.next()
         const request = {
             token: this.config.token,
@@ -376,7 +447,7 @@ export class Room {
             this.overlay.schedule()
 
             if (delay !== null) {
-                clearTimeout(this.timer)
+                clearTimeout(this.timer ?? undefined)
                 this.timer = null
             }
 
@@ -384,11 +455,16 @@ export class Room {
         }
     }
 
+    /**
+     * @param {SyncResponse} response
+     * @param {number} sent the last batch number sent
+     * @param {number} fieldsVersion
+     */
     receive(response, sent, fieldsVersion) {
         this.outbox.acknowledge(sent)
 
         if (!this.stopped) {
-            if (response.state) this.restart(response)
+            if (response.state) this.restart({ ...response, state: response.state })
             else if (response.operations.length) this.merge(response.operations)
 
             this.epoch = response.epoch
@@ -407,19 +483,28 @@ export class Room {
         this.setStatus(this.stopped ? 'stopped' : this.outbox.isEmpty ? 'synced' : 'syncing')
     }
 
-    /** Remote changes: collect ours, remember the caret, apply, repaint. */
+    /**
+     * Remote changes: collect ours, remember the caret, apply, repaint.
+     *
+     * @param {Operation[]} operations
+     */
     merge(operations) {
+        if (!this.document) return
+
         this.collect()
 
-        const touched = [...new Set(operations.map((operation) => operation.f))]
-            .map((field) => this.bindings.get(field))
-            .filter(Boolean)
+        const touched = [...new Set(operations.map((operation) => operation.f))].flatMap((field) => this.bindings.get(field) ?? [])
 
         touched.forEach((binding) => binding.capture())
         this.document.apply(operations)
         touched.forEach((binding) => binding.render())
     }
 
+    /**
+     * The whole draft, sent when this tab is too far behind or the draft restarted.
+     *
+     * @param {{state: DocumentState, epoch: number, acknowledged: number}} response
+     */
     restart({ state, epoch, acknowledged }) {
         this.collect()
 
@@ -438,14 +523,16 @@ export class Room {
             if (this.document?.kind(field)) binding.capture()
         })
 
-        this.document = new Document(state)
+        const document = new Document(state)
 
-        for (const { ops } of this.outbox.batches) this.document.apply(ops)
+        this.document = document
+
+        for (const { ops } of this.outbox.batches) document.apply(ops)
 
         this.epoch = epoch
 
         this.bindings.forEach((binding, field) => {
-            if (this.document.kind(field)) {
+            if (document.kind(field)) {
                 binding.render()
 
                 return
@@ -457,6 +544,7 @@ export class Room {
         })
     }
 
+    /** @param {Pick<SyncResponse, 'revision' | 'saved'>} response */
     noticeRevision({ revision, saved }) {
         if (!revision) return
 
@@ -493,6 +581,11 @@ export class Room {
         }
     }
 
+    /**
+     * @param {any} error a `SyncError`, or a network error
+     * @param {Batch[]} batches what the failed request carried
+     * @returns {number | null} when to try again, or null to stop
+     */
     handleFailure(error, batches) {
         const { status } = error
 
@@ -532,6 +625,7 @@ export class Room {
         this.setStatus(status)
     }
 
+    /** @param {string} field */
     bindingFailed(field) {
         this.failed.add(field)
         this.bound.delete(field)
@@ -542,6 +636,11 @@ export class Room {
      * A binding recovered from an editor error. Listeners can forward it, for
      * example to Sentry; the server logs it when `reportEditorErrors()` is on.
      */
+    /**
+     * @param {string} field
+     * @param {any} error
+     * @param {{key?: string | null, selection?: unknown, doc?: unknown}} details
+     */
     reportProblem(field, error, details = {}) {
         const problem = { field, error: `${error?.name ?? 'Error'}: ${error?.message ?? error}`, at: new Date().toISOString() }
 
@@ -550,6 +649,7 @@ export class Room {
         window.dispatchEvent(new CustomEvent('filament-collaboration:recovered', { detail: { ...problem, ...details, room: this.config.id } }))
 
         if (this.config.reportErrors && this.reports.length < 10) {
+            /** @type {Record<string, unknown>} */
             let report = { ...problem, ...details }
 
             if (JSON.stringify(report).length > REPORT_BYTES) report = { ...problem, key: details.key, selection: details.selection }
@@ -559,6 +659,7 @@ export class Room {
         }
     }
 
+    /** @param {string} status */
     setStatus(status) {
         if (this.status === status) return
 
@@ -584,10 +685,11 @@ export class Room {
         this.renderTimer = setTimeout(() => this.wire?.$refresh(), 1500)
     }
 
+    /** @param {Person} person */
     jumpTo(person) {
         const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 
-        this.dom.wrapper(person.field)?.scrollIntoView({ block: 'center', behavior })
+        if (person.field) this.dom.wrapper(person.field)?.scrollIntoView({ block: 'center', behavior })
     }
 
     inspect() {
@@ -630,9 +732,9 @@ export class Room {
     destroy() {
         this.leave()
         this.destroyed = true
-        this.events.abort()
+        this.events?.abort()
 
-        for (const timer of [this.timer, this.pullTimer, this.noticeTimer, this.renderTimer]) clearTimeout(timer)
+        for (const timer of [this.timer, this.pullTimer, this.noticeTimer, this.renderTimer]) clearTimeout(timer ?? undefined)
 
         this.bindings.forEach((binding) => binding.detach())
         this.realtime.destroy()

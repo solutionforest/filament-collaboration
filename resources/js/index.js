@@ -2,6 +2,7 @@ import '../css/collaboration.css'
 import { Room } from './room/room.js'
 import { renderInspector } from './ui/inspector.js'
 
+/** @type {Map<HTMLElement, {source: string, room: Room}>} */
 const rooms = new Map()
 
 function scan() {
@@ -9,14 +10,15 @@ function scan() {
 
     const present = new Set()
 
-    for (const el of document.querySelectorAll('[data-collaboration]')) {
-        const source = el.dataset.collaboration
+    for (const el of document.querySelectorAll(/** @type {'div'} */ ('[data-collaboration]'))) {
+        const source = el.dataset.collaboration ?? ''
         const known = rooms.get(el)
 
         present.add(el)
 
         if (known?.source === source) continue
 
+        /** @type {RoomConfig} */
         const config = JSON.parse(source)
 
         // A morph may move a room to a new element; it is still the same room.

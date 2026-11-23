@@ -23,6 +23,10 @@
             <directory>app</directory>
             <directory>../src</directory>
         </include>
+        <exclude>
+            <!-- Run by PHPStan, not by tests: `vendor/bin/phpstan analyse` fails without it. -->
+            <directory>../src/PHPStan</directory>
+        </exclude>
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>

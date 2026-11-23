@@ -8,6 +8,7 @@ const MAX_CHARACTERS_PER_REQUEST = 600_000
  * so both sync and Save may deliver it and the server still applies it once.
  */
 export class Outbox {
+    /** @type {Batch[]} */
     batches = []
     last = 0
 
@@ -15,13 +16,16 @@ export class Outbox {
         return this.batches.length === 0
     }
 
+    /** @param {Operation[]} operations */
     push(operations) {
         for (let start = 0; start < operations.length; start += MAX_OPERATIONS_PER_BATCH) {
             this.batches.push({ n: ++this.last, ops: operations.slice(start, start + MAX_OPERATIONS_PER_BATCH) })
         }
     }
 
+    /** @returns {Batch[]} as many as one request may carry */
     next() {
+        /** @type {Batch[]} */
         const batches = []
         let size = 0
         let operations = 0
@@ -38,6 +42,7 @@ export class Outbox {
         return batches
     }
 
+    /** @param {number} number the last batch the server applied */
     acknowledge(number) {
         this.batches = this.batches.filter((batch) => batch.n > number)
         this.last = Math.max(this.last, number)

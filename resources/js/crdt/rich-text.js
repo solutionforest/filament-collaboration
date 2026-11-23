@@ -7,17 +7,28 @@ const CONTINUES = 0
 const STARTS = 1
 const LEAF = 2
 
+/**
+ * A block's position in the tree: from the outermost ancestor to the block,
+ * `[type, attributes or 0, flag]`.
+ *
+ * @typedef {Array<[string, Record<string, any> | null | 0, number]>} BlockPath
+ */
+
+/** @type {(token: Token) => boolean} */
 export const isBlock = (token) => typeof token.value !== 'string' && 'b' in token.value
 
+/** @type {(ancestors: BlockPath) => BlockPath} */
 const continued = (ancestors) => ancestors.map(([type, attributes]) => [type, attributes, CONTINUES])
 
 /**
- * @param {object} document
- * @returns {Array<{value: string|object, formatting: object}>}
+ * @param {Partial<RichNode> | null | undefined} document
+ * @returns {Token[]}
  */
 export function toTokens(document) {
+    /** @type {Token[]} */
     const tokens = []
 
+    /** @param {BlockPath} path */
     const block = (path) =>
         tokens.push({
             value: { b: 1 },
@@ -26,6 +37,7 @@ export function toTokens(document) {
             },
         })
 
+    /** @param {RichNode} node */
     const content = (node) => {
         const marks = (node.marks ?? []).map((mark) => {
             const attributes = markAttributes(mark.type, mark.attrs)
@@ -50,6 +62,10 @@ export function toTokens(document) {
         })
     }
 
+    /**
+     * @param {RichNode[]} nodes
+     * @param {BlockPath} ancestors
+     */
     const children = (nodes, ancestors) => {
         let loose = false
 
@@ -89,7 +105,13 @@ export function toTokens(document) {
     return tokens
 }
 
+/**
+ * @param {string} type
+ * @param {Record<string, any> | null | 0} attributes
+ * @returns {RichNode}
+ */
 function createNode(type, attributes) {
+    /** @type {RichNode} */
     const node = { type }
 
     if (attributes && Object.keys(attributes).length) node.attrs = attributes
@@ -97,11 +119,19 @@ function createNode(type, attributes) {
     return node
 }
 
+/** @type {(parent: RichNode, child: RichNode) => void} */
 const append = (parent, child) => (parent.content ??= []).push(child)
 
+/**
+ * @param {Token[]} tokens
+ * @returns {RichNode}
+ */
 export function toDocument(tokens) {
+    /** @type {RichNode} */
     const root = { type: 'doc' }
+    /** @type {RichNode[]} */
     let open = []
+    /** @type {RichNode | null} */
     let block = null
 
     for (const token of tokens) {
@@ -115,14 +145,17 @@ export function toDocument(tokens) {
             continue
         }
 
+        /** @type {BlockPath} */
         const path = JSON.parse(token.formatting.b ?? '[["paragraph",0,0]]')
-        const [leafType, leafAttributes, leafFlag] = path.at(-1)
+        const [leafType, leafAttributes, leafFlag] = path.at(-1) ?? ['paragraph', 0, CONTINUES]
         let depth = 0
         let parent = root
 
         for (const [type, attributes, flag] of path.slice(0, -1)) {
-            if (flag === CONTINUES && open[depth]?.type === type) {
-                parent = open[depth]
+            const existing = open[depth]
+
+            if (flag === CONTINUES && existing?.type === type) {
+                parent = existing
             } else {
                 const node = createNode(type, attributes)
 
@@ -147,12 +180,17 @@ export function toDocument(tokens) {
     return root
 }
 
+/**
+ * @param {RichNode} block
+ * @param {Token} token
+ */
 function appendInline(block, token) {
     const marks = Object.entries(token.formatting)
         .filter(([key]) => key.startsWith('m:'))
         .map(([key, value]) => createNode(key.slice(2), value === '1' ? null : JSON.parse(value)))
 
-    const node = typeof token.value === 'string' ? { type: 'text' } : JSON.parse(token.value.n)
+    /** @type {RichNode} */
+    const node = typeof token.value === 'string' ? { type: 'text' } : JSON.parse(token.value.n ?? '{"type":"text"}')
 
     if (marks.length) node.marks = marks
 
@@ -160,12 +198,12 @@ function appendInline(block, token) {
         const previous = block.content?.at(-1)
 
         if (previous?.type === 'text' && canonical(previous.marks ?? []) === canonical(marks)) {
-            previous.text += token.value
+            previous.text += String(token.value)
 
             return
         }
 
-        node.text = token.value
+        node.text = String(token.value)
     }
 
     append(block, node)

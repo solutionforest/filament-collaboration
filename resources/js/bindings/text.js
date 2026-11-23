@@ -1,19 +1,34 @@
-import { characters, hasLoneSurrogate, wellFormed } from '../crdt/id.js'
+import { hasLoneSurrogate, toIndex, toOffset, wellFormed } from '../crdt/id.js'
 import { measureText } from '../ui/measure-text.js'
 import { Binding } from './binding.js'
 import { History } from './history.js'
 
+/** @type {(value: unknown) => string} */
 const normalize = (value) => wellFormed(String(value ?? '')).replace(/\r\n?/g, '\n')
-const toIndex = (value, offset) => characters(value.slice(0, offset)).length
-const toOffset = (value, index) => characters(value).slice(0, index).join('').length
 
 /** Text inputs and textareas, merged character by character. */
 export class TextBinding extends Binding {
     history = new History()
     composing = false
+    /** @type {HTMLInputElement | HTMLTextAreaElement | null} */
+    input = null
+    /** @type {AbortController | null} */
+    events = null
+    /** What the input and the Livewire state held when last synced. */
+    seen = ''
+    seenState = ''
+    /** @type {string | undefined} the value before a remote change */
+    before
+    /** @type {{start: Id | null, end: Id | null, direction: SelectionDirection | null} | null} */
+    anchors = null
+
+    /** A text field's characters. */
+    get sequence() {
+        return /** @type {import('../crdt/sequence.js').Sequence} */ (this.document.sequence(this.field))
+    }
 
     get isBusy() {
-        return this.composing && this.input?.isConnected
+        return this.composing && !!this.input?.isConnected
     }
 
     attach() {
@@ -39,11 +54,11 @@ export class TextBinding extends Binding {
             },
             { signal },
         )
-        input.addEventListener('keydown', (event) => this.handleShortcut(event), { signal })
+        input.addEventListener('keydown', (event) => event instanceof KeyboardEvent && this.handleShortcut(event), { signal })
         input.addEventListener(
             'beforeinput',
             (event) => {
-                if (!['historyUndo', 'historyRedo'].includes(event.inputType)) return
+                if (!(event instanceof InputEvent) || !['historyUndo', 'historyRedo'].includes(event.inputType)) return
 
                 event.preventDefault()
                 this.travel(event.inputType === 'historyUndo' ? 'undo' : 'redo')
@@ -75,7 +90,7 @@ export class TextBinding extends Binding {
         const shared = this.document.value(this.field)
 
         this.seen = value
-        this.seenState = normalize(this.room.wire.$get(this.path, false))
+        this.seenState = normalize(this.wire.$get(this.path, false))
 
         if (value !== initial && shared === initial) this.room.change(this.field, value, this.caret())
         else this.render()
@@ -84,14 +99,14 @@ export class TextBinding extends Binding {
     }
 
     caret() {
-        return document.activeElement === this.input ? toIndex(this.input.value, this.input.selectionEnd ?? 0) : null
+        return this.input && document.activeElement === this.input ? toIndex(this.input.value, this.input.selectionEnd ?? 0) : null
     }
 
     collect() {
         if (!this.input?.isConnected || this.composing) return
 
         const typed = normalize(this.input.value)
-        const state = normalize(this.room.wire.$get(this.path, false))
+        const state = normalize(this.wire.$get(this.path, false))
 
         let value = typed
 
@@ -124,11 +139,11 @@ export class TextBinding extends Binding {
         if (!this.input?.isConnected || document.activeElement !== this.input) return
 
         const { value, selectionStart, selectionEnd, selectionDirection } = this.input
-        const sequence = this.document.sequence(this.field)
+        const sequence = this.sequence
 
         this.anchors = {
-            start: sequence.idBefore(toIndex(value, selectionStart)),
-            end: sequence.idBefore(toIndex(value, selectionEnd)),
+            start: sequence.idBefore(toIndex(value, selectionStart ?? 0)),
+            end: sequence.idBefore(toIndex(value, selectionEnd ?? 0)),
             direction: selectionDirection,
         }
     }
@@ -144,39 +159,44 @@ export class TextBinding extends Binding {
         this.show(value)
 
         if (this.anchors && document.activeElement === this.input) {
-            const sequence = this.document.sequence(this.field)
+            const sequence = this.sequence
             const { start, end, direction } = this.anchors
 
             this.input.setSelectionRange(
                 toOffset(value, sequence.indexAfter(start) ?? 0),
                 toOffset(value, sequence.indexAfter(end) ?? 0),
-                direction,
+                direction ?? undefined,
             )
         }
 
         this.anchors = null
     }
 
+    /** @param {string} value */
     show(value) {
-        if (normalize(this.input.value) !== value || hasLoneSurrogate(this.input.value)) {
-            const { scrollTop, scrollLeft } = this.input
+        const input = this.input
 
-            this.input.value = value
-            this.input.scrollTop = scrollTop
-            this.input.scrollLeft = scrollLeft
+        if (input && (normalize(input.value) !== value || hasLoneSurrogate(input.value))) {
+            const { scrollTop, scrollLeft } = input
+
+            input.value = value
+            input.scrollTop = scrollTop
+            input.scrollLeft = scrollLeft
         }
 
-        const state = String(this.room.wire.$get(this.path, false) ?? '')
+        const state = String(this.wire.$get(this.path, false) ?? '')
 
-        if (hasLoneSurrogate(state) || normalize(state) !== value) this.room.wire.$set(this.path, value, false)
+        if (hasLoneSurrogate(state) || normalize(state) !== value) this.wire.$set(this.path, value, false)
 
         this.seen = this.seenState = value
     }
 
+    /** @param {KeyboardEvent} event */
     handleShortcut(event) {
         if (!(event.ctrlKey || event.metaKey) || event.altKey) return
 
         const key = event.key.toLowerCase()
+        /** @type {'undo' | 'redo' | null} */
         const direction = key === 'z' ? (event.shiftKey ? 'redo' : 'undo') : key === 'y' ? 'redo' : null
 
         if (!direction) return
@@ -185,6 +205,7 @@ export class TextBinding extends Binding {
         this.travel(direction)
     }
 
+    /** @param {'undo' | 'redo'} direction */
     travel(direction) {
         this.collect()
 
@@ -197,24 +218,25 @@ export class TextBinding extends Binding {
 
         const offset = toOffset(result.value, result.caret)
 
-        this.input.setSelectionRange(offset, offset)
+        this.input?.setSelectionRange(offset, offset)
     }
 
     cursor() {
         if (!this.input?.isConnected || this.composing) return null
 
         const { value, selectionStart, selectionEnd, selectionDirection } = this.input
-        const sequence = this.document.sequence(this.field)
+        const sequence = this.sequence
         const start = sequence.idBefore(toIndex(value, selectionStart ?? 0))
         const end = sequence.idBefore(toIndex(value, selectionEnd ?? 0))
 
         return selectionDirection === 'backward' ? { anchor: end, head: start } : { anchor: start, head: end }
     }
 
+    /** @param {Cursor} cursor */
     geometry({ anchor, head }) {
         if (!this.input?.isConnected) return null
 
-        const sequence = this.document.sequence(this.field)
+        const sequence = this.sequence
         const from = sequence.indexAfter(anchor)
         const to = sequence.indexAfter(head)
 

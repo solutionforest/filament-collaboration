@@ -1,8 +1,9 @@
 import { element } from '../dom.js'
 
 /** Fills `CollaborationDebugAction`'s slide-over. Never shows field contents. */
+/** @param {import('../room/room.js').Room[]} rooms */
 export function renderInspector(rooms) {
-    for (const host of document.querySelectorAll('[data-collaboration-debug]')) {
+    for (const host of document.querySelectorAll(/** @type {'div'} */ ('[data-collaboration-debug]'))) {
         if (!host.getClientRects().length) continue
 
         const sections = [...rooms].map((room) => {
@@ -32,6 +33,10 @@ export function renderInspector(rooms) {
     }
 }
 
+/**
+ * @param {string[]} headings
+ * @param {Array<Array<string | number>>} rows
+ */
 function table(headings, rows) {
     if (!rows.length) return null
 

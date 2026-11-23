@@ -1,12 +1,10 @@
-import { canonical, characters } from '../crdt/id.js'
+import { canonical, toIndex, toOffset } from '../crdt/id.js'
 import { flatten } from '../crdt/item-list.js'
 import { normalizeValue } from '../crdt/document.js'
 import { modelOf, plain } from '../dom.js'
 import { measureText } from '../ui/measure-text.js'
 import { Binding } from './binding.js'
 
-const toIndex = (value, offset) => characters(value.slice(0, offset)).length
-const toOffset = (value, index) => characters(value).slice(0, index).join('').length
 
 /**
  * Repeaters and builders. Items are added, removed and moved by Filament's
@@ -17,6 +15,17 @@ const toOffset = (value, index) => characters(value).slice(0, index).join('').le
  * through colleagues' typing, and show where colleagues are.
  */
 export class ItemsBinding extends Binding {
+    ready = false
+    seen = ''
+    /** @type {AbortController | null} */
+    events = null
+    /**
+     * Where the caret was before a remote change, as ids.
+     *
+     * @type {{input: HTMLInputElement | HTMLTextAreaElement, key: string, path: string, start: Id | null, end: Id | null, direction: SelectionDirection | null} | null}
+     */
+    anchors = null
+
     attach() {
         if (this.ready) return true
 
@@ -42,16 +51,20 @@ export class ItemsBinding extends Binding {
     }
 
     get list() {
-        return this.document?.fields.get(this.field)?.list ?? null
+        return /** @type {import('../crdt/item-list.js').ItemList} */ (this.document.list(this.field))
     }
 
     read() {
-        const value = plain(this.room.wire.$get(this.path, false))
+        const value = plain(this.wire.$get(this.path, false))
 
         return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
     }
 
-    /** What the items contain, regardless of their keys. */
+    /**
+     * What the items contain, regardless of their keys.
+     *
+     * @param {Record<string, any> | null | undefined} items
+     */
     content(items) {
         return canonical(
             Object.values(items ?? {}).map((item) =>
@@ -62,11 +75,18 @@ export class ItemsBinding extends Binding {
         )
     }
 
-    /** The input of `key`'s sub-field at `path`, as in `data.key_points.<key>.point`. */
+    /**
+     * The input of `key`'s sub-field at `path`, as in `data.key_points.<key>.point`.
+     *
+     * @param {string} key
+     * @param {string} path
+     * @returns {HTMLInputElement | HTMLTextAreaElement | null}
+     */
     input(key, path) {
         const model = path === '' ? `${this.path}.${key}` : `${this.path}.${key}.${path}`
+        const inputs = this.room.dom.root.querySelectorAll(/** @type {'input'} */ ('input, textarea'))
 
-        return [...this.room.dom.root.querySelectorAll('input, textarea')].find((input) => modelOf(input) === model) ?? null
+        return [...inputs].find((input) => modelOf(input) === model) ?? null
     }
 
     /** The text sub-field with the caret, if it is in this list. */
@@ -143,8 +163,9 @@ export class ItemsBinding extends Binding {
         const structural = canonical(Object.keys(value)) !== canonical(Object.keys(current))
 
         // The input with the caret first, so setting the state leaves the caret alone.
-        if (!structural && anchors && document.activeElement === anchors.input) {
-            const sequence = this.list.sequence(anchors.key, anchors.path)
+        const sequence = anchors && this.list.sequence(anchors.key, anchors.path)
+
+        if (!structural && anchors && sequence && document.activeElement === anchors.input) {
             const text = sequence.text()
 
             if (anchors.input.value !== text) anchors.input.value = text
@@ -152,11 +173,11 @@ export class ItemsBinding extends Binding {
             anchors.input.setSelectionRange(
                 toOffset(text, sequence.indexAfter(anchors.start) ?? 0),
                 toOffset(text, sequence.indexAfter(anchors.end) ?? 0),
-                anchors.direction,
+                anchors.direction ?? undefined,
             )
         }
 
-        this.room.wire.$set(this.path, value, structural)
+        this.wire.$set(this.path, value, structural)
         this.seen = canonical(value)
     }
 
@@ -174,6 +195,7 @@ export class ItemsBinding extends Binding {
         return { ...(selectionDirection === 'backward' ? { anchor: end, head: start } : { anchor: start, head: end }), item: key, path }
     }
 
+    /** @param {Cursor} cursor */
     geometry({ anchor, head, item, path }) {
         if (typeof item !== 'string' || typeof path !== 'string') return null
 
