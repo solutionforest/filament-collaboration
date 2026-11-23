@@ -35,6 +35,7 @@ const REPORT_BYTES = 16_000
  * @property {string | null} presence
  * @property {Person[] | null} people
  * @property {number} total
+ * @property {number} [relations] raised whenever somebody changes related records in a relation manager
  */
 
 /** @type {(milliseconds: number) => Promise<void>} */
@@ -54,6 +55,8 @@ export class Room {
     syncing = false
     /** @type {string | null} the person this page keeps going to, as they move from field to field */
     following = null
+    /** @type {number | null} the relation version this page's relation managers show */
+    relations = null
     /** @type {string | null} */
     followedField = null
     /** The `data-collaboration` this room last checked, and whether it named another draft. */
@@ -417,6 +420,7 @@ export class Room {
             this.followUp()
         }
         // Permissions changed: the next sync gets a 410 and the page renders a new token.
+        if (typeof payload.relations === 'number') this.relationsChanged(payload.relations)
         if (payload.sync || payload.refresh) this.syncSoon(30)
 
         // A crowd coming and going is fetched a little less eagerly.
@@ -532,6 +536,7 @@ export class Room {
         this.followUp()
         this.dirty = response.dirty
         this.noticeRevision(response)
+        if (typeof response.relations === 'number') this.relationsChanged(response.relations)
 
         this.setStatus(this.stopped ? 'stopped' : this.outbox.isEmpty ? 'synced' : 'syncing')
     }
@@ -786,6 +791,20 @@ export class Room {
     rerenderSoon() {
         clearTimeout(this.renderTimer)
         this.renderTimer = setTimeout(() => this.wire?.$refresh(), 1500)
+    }
+
+    /**
+     * Somebody changed related records: relation managers that share their
+     * changes (`SharesRelationChanges`) render again. Not on the first answer.
+     *
+     * @param {number} version
+     */
+    relationsChanged(version) {
+        const known = this.relations
+
+        this.relations = Math.max(known ?? 0, version)
+
+        if (known !== null && version > known) window.Livewire?.dispatch('filament-collaboration-relations-changed')
     }
 
     /**

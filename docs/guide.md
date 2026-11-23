@@ -232,6 +232,17 @@ Pass `notify: false` to skip the notifications. `CommentPosted` (`record`, `by`,
 
 **Following a colleague.** In the avatar list, **Follow** next to somebody keeps going to whichever field they are in, opening tabs and sections on the way, so you can watch a walkthrough without chasing it. Clicking or typing anywhere in the form stops it, and so does **Stop following** or them leaving.
 
+**Relation managers.** Add `SharesRelationChanges` to a relation manager, and what one person creates, edits, deletes, attaches or toggles in it shows at once in everybody else's copy of the page, over Reverb or at their next poll:
+
+```php
+use SolutionForest\FilamentCollaboration\Concerns\SharesRelationChanges;
+
+class TasksRelationManager extends RelationManager
+{
+    use SharesRelationChanges;
+}
+```
+
 **A column with the people on each record:**
 
 ```php

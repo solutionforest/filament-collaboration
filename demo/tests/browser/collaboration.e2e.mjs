@@ -1027,6 +1027,23 @@ describe('following a colleague', () => {
     })
 })
 
+describe('relation managers', () => {
+    test('a task one person adds to the checklist appears in the other open copy, and so does ticking it', async () => {
+        await together()
+
+        const checklist = (page) => page.locator('.fi-resource-relation-manager, [wire\\:id]').filter({ has: page.getByRole('heading', { name: 'Checklist' }) }).last()
+
+        await alice.getByRole('button', { name: 'New task' }).click()
+        await alice.locator('.fi-modal.fi-modal-open input[id$=".title"]').fill('Check every link')
+        await alice.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Create', exact: true }).click()
+
+        await eventually(async () => assert.match(await checklist(bob).innerText(), /Check every link/), 'Bob did not get the new task', 12000)
+
+        await checklist(bob).getByRole('switch').first().click()
+        await eventually(async () => assert.equal(await checklist(alice).getByRole('switch').first().getAttribute('aria-checked'), 'true'), 'Alice did not see it ticked', 12000)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()
