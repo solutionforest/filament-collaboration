@@ -2,6 +2,7 @@ import { AdapterBinding } from '../bindings/adapter.js'
 import { bindings as bindingTypes } from '../bindings/index.js'
 import { Document } from '../crdt/document.js'
 import { FormDom, plain } from '../dom.js'
+import { reveal } from '../ui/containers.js'
 import { FieldLocks } from '../ui/field-locks.js'
 import { Overlay } from '../ui/overlay.js'
 import { PresenceBar } from '../ui/presence-bar.js'
@@ -773,7 +774,13 @@ export class Room {
     jumpTo(person) {
         const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 
-        if (person.field) this.dom.wrapper(person.field)?.scrollIntoView({ block: 'center', behavior })
+        const wrapper = person.field ? this.dom.wrapper(person.field) : null
+
+        if (!wrapper) return
+
+        // Open the tab, step or section it is in first, and scroll once it has been laid out.
+        if (reveal(wrapper, this.dom.root)) requestAnimationFrame(() => requestAnimationFrame(() => wrapper.scrollIntoView({ block: 'center', behavior })))
+        else wrapper.scrollIntoView({ block: 'center', behavior })
     }
 
     inspect() {

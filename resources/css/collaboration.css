@@ -581,3 +581,22 @@ button.fi-collab-person-row:hover {
 .dark .fi-collab-mentions button:focus {
     background: rgb(255 255 255 / 8%);
 }
+
+/* Who is in a field that a closed tab, wizard step or collapsed section hides. */
+.fi-collab-chip {
+    width: 1.125rem;
+    height: 1.125rem;
+    border: 2px solid #fff;
+    border-radius: 9999px;
+    background: var(--fi-collab-color);
+    color: #fff;
+    font-size: 0.5rem;
+    font-weight: 700;
+    line-height: 0.875rem;
+    text-align: center;
+    transform: translate(-100%, -50%);
+}
+
+.dark .fi-collab-chip {
+    border-color: #18181b;
+}

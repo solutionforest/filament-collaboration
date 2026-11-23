@@ -228,6 +228,8 @@ Pass `notify: false` to skip the notifications. `CommentPosted` (`record`, `by`,
 
 ## 4. Presence in tables and modals
 
+**Fields out of sight.** When somebody is in a field behind a tab that is not selected, a wizard step that is not current, or a collapsed section, their initials show on that tab, step or section header. Choosing them in the avatar list opens the tab and the section and scrolls to the field. There is nothing to set up.
+
 **A column with the people on each record:**
 
 ```php

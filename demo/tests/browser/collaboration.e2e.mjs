@@ -961,6 +961,38 @@ describe('translated pages', () => {
     })
 })
 
+describe('fields out of sight', () => {
+    test('someone in a field behind a closed tab and section shows on the tab, and jumping to them opens both', async () => {
+        for (const page of [alice, bob]) {
+            await page.goto(`${app.base}/admin/pages/2/edit`)
+            await page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length), undefined, { timeout: 20000 })
+        }
+
+        await bob.getByRole('tab', { name: 'Publishing' }).click()
+        await bob.locator('.fi-section-header', { hasText: 'Address' }).click()
+        await field(bob, 'slug').click()
+
+        const tab = alice.getByRole('tab', { name: 'Publishing' })
+
+        await eventually(async () => {
+            const chip = await alice.locator('.fi-collab-chip').boundingBox()
+            const header = await tab.boundingBox()
+
+            assert.ok(chip && header, 'no chip')
+            assert.equal(await alice.locator('.fi-collab-chip').innerText(), 'BM')
+            // On the tab's top right corner.
+            assert.ok(Math.abs(chip.x + chip.width - (header.x + header.width - 6)) < 2 && Math.abs(chip.y + chip.height / 2 - header.y - 2) < 2, JSON.stringify({ chip, header }))
+        }, 'Alice did not see Bob on the tab', 12000)
+
+        await alice.locator('[data-collaboration-people]').click()
+        await alice.getByRole('button', { name: /Bob Martinez/ }).filter({ hasText: 'Slug' }).click()
+
+        await eventually(async () => assert.ok(await field(alice, 'slug').isVisible()), 'the slug was not revealed')
+        await eventually(async () => assert.equal(await alice.locator('.fi-collab-chip').count(), 0), 'the chip stayed after the field was shown')
+        assert.equal(await alice.locator('.fi-collab-outline').count(), 1)
+    })
+})
+
 describe('fields that are not live', () => {
     test('while somebody is in one, the others are told and cannot change it', async () => {
         await together()
