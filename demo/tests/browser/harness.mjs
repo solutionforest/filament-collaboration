@@ -174,9 +174,18 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         })
         const page = await context.newPage()
 
+        // THROTTLE=4 runs Chromium's CPU four times slower, as on a busy CI runner.
+        if (process.env.THROTTLE && (process.env.BROWSER ?? 'chromium') === 'chromium') {
+            const session = await context.newCDPSession(page)
+
+            await session.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.THROTTLE) })
+        }
+
         page.on('pageerror', (error) => problems.push(`${name}: ${error.stack ?? error.message}`))
         page.on('console', (message) => {
             if (/^\[filament-collaboration\]/.test(message.text())) problems.push(`${name}: ${message.text()}`)
+            // Alpine rethrows these as page errors, often with no message: say which expression it was.
+            if (/^Alpine Expression Error/.test(message.text())) problems.push(`${name}: ${message.text().replace(/\s+/g, ' ').trim()} on ${page.url()}`)
         })
         page.on('response', (response) => {
             if (response.status() >= 400 && !response.url().endsWith('favicon.ico')) {
