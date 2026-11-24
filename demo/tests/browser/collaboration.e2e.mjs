@@ -1226,6 +1226,14 @@ describe('seeing each other', () => {
 
         await panel.locator('[data-collaboration-comment-field]').selectOption('excerpt')
         await panel.locator('textarea').pressSequentially('Shorter, @Bo')
+
+        // The list opens at the @, on the line below it, not under the whole box.
+        const box = await panel.locator('textarea').boundingBox()
+        const list = await panel.locator('.fi-collab-mentions').boundingBox()
+
+        assert.ok(list.y > box.y && list.y < box.y + 50, `the list is not under the first line: ${JSON.stringify({ box, list })}`)
+        assert.ok(list.x > box.x + 40, `the list is not at the @: ${JSON.stringify({ box, list })}`)
+
         await panel.getByRole('option', { name: 'Bob Martinez' }).click()
         await eventually(async () => assert.ok(await panel.locator('textarea').evaluate((input) => input === document.activeElement)), 'the comment box lost focus')
         await alice.keyboard.type('please?')

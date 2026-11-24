@@ -29,15 +29,28 @@
                 busy: false,
                 names: @js($mentionable),
                 query: null,
+                at: { left: 0, top: 0 },
                 get suggestions() {
                     if (this.query === null) return []
                     const query = this.query.toLowerCase()
                     return this.names.filter((name) => name.toLowerCase().includes(query)).slice(0, 6)
                 },
                 typed(event) {
-                    const before = event.target.value.slice(0, event.target.selectionStart)
+                    const input = event.target
+                    const before = input.value.slice(0, input.selectionStart)
                     const match = before.match(/(?:^|\s)@([^@\n]{0,40})$/)
                     this.query = match && this.names.length ? match[1] : null
+                    if (this.query !== null) this.place(input, before.length - match[1].length - 1)
+                },
+                // The list opens under the @ being typed, kept inside the comment box.
+                place(input, offset) {
+                    const caret = window.filamentCollaboration?.caretRect?.(input, offset)
+                    const box = input.parentElement.getBoundingClientRect()
+                    if (!caret) return (this.at = { left: 8, top: input.offsetHeight + 4 })
+                    this.at = {
+                        left: Math.max(0, Math.min(caret.left - box.left, box.width - 192)),
+                        top: caret.bottom - box.top + 4,
+                    }
                 },
                 mention(name) {
                     const input = this.$refs.body
@@ -85,7 +98,7 @@
                     aria-label="{{ __('filament-collaboration::collaboration.panel.comments') }}"
                 ></textarea>
 
-                <ul class="fi-collab-mentions" x-show="suggestions.length" x-cloak role="listbox">
+                <ul class="fi-collab-mentions" x-show="suggestions.length" x-cloak role="listbox" x-bind:style="{ left: at.left + 'px', top: at.top + 'px' }">
                     <template x-for="name in suggestions" x-bind:key="name">
                         <li><button type="button" role="option" x-on:click="mention(name)" x-text="name"></button></li>
                     </template>

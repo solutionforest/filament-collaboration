@@ -146,6 +146,7 @@ interface Window {
         registerAdapter(name: string, definition: AdapterDefinition): void
         minimalChange: typeof import('./adapters/registry.js').minimalChange
         html: typeof import('./adapters/html.js')
+        caretRect(input: HTMLInputElement | HTMLTextAreaElement, offset: number): DOMRect | null
     }
 }
 
