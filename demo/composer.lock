@@ -899,11 +899,11 @@
         },
         {
             "name": "demo/filament-ckeditor",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-ckeditor",
-                "reference": "5f8d71291f293c2e476355c67693901fa0ddf13c"
+                "reference": "241cf1326f0086c49d70287102cc61a1b3f002c4"
             },
             "require": {
                 "filament/forms": "^5.8.3",
@@ -926,7 +926,7 @@
                 }
             },
             "license": [
-                "MIT"
+                "GPL-2.0-or-later"
             ],
             "description": "A CKEditor 5 form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
             "transport-options": {
@@ -936,7 +936,7 @@
         },
         {
             "name": "demo/filament-quill",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-quill",
@@ -973,11 +973,11 @@
         },
         {
             "name": "demo/filament-tinymce",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-tinymce",
-                "reference": "2f33d3187929dbcb9cb29c4ef2b2a99a8c1be7d1"
+                "reference": "e8a186c71c08a91fce7ce203620669e9106656e9"
             },
             "require": {
                 "filament/forms": "^5.8.3",
@@ -1000,7 +1000,7 @@
                 }
             },
             "license": [
-                "MIT"
+                "GPL-2.0-or-later"
             ],
             "description": "A TinyMCE form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
             "transport-options": {
@@ -1010,7 +1010,7 @@
         },
         {
             "name": "demo/filament-trix",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-trix",
@@ -1047,7 +1047,7 @@
         },
         {
             "name": "demo/filament-widgets",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-widgets",
@@ -6391,11 +6391,11 @@
         },
         {
             "name": "solutionforest/filament-collaboration",
-            "version": "dev-fix/mention-at-caret",
+            "version": "dev-chore/licences",
             "dist": {
                 "type": "path",
                 "url": "..",
-                "reference": "a0fae117d389b6bb48526fe8e78ffcd8bd69c1dd"
+                "reference": "a603c9d78c6906d06df7b132aad243d710828db5"
             },
             "require": {
                 "filament/filament": "^5.8.3",
