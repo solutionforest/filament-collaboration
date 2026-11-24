@@ -63,11 +63,12 @@ jobs:
         # The tests run in demo/, but the package's code is one level up.
         run: php -d pcov.directory=.. vendor/bin/pest --coverage --min=95
 
-      - name: Pest again, with presence in Redis
+      - name: Pest again, with presence in Redis and drafts' heads cached
         if: matrix.php == '8.4' && matrix.laravel == '13'
         run: vendor/bin/pest
         env:
           FILAMENT_COLLABORATION_PRESENCE: redis
+          FILAMENT_COLLABORATION_DRAFT_CACHE: 'true'
 
       - name: PHPStan, level 10
         if: matrix.filament == '5'

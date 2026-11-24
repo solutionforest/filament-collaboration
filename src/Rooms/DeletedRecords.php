@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Gate;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Comments\RecordComments;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
+use SolutionForest\FilamentCollaboration\Documents\DraftHeads;
 use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
 use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
@@ -39,6 +40,7 @@ final readonly class DeletedRecords
         private SharedUploads $uploads,
         private DraftVersions $versions,
         private RecordComments $comments,
+        private DraftHeads $heads,
     ) {}
 
     /**
@@ -159,6 +161,7 @@ final readonly class DeletedRecords
             $this->versions->forget(Data::string($document['room'] ?? null));
             Database::table('updates')->where('document_id', $document['id'] ?? null)->delete();
             Database::table('documents')->where('id', $document['id'] ?? null)->delete();
+            $this->heads->changed(Data::string($document['room'] ?? null));
         }
     }
 

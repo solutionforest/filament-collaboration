@@ -12,6 +12,10 @@ return [
     // Serialises saves. Every application server must share it and it must support locks.
     'cache_store' => env('FILAMENT_COLLABORATION_CACHE_STORE'),
 
+    // Keep each draft's head in the cache store, so a poll with nothing new makes no database query.
+    // `null` turns it on when the cache store is Redis or Memcached; `true` or `false` decides.
+    'draft_cache' => env('FILAMENT_COLLABORATION_DRAFT_CACHE'),
+
     // Where presence is kept: `database`, or `redis` for many servers and many people.
     'presence' => env('FILAMENT_COLLABORATION_PRESENCE', 'database'),
 
