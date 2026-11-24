@@ -7,6 +7,7 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 /**
@@ -14,7 +15,7 @@ use SolutionForest\FilamentCollaboration\Enums\FieldKind;
  * A file is stored as soon as it is uploaded, so everybody sees it and any
  * save keeps it. Adding, removing and reordering files merge.
  */
-class UploadType implements FieldType
+class UploadType implements FieldType, UsesAdapter
 {
     /** The marker, in a field's allowed sub-paths, that its values must be stored files. */
     public const FILES = "\0files";
@@ -36,5 +37,10 @@ class UploadType implements FieldType
             && $field->shouldStoreFiles()
             && ! str_contains($field::class, 'SpatieMediaLibrary')
             && ! str_contains($field::class, 'Curator');
+    }
+
+    public function getAdapter(Field $field): string
+    {
+        return 'filament-file-upload';
     }
 }

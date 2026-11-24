@@ -110,7 +110,7 @@ $table->columns([PresenceColumn::make()])
 
 ## Adapters: third-party editors and Filament's own fields
 
-Filament's own fields are adapters too (`filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-markdown-editor`, `filament-code-editor`): copy them from `resources/js/adapters/filament.js`. Make a field the package does not know live the same way: name an adapter in PHP and register it in JavaScript. Formats: `text`, `html`, `rich` (a ProseMirror / TipTap document, with `api.prosemirror` helpers) and `value`. Optional: `undo()`/`redo()` and `recover(error)` on the context, `geometry()` and `isDirty()` on the handle.
+Every field goes through an adapter, Filament's own too (`filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-repeater`, `filament-file-upload`, `filament-markdown-editor`, `filament-code-editor`): copy them from `resources/js/adapters/filament.js`. Make a field the package does not know live the same way: name an adapter in PHP and register it in JavaScript. Formats: `text`, `html`, `rich` (a ProseMirror / TipTap document, with `api.prosemirror` helpers), `value` and `items` (a list by key; positions carry `item` and `path`). Optional: `undo()`/`redo()` and `recover(error)` on the context, `geometry()` and `isDirty()` on the handle.
 
 ```php
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;

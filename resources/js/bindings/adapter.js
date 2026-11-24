@@ -1,5 +1,6 @@
 import { canonical, hasLoneSurrogate, toIndex, toOffset, wellFormed } from '../crdt/id.js'
 import { normalizeValue } from '../crdt/document.js'
+import { flatten } from '../crdt/item-list.js'
 import { toDocument, toTokens } from '../crdt/rich-text.js'
 import { documentToHtml, htmlToDocument } from '../adapters/html.js'
 import { plain } from '../dom.js'
@@ -11,7 +12,32 @@ const RECOVERIES = 3
 const RECOVERY_WINDOW = 10_000
 
 /** The adapter each built-in kind of field uses when the server names none. */
-const BUILT_IN = /** @type {Record<string, string>} */ ({ text: 'filament-text-input', value: 'filament-value', rich: 'filament-rich-editor' })
+const BUILT_IN = /** @type {Record<string, string>} */ ({ text: 'filament-text-input', value: 'filament-value', rich: 'filament-rich-editor', items: 'filament-repeater' })
+
+/**
+ * What a list's items contain, regardless of their keys: the same list
+ * loaded twice gets new keys from Filament.
+ *
+ * @param {unknown} items
+ */
+const contentOf = (items) =>
+    canonical(
+        Object.values(items && typeof items === 'object' ? items : {}).map((item) =>
+            Object.entries(flatten(item))
+                .sort(([a], [b]) => (a < b ? -1 : 1))
+                .map(([path, value]) => [path, normalizeValue(value)]),
+        ),
+    )
+
+/**
+ * A list item's sub-field, such as `data.title` in a builder block.
+ *
+ * @param {any} items
+ * @param {string | undefined} item
+ * @param {string | undefined} path
+ */
+const subField = (items, item, path) =>
+    item === undefined || path === undefined ? undefined : (path === '' ? [] : path.split('.')).reduce((value, key) => value?.[key], items?.[item])
 
 const normalizeText = (/** @type {unknown} */ value) => wellFormed(String(value ?? '')).replace(/\r\n?/g, '\n')
 
@@ -38,7 +64,7 @@ export class AdapterBinding extends Binding {
     definition = null
     /** @type {string} the content last read or written, canonical */
     seen = ''
-    /** @type {{anchor: Id | null, head: Id | null} | null} */
+    /** @type {Cursor | null} where this person's caret was before a remote change */
     anchors = null
     /** @type {any} the draft's value before a remote change, for undo */
     before = undefined
@@ -60,14 +86,45 @@ export class AdapterBinding extends Binding {
         return this.definition?.format ?? 'value'
     }
 
-    /** Text and rich formats are sequences: characters, or blocks, characters and embeds. */
+    /** Everything but a value has positions: characters, blocks, or a list item's text sub-field. */
     get isSequence() {
         return this.format !== 'value'
     }
 
-    /** A text field's characters, or a rich field's tokens. */
-    get sequence() {
-        return this.document.sequence(this.field)
+    /**
+     * Where positions count: a text field's characters, a rich field's tokens,
+     * or the characters of one text sub-field of a list item.
+     *
+     * @param {{item?: string, path?: string}} [at]
+     */
+    sequenceAt(at = {}) {
+        if (this.format !== 'items') return this.document.sequence(this.field)
+
+        const list = this.document.list(this.field)
+
+        return list && at.item !== undefined && at.path !== undefined && list.isText(at.path) ? list.sequence(at.item, at.path) : null
+    }
+
+    /**
+     * The text UTF-16 offsets count in, or null where positions are draft positions (HTML, rich).
+     *
+     * @param {{item?: string, path?: string}} [at]
+     */
+    textAt(at = {}) {
+        if (this.format === 'text') return normalizeText(this.handle?.read())
+        if (this.format === 'items') return normalizeText(subField(this.read(), at.item, at.path))
+
+        return null
+    }
+
+    /**
+     * @param {{item?: string, path?: string}} at
+     * @param {number} offset the adapter's position
+     */
+    indexAt(at, offset) {
+        const text = this.textAt(at)
+
+        return text === null ? offset : toIndex(text, offset)
     }
 
     get isBusy() {
@@ -78,8 +135,8 @@ export class AdapterBinding extends Binding {
         if (this.unsupported) return false
 
         const definition = adapters.get(this.name)
-        // A picker works through the Livewire state: it needs no element of its own.
-        const element = this.room.dom.wrapper(this.field) ?? (definition?.format === 'value' ? this.room.dom.root : null)
+        // Pickers and lists work through the Livewire state: they need no element of their own.
+        const element = this.room.dom.wrapper(this.field) ?? (definition?.format === 'value' || definition?.format === 'items' ? this.room.dom.root : null)
 
         if (!definition || !element) return false
         if (this.handle && this.element === element && this.handle.isAlive?.() !== false) return true
@@ -131,9 +188,11 @@ export class AdapterBinding extends Binding {
         const shared = this.document.value(this.field)
         // A rich editor's document differs from the stored one in ways that do not matter until somebody types.
         const mayHaveTyped = this.format !== 'rich' || this.focused()
+        // A list's keys differ every time it is loaded: compare what its items hold.
+        const same = (/** @type {unknown} */ a, /** @type {unknown} */ b) => (this.format === 'items' ? contentOf(a) === contentOf(b) : canonical(a) === canonical(b))
 
         // Typed into before live editing connected: keep that.
-        if (mayHaveTyped && canonical(current) !== canonical(initial) && canonical(this.normalize(shared)) === canonical(initial)) {
+        if (mayHaveTyped && !same(current, initial) && same(this.normalize(shared), initial)) {
             this.seen = canonical(current)
             this.room.change(this.field, current, this.caret())
         } else {
@@ -156,6 +215,11 @@ export class AdapterBinding extends Binding {
     normalize(value) {
         if (this.format === 'text') return normalizeText(value)
         if (this.format === 'value') return normalizeValue(plain(value))
+        if (this.format === 'items') {
+            const items = plain(value)
+
+            return items && typeof items === 'object' && !Array.isArray(items) ? items : {}
+        }
 
         // HTML or a document: in the form the draft holds it.
         try {
@@ -165,13 +229,20 @@ export class AdapterBinding extends Binding {
         }
     }
 
-    /** The caret, as an index the draft understands. */
+    /**
+     * The caret, as the draft understands it: an index, or for a list the
+     * item, sub-field and index.
+     *
+     * @returns {any}
+     */
     caret() {
         const selection = this.focused() ? this.handle?.selection?.() : null
 
         if (!selection) return null
 
-        return this.format === 'text' ? toIndex(normalizeText(this.handle?.read()), selection.head) : selection.head
+        if (this.format !== 'items') return this.indexAt(selection, selection.head)
+
+        return this.sequenceAt(selection) ? { key: selection.item, path: selection.path, index: this.indexAt(selection, selection.head) } : null
     }
 
     focused() {
@@ -257,10 +328,11 @@ export class AdapterBinding extends Binding {
         this.seen = canonical(this.read())
 
         if (anchors && this.focused()) {
-            const anchor = this.offsetOf(anchors.anchor)
-            const head = this.offsetOf(anchors.head)
+            const at = { item: anchors.item, path: anchors.path }
+            const anchor = this.offsetOf(anchors.anchor, at)
+            const head = this.offsetOf(anchors.head, at)
 
-            if (anchor !== null && head !== null) handle.setSelection?.({ anchor, head })
+            if (anchor !== null && head !== null) handle.setSelection?.({ anchor, head, ...(this.format === 'items' ? at : {}) })
         }
 
         // A picker other fields depend on: render the form again, as its own change would.
@@ -301,45 +373,48 @@ export class AdapterBinding extends Binding {
      * The editor's position just after a token.
      *
      * @param {Id | null} id
+     * @param {{item?: string, path?: string}} [at] for a list, which item's sub-field
      */
-    offsetOf(id) {
-        const index = this.sequence?.indexAfter(id) ?? null
+    offsetOf(id, at = {}) {
+        const index = this.sequenceAt(at)?.indexAfter(id) ?? null
 
         if (index === null) return null
 
-        return this.format === 'text' ? toOffset(normalizeText(this.handle?.read()), index) : index
+        const text = this.textAt(at)
+
+        return text === null ? index : toOffset(text, index)
     }
 
     /** @returns {Cursor | null} */
     cursor() {
-        const sequence = this.sequence
         const selection = this.isSequence && this.focused() && !this.isBusy ? this.handle?.selection?.() : null
+        const sequence = selection && this.sequenceAt(selection)
 
         if (!sequence || !selection) return null
 
-        const text = this.format === 'text' ? normalizeText(this.handle?.read()) : ''
-        const index = (/** @type {number} */ offset) => (this.format === 'text' ? toIndex(text, offset) : offset)
+        const ids = { anchor: sequence.idBefore(this.indexAt(selection, selection.anchor)), head: sequence.idBefore(this.indexAt(selection, selection.head)) }
 
-        return { anchor: sequence.idBefore(index(selection.anchor)), head: sequence.idBefore(index(selection.head)) }
+        return this.format === 'items' ? { ...ids, item: selection.item, path: selection.path } : ids
     }
 
     /**
      * @param {Cursor} cursor
      * @returns {Geometry | null}
      */
-    geometry({ anchor, head }) {
+    geometry({ anchor, head, item, path }) {
         const handle = this.handle
+        const at = this.format === 'items' ? { item, path } : {}
 
         if (!handle || !this.element) return null
 
-        const to = this.offsetOf(head)
+        const to = this.offsetOf(head, at)
 
         if (to === null) return null
 
         if (handle.geometry) {
-            const from = this.offsetOf(anchor) ?? to
+            const from = this.offsetOf(anchor, at) ?? to
 
-            return handle.geometry({ anchor: from, head: to })
+            return handle.geometry({ anchor: from, head: to, ...at })
         }
 
         const caret = handle.caretRect?.(to) ?? null

@@ -124,7 +124,7 @@ it('validates custom components like any field: the character limit and the numb
         ->assertHasFormErrors(['social_post' => 'max', 'rating' => 'max']);
 });
 
-it("edits Filament's own fields through adapters too, by the same API; only lists are bound otherwise", function (): void {
+it("edits every field through an adapter, Filament's own lists and uploads included, by the same API", function (): void {
     $editor = Editor::open($this, User::factory()->create(), Document::create(['title' => 'One code path']));
 
     expect($editor->config['adapters'])->toMatchArray([
@@ -133,13 +133,13 @@ it("edits Filament's own fields through adapters too, by the same API; only list
         'body_html' => 'filament-rich-editor',
         'status' => 'filament-value',
         'robots_noindex' => 'filament-value',
+        'key_points' => 'filament-repeater',
+        'sidebar' => 'filament-repeater',
+        'gallery' => 'filament-file-upload',
         'newsletter_markdown' => 'filament-markdown-editor',
         'tinymce_html' => 'demo-tinymce',
     ])
-        ->and($editor->config['adapters'])->not->toHaveKeys(['key_points', 'gallery'])
-        ->and(array_keys($editor->config['adapters']))->toEqualCanonicalizing(
-            array_keys(array_filter($editor->config['fields'], fn (string $kind): bool => $kind !== 'items')),
-        );
+        ->and(array_keys($editor->config['adapters']))->toEqualCanonicalizing(array_keys($editor->config['fields']));
 });
 
 it("keeps Filament's rich editor a document on save, and other rich editors HTML", function (): void {

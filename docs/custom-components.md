@@ -16,6 +16,7 @@ The code is in [`demo/packages/filament-widgets`](../demo/packages/filament-widg
 | Plain text: a composer, a code box, a notes widget | `FieldKind::Text` | `text` | both keep their typing, with carets |
 | HTML: TinyMCE, CKEditor, Quill, Trix | `FieldKind::RichText` | `html` | both keep their typing, blocks and formatting; see [HTML editors](guide.md#html-editors) |
 | A ProseMirror / TipTap document | `FieldKind::RichText` | `rich` | the same, as Filament's own rich editor does |
+| A list: items by key, each with sub-fields | `FieldKind::Items` | `items` | adding, removing and moving merge; text sub-fields by character, with carets |
 | A choice: a rating, a colour, a date, a toggle, a JSON object | `FieldKind::Value` | `value` | the latest change wins |
 
 If your field is a picker whose state Livewire already updates on every change, you may not need JavaScript at all: `CollaborationPlugin::make()->fieldTypes([ValueType::make([StarRating::class])])` shares its value through Livewire. Write an adapter when the field keeps its state in JavaScript, when it holds text that should merge by character, or when you want carets.
@@ -321,12 +322,12 @@ it('makes custom components live through their adapters', function (): void {
 
 | | |
 | --- | --- |
-| `registerAdapter(name, { format, attach })` | `format`: `'text'`, `'html'`, `'rich'` or `'value'` |
+| `registerAdapter(name, { format, attach })` | `format`: `'text'`, `'html'`, `'rich'`, `'value'` or `'items'` |
 | `attach({ field, element, statePath, wire, changed, moved, undo, redo, recover })` | returns a handle; `null` to be asked again; `false` to merge on save |
 | context `undo()` / `redo()` | undo only this person's typing; call on Ctrl+Z (`text`) |
 | context `recover(error, details)` | the editor threw: show the draft again, report it, give up after repeated failures |
 | handle `read()` / `write(value)` | required |
-| handle `selection()` / `setSelection({ anchor, head })` | keeps your caret in place |
+| handle `selection()` / `setSelection({ anchor, head })` | keeps your caret in place; for `items` also `item` and `path`, the item's key and sub-field |
 | handle `caretRect(position)` or `geometry({ anchor, head })` | where to draw other people's carets, or carets and selections |
 | handle `isFocused()`, `isBusy()`, `isDirty()`, `isAlive()`, `destroy()` | optional |
 | `minimalChange(old, next)` | the range to replace, or `null` if equal |

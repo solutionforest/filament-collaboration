@@ -1,4 +1,4 @@
-import { bindingFor } from '../bindings/index.js'
+import { AdapterBinding } from '../bindings/adapter.js'
 import { Document } from '../crdt/document.js'
 import { FormDom, plain } from '../dom.js'
 import { reveal } from '../ui/containers.js'
@@ -273,8 +273,7 @@ export class Room {
         for (const [field, kind] of Object.entries(this.config.fields)) {
             if (this.failed.has(field) || this.document.kind(field) !== kind) continue
 
-            const Type = bindingFor(kind)
-            const binding = this.bindings.get(field) ?? new Type(this, field)
+            const binding = this.bindings.get(field) ?? new AdapterBinding(this, field)
 
             this.bindings.set(field, binding)
 

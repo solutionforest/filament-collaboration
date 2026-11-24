@@ -21,7 +21,7 @@ With broadcasting on, the server also pushes the new operations to everyone in t
 
 ## In the browser
 
-Every field that is not a list is bound through an **adapter**, Filament's own exactly like a third party's: `filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-markdown-editor` and `filament-code-editor` are registered with the same `registerAdapter()` an app uses, in `resources/js/adapters/filament.js`. One binding, `bindings/adapter.js`, connects any adapter to the shared draft: what is typed goes to the draft, what colleagues type is written back with the caret kept, per-person undo, carets to draw and recovery from editor errors. Repeaters, builders and uploads, which are Filament's own structure rather than one editor, have their own binding, `bindings/items.js`.
+Every field is bound through an **adapter**, Filament's own exactly like a third party's: `filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-repeater`, `filament-file-upload`, `filament-markdown-editor` and `filament-code-editor` are registered with the same `registerAdapter()` an app uses, in `resources/js/adapters/filament.js`. One binding, `bindings/adapter.js`, connects any adapter to the shared draft: what is typed goes to the draft, what colleagues type is written back with the caret kept, per-person undo, carets to draw and recovery from editor errors. Lists use the same binding with the `items` format: items by key, their text sub-fields merged by character.
 
 ## The shared draft
 

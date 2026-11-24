@@ -500,7 +500,7 @@ For a picker, `ValueType::make([StarRating::class])` does the same without a cla
 
 A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions.
 
-**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. An adapter you write gets exactly what they get, and they are the best examples to copy. Only repeaters, builders and uploads, which are Filament's own structure rather than one editor, are bound differently.
+**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), repeaters and builders (`filament-repeater`), uploads (`filament-file-upload`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. Every field goes through this one API. An adapter you write gets exactly what they get, and they are the best examples to copy.
 
 **1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:
 
@@ -522,6 +522,7 @@ An app can also name the adapter on one field: `TinyEditor::make('body')->collab
 | `FieldKind::RichText` | `html`: an HTML string | by character, block and mark; see [HTML editors](#html-editors) |
 | `FieldKind::RichText` | `rich`: a ProseMirror / TipTap JSON document | the same, for editors built on ProseMirror; `filamentCollaboration.prosemirror` has the helpers Filament's rich editor uses |
 | `FieldKind::Value` | `value`: any JSON | the latest change wins |
+| `FieldKind::Items` | `items`: items by key, each an object of sub-fields, as a repeater keeps them | adding, removing and moving merge; text sub-fields by character, with carets; other sub-fields the latest change. Positions carry the item and sub-field: `{ item, path, anchor, head }` |
 
 **2. Register the adapter**, in JavaScript loaded on the panel:
 

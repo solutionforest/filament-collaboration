@@ -207,12 +207,13 @@ interface AdapterHandle {
     read(): any
     /** Replaces the content. Change only what differs, so the editor's own state survives. */
     write(value: any): void
-    selection?(): { anchor: number; head: number } | null
-    setSelection?(selection: { anchor: number; head: number }): void
+    /** For `items`, also which item and sub-field: `{ item: key, path: 'title', anchor, head }`. */
+    selection?(): AdapterSelection | null
+    setSelection?(selection: AdapterSelection): void
     /** Where a caret at this position is drawn, for other people's carets. */
     caretRect?(position: number): DOMRect | null
     /** Somebody's caret and selection between two positions, if the editor can draw a selection. Used instead of `caretRect`. */
-    geometry?(range: { anchor: number; head: number }): Geometry | null
+    geometry?(range: AdapterSelection): Geometry | null
     /** False when nothing changed since the last `read()`: reading is skipped. For editors where reading is costly. */
     isDirty?(): boolean
     /** Whether the editor has focus; the wrapper containing the focus otherwise. */
@@ -224,12 +225,21 @@ interface AdapterHandle {
     destroy?(): void
 }
 
+/** Positions in the editor; for a list, in one item's text sub-field. */
+interface AdapterSelection {
+    anchor: number
+    head: number
+    item?: string
+    path?: string
+}
+
 interface AdapterDefinition {
     /**
      * `text` merges characters; `html` and `rich` merge characters, blocks and marks, as an HTML string
-     * or as a ProseMirror / TipTap JSON document; `value` takes the latest.
+     * or as a ProseMirror / TipTap JSON document; `value` takes the latest; `items` is a list of items by
+     * key, as Filament's repeaters keep it: adding, removing and moving merge, text sub-fields by character.
      */
-    format: 'text' | 'html' | 'rich' | 'value'
+    format: 'text' | 'html' | 'rich' | 'value' | 'items'
     /** Null while the editor is not ready yet: it is asked again shortly. False: it cannot be live here, and merges on save. */
     attach(context: AdapterContext): AdapterHandle | null | false
 }
