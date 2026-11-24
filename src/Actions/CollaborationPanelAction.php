@@ -30,6 +30,10 @@ class CollaborationPanelAction extends Action
 
         $this
             ->label(__('filament-collaboration::collaboration.panel.label'))
+            // Only the icon in the header; the label stays as its tooltip and accessible name.
+            ->iconButton()
+            ->tooltip(__('filament-collaboration::collaboration.panel.label'))
+            ->extraAttributes(['aria-label' => __('filament-collaboration::collaboration.panel.label')])
             ->icon(Heroicon::OutlinedChatBubbleLeftRight)
             ->color('gray')
             ->visible(fn (Component $livewire): bool => in_array(InteractsWithCollaboration::class, class_uses_recursive($livewire), true))

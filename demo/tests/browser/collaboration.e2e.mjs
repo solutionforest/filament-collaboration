@@ -1283,7 +1283,12 @@ describe('seeing each other', () => {
         assert.equal(await panel.locator('.fi-collab-mention').innerText(), '@Bob Martinez')
 
         await bob.reload()
-        await bob.getByRole('button', { name: /Comments & history/ }).click()
+
+        // An icon with the open count as its badge: no label on screen.
+        const button = bob.getByRole('button', { name: 'Comments & history' })
+
+        await eventually(async () => assert.equal((await button.innerText()).trim(), '1'), 'the button did not show one open comment')
+        await button.click()
         await eventually(async () => assert.match(await bob.locator('[data-collaboration-comments]').innerText(), /Shorter, @Bob Martinez please\?/), 'Bob did not see the comment')
 
         await bob.locator('[data-collaboration-comment]').first().getByRole('button', { name: 'Resolve' }).click()

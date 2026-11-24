@@ -95,7 +95,13 @@ it('resolves and reopens a comment, with the count on the panel button', functio
         ->call('postCollaborationComment', 'One')
         ->call('postCollaborationComment', 'Two', 'excerpt');
 
-    expect(CollaborationPanelAction::make()->livewire($page->instance())->getBadge())->toEqual(2);
+    $button = CollaborationPanelAction::make()->livewire($page->instance());
+
+    // An icon in the header, its label as the tooltip and accessible name, the open count as a badge.
+    expect($button->getBadge())->toEqual(2)
+        ->and($button->isIconButton())->toBeTrue()
+        ->and($button->getTooltip())->toBe('Comments & history')
+        ->and($button->getExtraAttributes())->toMatchArray(['aria-label' => 'Comments & history']);
 
     $id = DB::table('filament_collaboration_comments')->min('id');
 

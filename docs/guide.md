@@ -200,7 +200,7 @@ Each new row also dispatches `DraftEdited` (`record`, `by`, `field`, `minute`), 
 
 ### Comments and version history
 
-Add `CollaborationPanelAction` to the page's header actions. It opens one slide-over with two tabs, **Comments** and **History**. Its **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
+Add `CollaborationPanelAction` to the page's header actions: an icon button, with "Comments & history" as its tooltip and accessible name, and the number of open comments as a badge. It opens one slide-over with two tabs, **Comments** and **History**. Its **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
 
 ```php
 use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
