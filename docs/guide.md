@@ -200,7 +200,7 @@ Each new row also dispatches `DraftEdited` (`record`, `by`, `field`, `minute`), 
 
 ### Comments and version history
 
-Add `CollaborationPanelAction` to the page's header actions. It opens one slide-over with two tabs, **Comments** and **History**. Its **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
+Add `CollaborationPanelAction` to the page's header actions: an icon button, with "Comments & history" as its tooltip and accessible name, and the number of open comments as a badge. It opens one slide-over with two tabs, **Comments** and **History**. Its **History** tab lists the shared draft's versions, newest first, with who changed it and which fields:
 
 ```php
 use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
@@ -211,6 +211,14 @@ protected function getHeaderActions(): array
         CollaborationPanelAction::make(),
     ];
 }
+```
+
+**Optional.** Turn it off for the whole panel, or decide per resource or per record. Off, the button is not rendered, and the page refuses to post, resolve or restore, even if asked directly. Versions are still kept, so turning it back on shows the history:
+
+```php
+CollaborationPlugin::make()->commentsAndHistory(false);
+
+CollaborationPlugin::make()->commentsAndHistory(fn (Model $record): bool => ! $record instanceof Invoice);
 ```
 
 A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
@@ -358,6 +366,7 @@ CollaborationPlugin::make()
 | `presenceRenderHook()` | header actions | where the avatars render; use one of Filament's page hooks |
 | `fieldTypes()` | none | your own field types, tried before the built-in ones; see [Extending](#9-extending) |
 | `debug()` | off | shows `CollaborationDebugAction`; see [Debugging](#10-debugging) |
+| `commentsAndHistory()` | on | `false`, or a closure given `$record` and `$livewire`: no comments and history button, and no posting or restoring; see [Comments](#comments-and-version-history) |
 | `mentionable($users, notify:)` | none | who can be `@mentioned` in comments; see [Comments](#comments-and-version-history) |
 | `reportEditorErrors()` | off | logs rich editor errors with their content; see [Debugging](#10-debugging) |
 | `lockWhileEditing()` | off | fields that cannot be live are read-only for others while somebody is in them |
@@ -491,7 +500,7 @@ For a picker, `ValueType::make([StarRating::class])` does the same without a cla
 
 A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions.
 
-**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. An adapter you write gets exactly what they get, and they are the best examples to copy. Only repeaters, builders and uploads, which are Filament's own structure rather than one editor, are bound differently.
+**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), repeaters and builders (`filament-repeater`), uploads (`filament-file-upload`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. Every field goes through this one API. An adapter you write gets exactly what they get, and they are the best examples to copy.
 
 **1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:
 
@@ -513,6 +522,7 @@ An app can also name the adapter on one field: `TinyEditor::make('body')->collab
 | `FieldKind::RichText` | `html`: an HTML string | by character, block and mark; see [HTML editors](#html-editors) |
 | `FieldKind::RichText` | `rich`: a ProseMirror / TipTap JSON document | the same, for editors built on ProseMirror; `filamentCollaboration.prosemirror` has the helpers Filament's rich editor uses |
 | `FieldKind::Value` | `value`: any JSON | the latest change wins |
+| `FieldKind::Items` | `items`: items by key, each an object of sub-fields, as a repeater keeps them | adding, removing and moving merge; text sub-fields by character, with carets; other sub-fields the latest change. Positions carry the item and sub-field: `{ item, path, anchor, head }` |
 
 **2. Register the adapter**, in JavaScript loaded on the panel:
 

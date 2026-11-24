@@ -77,9 +77,9 @@ final readonly class FieldResolver
         foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
             $path = (string) $path;
 
-            // Filament's own fields go through adapters too, named by their kind unless a type names one.
-            if (isset($live[$path]) && ($adapter = $this->adapterOf($field) ?? $live[$path]->defaultAdapter()) !== null) {
-                $adapters[$path] = $adapter;
+            // Every live field goes through an adapter, Filament's own too: named by its type, or by its kind.
+            if (isset($live[$path])) {
+                $adapters[$path] = $this->adapterOf($field) ?? $live[$path]->defaultAdapter();
             }
         }
 

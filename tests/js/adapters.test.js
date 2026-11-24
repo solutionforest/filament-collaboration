@@ -54,11 +54,11 @@ test('a structure the schema refuses keeps its text, as paragraphs', () => {
     built.check()
 })
 
-test('every adapter format, Filament\'s own rich one included, is accepted; anything else is refused', () => {
-    for (const format of /** @type {const} */ (['text', 'html', 'rich', 'value'])) {
+test('every adapter format, Filament\'s own rich and list ones included, is accepted; anything else is refused', () => {
+    for (const format of /** @type {const} */ (['text', 'html', 'rich', 'value', 'items'])) {
         registerAdapter(`test-${format}`, { format, attach: () => null })
         assert.ok(adapters.has(`test-${format}`))
     }
 
-    assert.throws(() => registerAdapter('test-wrong', /** @type {any} */ ({ format: 'markdown', attach: () => null })), /needs a format \(text, html, rich or value\)/)
+    assert.throws(() => registerAdapter('test-wrong', /** @type {any} */ ({ format: 'markdown', attach: () => null })), /needs a format \(text, html, rich, value or items\)/)
 })

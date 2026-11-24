@@ -169,6 +169,18 @@ function registerBuiltInAdapters(register) {
         },
     })
 
+    // Repeater and Builder: items added, removed and moved merge; text sub-fields merge by character, with carets.
+    register('filament-repeater', {
+        format: 'items',
+        attach: (context) => listAdapter(context),
+    })
+
+    // FileUpload: each file is stored as soon as it is uploaded, so everybody's save keeps it.
+    register('filament-file-upload', {
+        format: 'items',
+        attach: (context) => listAdapter(context, { uploads: true }),
+    })
+
     // Filament's RichEditor (TipTap): merged by character, block and mark, through its own ProseMirror.
     register('filament-rich-editor', {
         format: 'rich',
@@ -289,7 +301,8 @@ function registerBuiltInAdapters(register) {
                     const { state, view, schema } = editor
                     const transaction = replacement(state, buildDocument(schema, doc))
 
-                    if (!transaction.docChanged) return
+                    // Unchanged after an error the editor threw: its caret may be where nothing can be typed.
+                    if (!transaction.docChanged) return keepCaretTypable()
 
                     view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
                     keepCaretTypable()
@@ -443,4 +456,150 @@ export function registerFilamentAdapters(register) {
             }
         },
     })
+}
+
+/** Livewire's name for a file that is uploaded but not yet stored. */
+const isTemporary = (/** @type {unknown} */ file) => typeof file === 'string' && file.startsWith('livewire-file:')
+
+/**
+ * A list as Livewire keeps it: items by key. Filament's own actions add,
+ * remove and move them; this follows the resulting state, and gives the
+ * text inputs inside items carets of their own.
+ *
+ * @param {AdapterContext} context
+ * @param {{uploads?: boolean}} options uploads: the items are files, stored as soon as uploaded
+ * @returns {AdapterHandle}
+ */
+function listAdapter({ element, field, statePath, wire, changed, moved }, { uploads = false } = {}) {
+    const events = new AbortController()
+    const { signal } = events
+    const prefix = `${statePath}.`
+    let storing = false
+    /** @type {Set<string>} temporary files the server refused (Filament shows why): not sent again */
+    const refused = new Set()
+
+    /** @returns {Record<string, any>} */
+    const state = () => {
+        const value = plain(wire.$get(statePath, false))
+
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+    }
+
+    /** Files uploaded on this page but not stored yet, by key. */
+    const temporary = () => Object.fromEntries(Object.entries(state()).filter(([, file]) => isTemporary(file)))
+
+    /** Stores what was just uploaded; the stored files then come back as state. */
+    const store = () => {
+        const waiting = Object.values(temporary()).filter((file) => !refused.has(file))
+
+        if (storing || !waiting.length) return
+
+        storing = true
+        wire.$call('storeCollaborationUpload', field)
+            .then(() => {
+                // Still temporary after storing: refused, for example by the field's rules. Filament shows why.
+                for (const file of Object.values(temporary())) if (waiting.includes(file)) refused.add(file)
+            })
+            .catch(() => waiting.forEach((file) => refused.add(file)))
+            .finally(() => {
+                storing = false
+                changed()
+            })
+    }
+
+    /** The text input or textarea of an item's sub-field, as in `data.key_points.<key>.point`. */
+    const input = (/** @type {string | undefined} */ item, /** @type {string | undefined} */ path) => {
+        if (item === undefined || path === undefined) return null
+
+        const model = path === '' ? `${statePath}.${item}` : `${statePath}.${item}.${path}`
+
+        return /** @type {HTMLInputElement | HTMLTextAreaElement | undefined} */ ([...element.querySelectorAll('input, textarea')].find((node) => modelOf(node) === model)) ?? null
+    }
+
+    /** The item and sub-field with the caret, if it is in this list. */
+    const focused = () => {
+        const active = document.activeElement
+        const model = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? modelOf(active) : null
+
+        if (!active || !model?.startsWith(prefix)) return null
+
+        const rest = model.slice(prefix.length)
+        const dot = rest.indexOf('.')
+
+        return {
+            input: /** @type {HTMLInputElement | HTMLTextAreaElement} */ (active),
+            item: dot < 0 ? rest : rest.slice(0, dot),
+            path: dot < 0 ? '' : rest.slice(dot + 1),
+        }
+    }
+
+    for (const name of ['select', 'keyup', 'pointerup']) document.addEventListener(name, () => focused() && moved(), { signal, capture: true })
+    document.addEventListener('input', () => focused() && changed(), { signal, capture: true })
+
+    return {
+        read() {
+            // A file still uploading is only on this page: it is shared once stored.
+            if (!uploads) return state()
+
+            store()
+
+            return Object.fromEntries(Object.entries(state()).filter(([, file]) => !isTemporary(file)))
+        },
+        write(items) {
+            const current = state()
+            // New, removed or moved items need Filament to render their fields.
+            const structural = JSON.stringify(Object.keys(items)) !== JSON.stringify(Object.keys(current))
+
+            if (uploads) {
+                // Keep what is still uploading here; the upload field follows its state itself.
+                wire.$set(statePath, { ...items, ...temporary() }, false)
+
+                return
+            }
+
+            // The input with the caret first, so setting the state leaves its caret alone.
+            const at = focused()
+            const text = at ? subFieldText(items, at.item, at.path) : null
+
+            if (!structural && at && text !== null && at.input.value !== text) at.input.value = text
+
+            wire.$set(statePath, items, structural)
+        },
+        selection() {
+            const at = focused()
+
+            if (!at) return null
+
+            const { input: node, item, path } = at
+            const start = node.selectionStart ?? 0
+            const end = node.selectionEnd ?? 0
+
+            return node.selectionDirection === 'backward' ? { item, path, anchor: end, head: start } : { item, path, anchor: start, head: end }
+        },
+        setSelection({ item, path, anchor, head }) {
+            const node = input(item, path)
+
+            if (node && document.activeElement === node) node.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head), anchor > head ? 'backward' : 'forward')
+        },
+        geometry({ item, path, anchor, head }) {
+            const node = input(item, path)
+
+            return node ? measureText(node, anchor, head) : null
+        },
+        isFocused: () => focused() !== null,
+        destroy: () => events.abort(),
+    }
+}
+
+/**
+ * An item's text sub-field, or null if it is not text.
+ *
+ * @param {Record<string, any>} items
+ * @param {string} item
+ * @param {string} path
+ */
+function subFieldText(items, item, path) {
+    const value = (path === '' ? [] : path.split('.')).reduce((/** @type {any} */ found, key) => found?.[key], items[item])
+
+    return typeof value === 'string' ? value : null
 }

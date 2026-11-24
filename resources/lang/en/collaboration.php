@@ -76,6 +76,7 @@ return [
             'save' => 'Saved by :name',
             'before' => 'Before :name restored',
             'restore' => 'Restored by :name',
+            'discard' => 'Before the draft was discarded',
         ],
     ],
 

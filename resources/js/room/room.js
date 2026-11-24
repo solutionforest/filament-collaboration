@@ -1,4 +1,4 @@
-import { bindingFor } from '../bindings/index.js'
+import { AdapterBinding } from '../bindings/adapter.js'
 import { Document } from '../crdt/document.js'
 import { FormDom, plain } from '../dom.js'
 import { reveal } from '../ui/containers.js'
@@ -273,8 +273,7 @@ export class Room {
         for (const [field, kind] of Object.entries(this.config.fields)) {
             if (this.failed.has(field) || this.document.kind(field) !== kind) continue
 
-            const Type = bindingFor(kind)
-            const binding = this.bindings.get(field) ?? new Type(this, field)
+            const binding = this.bindings.get(field) ?? new AdapterBinding(this, field)
 
             this.bindings.set(field, binding)
 
@@ -846,9 +845,18 @@ export class Room {
 
         const person = tabs.find((tab) => tab.field && !tab.idle) ?? tabs.find((tab) => tab.field)
 
-        if (!person?.field || person.field === this.followedField) return
+        // Out of every field: coming back to the same one is a move to follow again.
+        if (!person?.field) {
+            this.followedField = null
 
-        this.followedField = person.field
+            return
+        }
+
+        if (person.field === this.followedField) return
+
+        // Only once the field is on the page: a field still rendering is tried again on the next update.
+        if (this.dom.wrapper(person.field)) this.followedField = person.field
+
         this.jumpTo(person)
     }
 

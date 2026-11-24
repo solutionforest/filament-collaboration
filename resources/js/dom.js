@@ -125,8 +125,14 @@ export class FormDom {
 
         const suffix = CSS.escape(`.${field}`)
         const label = CSS.escape(`.${field}-label`)
-        const candidates = this.root.querySelectorAll(`label[for$="${suffix}"], [id$="${suffix}"], [id$="${label}"]`)
-        const found = [...candidates].find((node) => this.belongs(node)) ?? this.model(field)
+        const candidates = [...this.root.querySelectorAll(`label[for$="${suffix}"], [id$="${suffix}"], [id$="${label}"]`)].filter((node) => this.belongs(node))
+        // `form.title`, not a repeater item's `form.key_points.<key>.title`: the schema's name is the only prefix.
+        const exact = (/** @type {Element} */ node) => {
+            const id = (node.getAttribute('for') ?? node.id).replace(/-label$/, '')
+
+            return !id.slice(0, id.length - field.length - 1).includes('.')
+        }
+        const found = this.model(field) ?? this.richEditor(field) ?? candidates.find(exact) ?? candidates[0] ?? null
         const wrapper = found?.closest('[data-field-wrapper]') ?? null
 
         if (wrapper) this.wrappers.set(field, wrapper)

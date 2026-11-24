@@ -16,13 +16,14 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 /**
  * Repeaters and builders whose items hold simple values. Items with uploads,
  * rich text or nested lists merge on save instead.
  */
-class ItemsType implements FieldType
+class ItemsType implements FieldType, UsesAdapter
 {
     /** @var list<class-string<Field>> */
     private const NOT_SHAREABLE = [Builder::class, CodeEditor::class, FileUpload::class, KeyValue::class, MarkdownEditor::class, Repeater::class, RichEditor::class];
@@ -161,5 +162,10 @@ class ItemsType implements FieldType
         }
 
         return ! ($field instanceof TextInput && $field->isPassword());
+    }
+
+    public function getAdapter(Field $field): string
+    {
+        return 'filament-repeater';
     }
 }

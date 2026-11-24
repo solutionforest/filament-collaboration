@@ -76,6 +76,7 @@ return [
             'save' => ':name 儲存',
             'before' => ':name 還原前',
             'restore' => ':name 還原',
+            'discard' => '捨棄草稿前',
         ],
     ],
 

@@ -15,7 +15,7 @@ Open `/admin` in two browsers as `alice@example.test` and `bob@example.test` (pa
 
 What to try:
 
-- **Articles**: every kind of live field, including a gallery upload, Markdown and code editors, four third-party editors, and a locked "Editor's notes" field. **Comments & history** in the header opens comments (type `@` to mention a colleague) and versions to restore. The **Checklist** below the form refreshes in the other browser.
+- **Articles**: every kind of live field, including a gallery upload, Markdown and code editors, four third-party editors, and a locked "Editor's notes" field. The comments icon in the header (**Comments & history**) opens comments (type `@` to mention a colleague) and versions to restore. The **Checklist** below the form refreshes in the other browser.
 - **Translated pages**: English and Chinese, each its own shared draft. The slug is behind the Publishing tab and a collapsed section; when Bob is in it, Alice sees his initials on the tab. **Follow** in the avatar list keeps your page on a colleague's field.
 - Presence in Redis: set `FILAMENT_COLLABORATION_PRESENCE=redis` in `.env`, with Redis running.
 

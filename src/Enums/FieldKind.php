@@ -21,15 +21,15 @@ enum FieldKind: string
 
     /**
      * The JavaScript adapter of Filament's own fields of this kind, used when a
-     * field type names none. Lists are Filament's own structure: they have none.
+     * field type names none.
      */
-    public function defaultAdapter(): ?string
+    public function defaultAdapter(): string
     {
         return match ($this) {
             self::Text => 'filament-text-input',
             self::RichText => 'filament-rich-editor',
             self::Value => 'filament-value',
-            self::Items => null,
+            self::Items => 'filament-repeater',
         };
     }
 }

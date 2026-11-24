@@ -26,7 +26,7 @@
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
 | **Safe by default** | Every request is authorised again, every edit is validated, and fields a person cannot see never reach their browser. |
-| **Comments and history** | One slide-over: comments on the record or a field with `@mentions` and notifications, and the draft's versions, restored for everybody in a click. See [Comments and version history](docs/guide.md#comments-and-version-history). |
+| **Comments and history** | One slide-over: comments on the record or a field with `@mentions` and notifications, and the draft's versions, restored for everybody in a click. Optional: `commentsAndHistory(false)`, or a closure per resource or record. See [Comments and version history](docs/guide.md#comments-and-version-history). |
 | **Nobody out of sight** | A colleague in a field behind a closed tab, wizard step or collapsed section shows on its header; **Follow** keeps your page on whichever field they are in. |
 | **Translations, uploads, relations** | Translated pages get one shared draft per language. Uploaded files appear for everyone at once. Relation managers refresh in colleagues' open copies. |
 | **Scales out** | Several app servers on one database, presence in Redis, changes over Reverb; a load test with 300 editors across two servers is included. |
