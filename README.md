@@ -78,6 +78,7 @@ The package also ships a **[Laravel Boost](https://laravel.com/docs/boost)** ski
 | Filament | 5.8.3 or later |
 | Database | MySQL / MariaDB, PostgreSQL, SQLite |
 | Cache | Any store with atomic locks, shared by all app servers (Redis, database; file on a single server) |
+| Servers | PHP-FPM, `php artisan serve` or [Laravel Octane](docs/guide.md#laravel-octane); several panels, each with its own guard if you like ([guide](docs/guide.md#several-panels)) |
 | Optional | Laravel Reverb, or any Pusher-compatible broadcaster, for pushed changes. Redis for presence across many servers. |
 
 Every combination of PHP and Laravel is tested on each push. See [Quality](#quality).

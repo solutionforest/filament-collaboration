@@ -10,6 +10,8 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ### Added
 
+- **Several panels with their own guards.** The Reverb channel admits people signed in with any session guard, not only the default one, so a panel with `->authGuard()` gets pushed changes. Tests cover two panels editing one record together, a token refused on another panel, and a panel without the plugin.
+- **Laravel Octane.** A CI job runs two editors on a single Swoole worker; the browser tests run on Octane with `OCTANE=swoole`.
 - **Draft heads in the cache.** With a Redis or Memcached cache store, a poll with nothing new reads no draft from the database: with presence, cache and sessions in Redis, it makes one query instead of two. `FILAMENT_COLLABORATION_DRAFT_CACHE` turns it on or off.
 
 ## [0.1.0] - 2026-11-24
