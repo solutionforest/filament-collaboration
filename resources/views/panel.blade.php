@@ -138,7 +138,8 @@
                     <p class="fi-collab-version-fields">{{ collect($version['changed'])->map(fn (string $field): string => $labels[$field] ?? $field)->join(', ') }}</p>
                 @endif
 
-                @if ($canRestore && ! $loop->first)
+                {{-- The newest too: colleagues may have changed the draft since it was kept. --}}
+                @if ($canRestore)
                     <button
                         type="button"
                         class="fi-collab-link"

@@ -14,7 +14,7 @@
 
 ![Three people editing one article](docs/media/live-editing.png)
 
-▶ [Watch the 37-second tutorial](docs/media/tutorial.mp4): two browsers side by side.
+▶ [Watch the one-minute tutorial](docs/media/tutorial.mp4): two browsers side by side, from typing together to comments, history and restore.
 
 ## What you get
 
@@ -193,7 +193,7 @@ Each push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What |
 | --- | --- |
-| Pest | 321 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus the oldest supported Filament, 5.8.3; at least 95% line coverage; the whole suite again with presence in Redis |
+| Pest | 332 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus the oldest supported Filament, 5.8.3; at least 95% line coverage; the whole suite again with presence in Redis |
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |

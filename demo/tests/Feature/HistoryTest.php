@@ -84,3 +84,18 @@ it('shows the panel on the edit page, with the history', function (): void {
         ->toContain('data-collaboration-history')
         ->toContain('Alice Chen');
 });
+
+it('offers to restore the newest version too, as the draft may have changed since it was kept', function (): void {
+    arrangeHistory($this);
+    $alice = Editor::open($this, $this->alice, $this->article);
+    $alice->sync();
+    $alice->type('title', 'Kept')->sync();
+    // Within five minutes: changed, but no new version.
+    $alice->type('title', 'Kept, then changed')->sync();
+
+    $this->actingAs($this->alice);
+    $page = Livewire::test(EditDocument::class, ['record' => $this->article->id]);
+
+    expect(DB::table('filament_collaboration_versions')->count())->toBe(1)
+        ->and(view('filament-collaboration::panel', ['page' => $page->instance()])->render())->toContain('restoreCollaborationVersion');
+});

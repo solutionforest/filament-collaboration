@@ -96,7 +96,37 @@ try {
     await alice.getByRole('button', { name: 'Save changes' }).first().click()
     await wait(5000)
 
-    say('8. The inspector is one header action, and opt-in')
+    say('8. The chat icon opens comments: @ mentions a colleague')
+    await alice.getByRole('button', { name: 'Comments & history' }).click()
+
+    const comments = alice.locator('[data-collaboration-comments]')
+
+    await comments.locator('textarea').waitFor()
+    await wait(800)
+    await comments.locator('[data-collaboration-comment-field]').selectOption('title')
+    await comments.locator('textarea').pressSequentially('Shorter title? @Bo', { delay: 110 })
+    await comments.getByRole('option', { name: 'Bob Martinez' }).waitFor()
+    await wait(1200)
+    await comments.getByRole('option', { name: 'Bob Martinez' }).click()
+    await alice.keyboard.type('what do you think?', { delay: 90 })
+    await comments.getByRole('button', { name: 'Comment', exact: true }).click()
+    await alice.locator('[data-collaboration-comment]').first().waitFor()
+    await wait(3000)
+
+    say('9. History: Bob changes the title; restore the saved draft, for everybody')
+    await title(bob).click()
+    await cursor(bob, -1)
+    await bob.keyboard.type(' (maybe?)', { delay: 140 })
+    await wait(1500)
+    await alice.getByRole('tab', { name: 'History' }).click()
+    await wait(2500)
+    alice.once('dialog', (dialog) => dialog.accept())
+    await alice.locator('[data-collaboration-history] .fi-collab-version', { hasText: 'Saved by' }).first().getByRole('button', { name: /Restore the draft from/ }).click()
+    await wait(4500)
+    await alice.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Close' }).last().click()
+    await wait(1500)
+
+    say('10. The inspector is one header action, and opt-in')
     await bob.getByRole('button', { name: 'Collaboration inspector' }).click()
     await wait(4500)
 

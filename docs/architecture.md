@@ -91,7 +91,7 @@ On one core this measures correctness across servers, not how throughput scales:
 
 | Command | Where | What |
 | --- | --- | --- |
-| `vendor/bin/pest` | `demo/` | 321 tests: the package's unit tests and the demo's feature tests; `FILAMENT_COLLABORATION_PRESENCE=redis` runs them on Redis presence |
+| `vendor/bin/pest` | `demo/` | 332 tests: the package's unit tests and the demo's feature tests; `FILAMENT_COLLABORATION_PRESENCE=redis` runs them on Redis presence |
 | `vendor/bin/phpstan analyse` | `demo/` | level 10, on the package and the demo |
 | `npm run test:e2e` | `demo/` | 54 scenarios in real browsers; `BROWSER=webkit`, `TRANSPORT=reverb`, `THROTTLE=8` for a slow CPU |
 | `npm run test:chaos -- 10 42` | `demo/` | four browsers pressing random keys; every round must converge |
