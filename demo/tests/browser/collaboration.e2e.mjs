@@ -1288,8 +1288,17 @@ describe('seeing each other', () => {
         const button = bob.getByRole('button', { name: 'Comments & history' })
 
         await eventually(async () => assert.equal((await button.innerText()).trim(), '1'), 'the button did not show one open comment')
-        await button.click()
-        await eventually(async () => assert.match(await bob.locator('[data-collaboration-comments]').innerText(), /Shorter, @Bob Martinez please\?/), 'Bob did not see the comment')
+        // The badge is in the reloaded HTML: a click before Livewire has started is lost, so click until the slide-over opens.
+        const comments = bob.locator('[data-collaboration-comments]')
+
+        await eventually(
+            async () => {
+                if (!(await comments.isVisible())) await button.click()
+                assert.match(await comments.innerText({ timeout: 2000 }), /Shorter, @Bob Martinez please\?/)
+            },
+            'Bob did not see the comment',
+            30000,
+        )
 
         await bob.locator('[data-collaboration-comment]').first().getByRole('button', { name: 'Resolve' }).click()
         await eventually(async () => assert.match(await bob.locator('.fi-collab-resolved summary').innerText(), /Resolved \(1\)/), 'the comment was not resolved')

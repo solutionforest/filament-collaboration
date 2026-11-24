@@ -158,7 +158,7 @@ export default defineConfig({
 
         footer: {
             message: 'Released under the MIT License.',
-            copyright: 'Copyright © 2026 Solution Forest',
+            copyright: 'Copyright © 2026 Solution Forest Limited · Made in HK',
         },
     },
 })
