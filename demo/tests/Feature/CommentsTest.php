@@ -178,8 +178,10 @@ it('sends what people typed as text in notifications, and keeps a field comment 
         ->call('postCollaborationComment', '@Bob Martinez see <a href="https://evil.test">this</a>')
         ->call('postCollaborationComment', '@Bob Martinez the secret figure is wrong', 'excerpt');
 
-    $notifications = $this->bob->notifications()->oldest()->get();
+    // Both arrive in the same second: tell them apart by what they hold, not by order.
+    $bodies = $this->bob->notifications()->get()->map(fn ($notification) => $notification->data['body'] ?? null);
 
-    expect($notifications[0]->data['body'])->toContain('&lt;a href=')->not->toContain('<a href')
-        ->and($notifications[1]->data['body'])->toBeNull();
+    expect($bodies)->toHaveCount(2)
+        ->and($bodies->filter()->sole())->toContain('&lt;a href=')->not->toContain('<a href')
+        ->and($bodies->filter(fn ($body) => $body === null))->toHaveCount(1);
 });
