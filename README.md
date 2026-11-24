@@ -327,5 +327,3 @@ Releases follow [Semantic Versioning](https://semver.org), and every change is l
 Filament Collaboration is open source under the MIT license. See [LICENSE](LICENSE).
 
 The demo in `demo/` is not part of what Composer installs. Two of its example editor packages bundle GPL editors, so they are licensed GPL-2.0-or-later: `demo/packages/filament-tinymce` (TinyMCE) and `demo/packages/filament-ckeditor` (CKEditor 5). Their `LICENSE.md` files explain more. The Quill (BSD-3-Clause) and Trix (MIT) examples, and the package itself, have no such terms.
-
-Made in Hong Kong by [Solution Forest](https://github.com/solutionforest).
