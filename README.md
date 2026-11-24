@@ -265,4 +265,6 @@ More in the guide's [troubleshooting](docs/guide.md#11-troubleshooting).
 
 ## License
 
-MIT
+MIT: see [LICENSE](LICENSE).
+
+The demo in `demo/` is not part of what Composer installs. Two of its example editor packages bundle GPL editors, so they are GPL-2.0-or-later: `demo/packages/filament-tinymce` (TinyMCE) and `demo/packages/filament-ckeditor` (CKEditor 5). Their `LICENSE.md` files say more. The Quill (BSD-3-Clause) and Trix (MIT) examples, and the package itself, carry no such terms.

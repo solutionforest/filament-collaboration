@@ -2,7 +2,7 @@
     "name": "demo/filament-ckeditor",
     "description": "A CKEditor 5 form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
     "type": "library",
-    "license": "MIT",
+    "license": "GPL-2.0-or-later",
     "require": {
         "php": "^8.3",
         "filament/forms": "^5.8.3"
