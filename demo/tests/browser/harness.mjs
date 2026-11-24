@@ -56,6 +56,11 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
         Object.assign(env, { FILAMENT_COLLABORATION_PRESENCE: 'redis', REDIS_PREFIX: `filament-collaboration-browser-${port}:` })
     }
 
+    // CACHE=redis keeps the cache and sessions in Redis too, which also keeps drafts' heads there.
+    if (process.env.CACHE === 'redis') {
+        Object.assign(env, { CACHE_STORE: 'redis', SESSION_DRIVER: 'redis', REDIS_PREFIX: `filament-collaboration-browser-${port}:` })
+    }
+
     // `php -S` only passes the environment to $_ENV when asked, and Laravel reads the storage path from there.
     const options = ['-d', 'variables_order=EGPCS']
 

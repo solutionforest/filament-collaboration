@@ -32,6 +32,7 @@ final class DocumentRepository
         private readonly RoomNotifier $notifier,
         private readonly SharedUploads $uploads,
         private readonly DraftVersions $versions,
+        private readonly DraftHeads $heads,
     ) {}
 
     /** Records that a draft is one language of a record's room. */
@@ -301,8 +302,8 @@ final class DocumentRepository
      */
     public function changesSince(string $room, int $client, int $epoch, int $since, array $readable): DraftUpdate
     {
-        $row = Data::map(Database::table('documents')->where('room', $room)
-            ->first(['id', 'epoch', 'sequence', 'floor', 'version', 'dirty', 'saved_by']));
+        $row = $this->heads->read($room, static fn (): array => Data::map(Database::table('documents')->where('room', $room)
+            ->first(['id', 'epoch', 'sequence', 'floor', 'version', 'dirty', 'saved_by'])));
 
         if ($row === []) {
             return new DraftUpdate;
@@ -508,7 +509,7 @@ final class DocumentRepository
             $empty = Data::encode((new Document)->toArray());
 
             // Both statements write, so SQLite takes its write lock before anything is read.
-            Database::table('documents')->insertOrIgnore([
+            $created = Database::table('documents')->insertOrIgnore([
                 'room' => $room,
                 'state' => $empty,
                 'saved_state' => $empty,
@@ -527,6 +528,10 @@ final class DocumentRepository
             if ($after !== $before) {
                 Database::table('documents')->where('id', $draft->id)->update([...$after, 'updated_at' => now()]);
                 $changed = $draft;
+            }
+
+            if ($created > 0 || $after !== $before) {
+                $this->heads->changed($room);
             }
 
             return $result;

@@ -41,6 +41,7 @@ The merge engine is written twice, in PHP (`src/Crdt`) and JavaScript (`resource
 - Drafts are stored in `filament_collaboration_documents`, with an update log in `filament_collaboration_updates`. Writes happen under a row lock. The log is compacted once a draft is clean and nobody is editing.
 - Sync never writes the session, so it cannot race a save or a logout.
 - Save takes a cache lock per record, publishes the live fields from the draft, and three-way merges the rest.
+- With a Redis or Memcached cache store, each draft's head (epoch, sequence, version, unsaved fields) is cached under a random token that every committed change renews, so a poll with nothing new reads no draft from the database.
 - Presence is one record per open tab, in `filament_collaboration_participants` by default. With `FILAMENT_COLLABORATION_PRESENCE=redis` it is in Redis instead: per room a hash of tabs and a sorted set of when each was last seen, per resource a sorted set of its tabs. An unchanged heartbeat is written only every few seconds either way.
 - Several application servers can share one database and one cache store: a request may reach any of them.
 - Comments, versions of the draft, uploads stored for it and the per-minute edit trail have tables of their own (`filament_collaboration_comments`, `_versions`, `_uploads`, `_edits`). A relation manager's changes raise a counter per room in the cache, pushed or polled like everything else.
@@ -95,7 +96,7 @@ On one core this measures correctness across servers, not how throughput scales:
 | `vendor/bin/phpstan analyse` | `demo/` | level 10, on the package and the demo |
 | `npm run test:e2e` | `demo/` | 54 scenarios in real browsers; `BROWSER=webkit`, `TRANSPORT=reverb`, `THROTTLE=8` for a slow CPU |
 | `npm run test:chaos -- 10 42` | `demo/` | four browsers pressing random keys; every round must converge |
-| `npm run test:load -- 100 45` | `demo/` | editors and seconds; `TRANSPORT=reverb`, `ACTIVE=0.1`, `SERVERS=2` and `PRESENCE=redis` also apply |
+| `npm run test:load -- 100 45` | `demo/` | editors and seconds; `TRANSPORT=reverb`, `ACTIVE=0.1`, `SERVERS=2`, `PRESENCE=redis` and `CACHE=redis` (cache and sessions in Redis) also apply |
 | `npm run test:latency` | `demo/` | key press to another screen |
 | `npm run check` | root | ESLint, `tsc --strict` over the JSDoc types, and the CRDT tests |
 | `npm run media` / `npm run tutorial` | `demo/` | the README's screenshots and video, from real sessions |

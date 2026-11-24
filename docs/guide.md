@@ -382,6 +382,7 @@ Publish it with `php artisan vendor:publish --tag=filament-collaboration-config`
 | `cache_store` | `FILAMENT_COLLABORATION_CACHE_STORE` | default store | serialises saves; needs atomic locks, shared by all servers |
 | `presence` | `FILAMENT_COLLABORATION_PRESENCE` | `database` | where presence is kept: `database`, or `redis` |
 | `redis_connection` | `FILAMENT_COLLABORATION_REDIS_CONNECTION` | `default` | the Redis connection for `redis` presence |
+| `draft_cache` | `FILAMENT_COLLABORATION_DRAFT_CACHE` | on with a Redis or Memcached `cache_store` | keeps each draft's head in the cache, so a poll with nothing new reads no draft from the database |
 | `presence_timeout` | `FILAMENT_COLLABORATION_PRESENCE_TIMEOUT` | 20 | seconds without a heartbeat before someone disappears |
 | `compact_after` | `FILAMENT_COLLABORATION_COMPACT_AFTER` | 1800 | seconds before a clean draft's edit history is discarded |
 | `token_lifetime` | `FILAMENT_COLLABORATION_TOKEN_LIFETIME` | 900 | seconds a room token is valid; open pages renew it |
@@ -400,6 +401,16 @@ FILAMENT_COLLABORATION_REDIS_CONNECTION=default
 ```
 
 Nothing else changes. Tabs left behind expire by themselves, and a room nobody is in takes up no space. To keep presence somewhere else, bind your own `PresenceRepository`. `demo/tests/Feature/PresenceRepositoryTest.php` lists the behaviour it needs.
+
+**Without Reverb, put the cache and sessions in Redis too.** Every open tab polls, and most polls find nothing new, because most people on a record are reading. With all three in Redis, such a poll makes one database query: the record itself, which is loaded so your policy can check access again.
+
+```dotenv
+FILAMENT_COLLABORATION_PRESENCE=redis   # who is here, carets
+CACHE_STORE=redis                       # save locks, and each draft's head
+SESSION_DRIVER=redis                    # every poll reads the session
+```
+
+With a Redis or Memcached cache store, each draft's head (its position, version and unsaved fields) is kept in the cache, so a poll that is up to date reads no draft from the database. The draft itself stays in the database. Every change gives the draft a new random token in the cache, so a cached head is never out of date: a lost key costs one database read, never a missed change. Set `FILAMENT_COLLABORATION_DRAFT_CACHE=false` to turn it off. A cache each server keeps for itself, such as `array` or `file`, never turns it on, since another server would not see the token change.
 
 To measure your own setup, run the demo's load test with two servers: `SERVERS=2 PRESENCE=redis npm run test:load -- 300 45`. Add `TRANSPORT=reverb` to push over Reverb. It checks that everybody sees everybody across both servers, that every editor ends with the same text, and that no typing is lost. The **Load** workflow runs it on a CI runner.
 
