@@ -116,6 +116,8 @@ A field the package does not know, such as a third-party editor, merges on save.
 
 **Translated pages** (a locale switcher, such as `lara-zeus/spatie-translatable`'s) are live too, with one shared draft per language. Everybody on the record is in one room and sees each other, while English typing stays in the English draft and Chinese in the Chinese one. Switching language moves your page to that language's draft, including colleagues' unsaved typing there. Saving publishes the language you are on; the others keep what is stored, and their drafts are saved from their own language.
 
+![Bob in the Chinese draft while Alice is in the English one](media/translations.png)
+
 Date pickers with a personal timezone always merge on save, because their state differs per person.
 
 ## 3. Saving, drafts and conflicts
@@ -213,6 +215,8 @@ protected function getHeaderActions(): array
 
 A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
 
+![The history: who changed which fields, and a restore](media/history.png)
+
 **Comments** are on the record, or on one of its fields. Everybody who can open the record reads them and can comment. The author and anybody who may edit the record can resolve or reopen a comment. The button shows how many comments are open. Every language of a translated record shares its comments, and deleting a record for good deletes them too.
 
 To let people `@mention` each other, say who may be mentioned on a record. The comment box suggests their names after `@`. Each person mentioned gets a Filament [database notification](https://filamentphp.com/docs/notifications/database-notifications) that links back to the record:
@@ -226,11 +230,17 @@ $panel->databaseNotifications(); // to show them in the panel
 
 Pass `notify: false` to skip the notifications. `CommentPosted` (`record`, `by`, `comment`, `url`) is dispatched for every comment, and `$event->comment->mentions` lists the people it mentions, so you can send the news anywhere else too.
 
+![Comments on fields, with a mention being picked](media/comments.png)
+
 ## 4. Presence in tables and modals
 
 **Fields out of sight.** When somebody is in a field behind a tab that is not selected, a wizard step that is not current, or a collapsed section, their initials show on that tab, step or section header. Choosing them in the avatar list opens the tab and the section and scrolls to the field. There is nothing to set up.
 
+![Bob is behind the closed Publishing tab](media/hidden-field.png)
+
 **Following a colleague.** In the avatar list, **Follow** next to somebody keeps going to whichever field they are in, opening tabs and sections on the way, so you can watch a walkthrough without chasing it. Clicking or typing anywhere in the form stops it, and so does **Stop following** or them leaving.
+
+![Following Bob opened the tab and the section](media/follow.png)
 
 **Relation managers.** Add `SharesRelationChanges` to a relation manager, and what one person creates, edits, deletes, attaches or toggles in it shows at once in everybody else's copy of the page, over Reverb or at their next poll:
 
@@ -242,6 +252,8 @@ class TasksRelationManager extends RelationManager
     use SharesRelationChanges;
 }
 ```
+
+![Tasks Alice added, in Bob's open copy](media/relation-manager.png)
 
 **A column with the people on each record:**
 
@@ -434,6 +446,8 @@ An image inserted into a rich editor is stored at once, so whoever saves keeps i
 
 **Upload fields** work the same way. A file is checked against the field's own rules (type, size, count) and stored the moment it finishes uploading, so everybody sees it at once and anybody's save keeps it. The list of files is shared like a repeater's items: adding, removing and reordering merge. A browser can only add files stored for this draft, or files the record already has.
 
+![A file Alice uploaded, in Bob's form](media/live-uploads.png)
+
 If you use Filament's `preventFilePathTampering()`, also allow files stored for the draft, as a colleague's file is not yet one of the record's:
 
 ```php
@@ -533,6 +547,10 @@ Only `read` and `write` are required; without the selection methods, edits still
 
 If the adapter is missing, or throws, the field simply merges on save as before.
 
+The demo's `packages/` folder has working adapters for TinyMCE, CKEditor 5, Quill and Trix:
+
+![TinyMCE and Quill, live with carets](media/third-party-editors.png)
+
 ### HTML editors
 
 TinyMCE, CKEditor, Quill, Trix and most WYSIWYG editors hold HTML. Merging HTML by character could break its tags, so an adapter with `format: 'html'` hands over HTML, and the package turns it into the same document the built-in rich editor shares: paragraphs, headings, bold, italic, underline, strike, code, links, lists, quotes, tables, images and line breaks. Those merge by character, block and mark, with carets; anything else in the HTML is kept as its text. On save, the field gets HTML back.
@@ -570,6 +588,22 @@ Register its PHP side with `FieldKind::RichText`. Keep the editor object off Alp
 **Working examples** are in `demo/packages/`: a TinyMCE, a CKEditor 5, a Quill and a Trix field, each a small Filament package with its adapter in `resources/js/editor.js` and its registration in the service provider. The demo's article form uses all four, and the browser tests type in each from two browsers at once. Rebuild them with `npm run build:editors` in `demo/`. TinyMCE and CKEditor 5 are GPL-licensed when used without a commercial licence key.
 
 **Your own presence storage.** Presence is stored in the database by default. Bind your own implementation of `Contracts\PresenceRepository`, for example on Redis, in a service provider.
+
+### With an AI assistant
+
+The package ships a [Laravel Boost](https://laravel.com/docs/boost) skill, `filament-collaboration-development`, and a short guideline in `resources/boost`. Boost installs a package's skills once the app opts in, in `boost.json`:
+
+```json
+{
+    "packages": ["solutionforest/filament-collaboration"]
+}
+```
+
+```bash
+php artisan boost:update
+```
+
+The guideline goes into your `CLAUDE.md` / `AGENTS.md`, and the skill into `.claude/skills` and `.agents/skills`. It covers the traits, which fields are live, permissions, comments and history, relation managers, adapters, Reverb and Redis presence, testing and common mistakes. The demo uses it.
 
 ## 10. Debugging
 
