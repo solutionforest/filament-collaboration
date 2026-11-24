@@ -7,9 +7,10 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\RichEditor;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
-class RichEditorType implements FieldType
+class RichEditorType implements FieldType, UsesAdapter
 {
     public function supports(Field $field): bool
     {
@@ -26,5 +27,10 @@ class RichEditorType implements FieldType
         return $field->getPlugins() === [] && $field->getCustomBlocks() === [] && $field->getMentionProviders() === []
             ? FieldKind::RichText
             : null;
+    }
+
+    public function getAdapter(Field $field): string
+    {
+        return 'filament-rich-editor';
     }
 }

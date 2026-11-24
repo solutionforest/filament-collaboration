@@ -7,9 +7,10 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\TextInput;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
-class TextInputType implements FieldType
+class TextInputType implements FieldType, UsesAdapter
 {
     public function supports(Field $field): bool
     {
@@ -28,5 +29,11 @@ class TextInputType implements FieldType
             'text', 'search', 'tel', 'url' => filled($field->getMask()) ? FieldKind::Value : FieldKind::Text,
             default => FieldKind::Value,
         };
+    }
+
+    /** Typed inputs through the text adapter, masked and other inputs through the value adapter. */
+    public function getAdapter(Field $field): ?string
+    {
+        return $this->getKind($field)?->defaultAdapter();
     }
 }

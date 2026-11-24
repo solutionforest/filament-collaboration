@@ -12,8 +12,8 @@ export const adapters = new Map()
  * @param {AdapterDefinition} definition
  */
 export function registerAdapter(name, definition) {
-    if (!definition || typeof definition.attach !== 'function' || !['text', 'html', 'value'].includes(definition.format)) {
-        throw new Error(`[filament-collaboration] Adapter "${name}" needs a format (text, html or value) and an attach() function.`)
+    if (!definition || typeof definition.attach !== 'function' || !['text', 'html', 'rich', 'value'].includes(definition.format)) {
+        throw new Error(`[filament-collaboration] Adapter "${name}" needs a format (text, html, rich or value) and an attach() function.`)
     }
 
     adapters.set(name, definition)

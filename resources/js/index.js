@@ -1,6 +1,7 @@
 import '../css/collaboration.css'
 import { Room } from './room/room.js'
 import * as html from './adapters/html.js'
+import * as prosemirror from './adapters/prosemirror.js'
 import { minimalChange, registerAdapter } from './adapters/registry.js'
 import { registerFilamentAdapters } from './adapters/filament.js'
 import { measureText } from './ui/measure-text.js'
@@ -74,6 +75,8 @@ function boot() {
         // For adapters: change only what differs, and map HTML editors' carets.
         minimalChange,
         html,
+        // For ProseMirror and TipTap editors, as Filament's own rich editor uses them.
+        prosemirror,
         // Where a caret at this offset of an input or textarea is, in viewport coordinates.
         caretRect: (input, offset) => measureText(input, offset, offset)?.caret ?? null,
     }

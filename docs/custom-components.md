@@ -1,6 +1,6 @@
 # Make your own component live
 
-Filament Collaboration knows Filament's own fields. A field of your own, or one from another package, is not live at first: it merges on save, and the others see who is in it. This guide makes such a field live in about 60 lines of JavaScript, with two working examples from the demo:
+Filament Collaboration knows Filament's own fields, and makes them live through the very adapter API this guide uses: a text input is the `filament-text-input` adapter, the rich editor `filament-rich-editor`, pickers `filament-value`, in `resources/js/adapters/filament.js`. A field of your own, or one from another package, is not live at first: it merges on save, and the others see who is in it. This guide makes such a field live in about 60 lines of JavaScript, with two working examples from the demo:
 
 - **Post composer**: a textarea inside an Alpine component, with a character counter. Two people typing in it at once both keep their words, and each sees where the other's caret is.
 - **Star rating**: a row of buttons. The latest click wins, as with Filament's own `Select` and `Toggle`.
@@ -15,6 +15,7 @@ The code is in [`demo/packages/filament-widgets`](../demo/packages/filament-widg
 | --- | --- | --- | --- |
 | Plain text: a composer, a code box, a notes widget | `FieldKind::Text` | `text` | both keep their typing, with carets |
 | HTML: TinyMCE, CKEditor, Quill, Trix | `FieldKind::RichText` | `html` | both keep their typing, blocks and formatting; see [HTML editors](guide.md#html-editors) |
+| A ProseMirror / TipTap document | `FieldKind::RichText` | `rich` | the same, as Filament's own rich editor does |
 | A choice: a rating, a colour, a date, a toggle, a JSON object | `FieldKind::Value` | `value` | the latest change wins |
 
 If your field is a picker whose state Livewire already updates on every change, you may not need JavaScript at all: `CollaborationPlugin::make()->fieldTypes([ValueType::make([StarRating::class])])` shares its value through Livewire. Write an adapter when the field keeps its state in JavaScript, when it holds text that should merge by character, or when you want carets.
@@ -209,6 +210,7 @@ What each part is for:
 - **`caretRect(offset)`** returns a `DOMRect` in viewport coordinates, for drawing other people's carets. `api.caretRect(input, offset)` measures one in any `<input>` or `<textarea>`. For HTML editors, `api.html.caretRectAt(root, position)` does the same.
 - **`isBusy()`** returning true makes remote changes wait, for example during IME composition.
 - **`isAlive()`** returning false makes the package attach again, for example after the field was re-rendered.
+- **`undo()` and `redo()`**, on the context, undo only this person's typing. Call them from Ctrl+Z instead of the editor's own undo, as Filament's text inputs do.
 
 ### A picker: the latest value wins
 
@@ -319,14 +321,17 @@ it('makes custom components live through their adapters', function (): void {
 
 | | |
 | --- | --- |
-| `registerAdapter(name, { format, attach })` | `format`: `'text'`, `'html'` or `'value'` |
-| `attach({ field, element, statePath, wire, changed, moved })` | returns a handle; `null` to be asked again; `false` to merge on save |
+| `registerAdapter(name, { format, attach })` | `format`: `'text'`, `'html'`, `'rich'` or `'value'` |
+| `attach({ field, element, statePath, wire, changed, moved, undo, redo, recover })` | returns a handle; `null` to be asked again; `false` to merge on save |
+| context `undo()` / `redo()` | undo only this person's typing; call on Ctrl+Z (`text`) |
+| context `recover(error, details)` | the editor threw: show the draft again, report it, give up after repeated failures |
 | handle `read()` / `write(value)` | required |
 | handle `selection()` / `setSelection({ anchor, head })` | keeps your caret in place |
-| handle `caretRect(position)` | where to draw other people's carets |
-| handle `isFocused()`, `isBusy()`, `isAlive()`, `destroy()` | optional |
+| handle `caretRect(position)` or `geometry({ anchor, head })` | where to draw other people's carets, or carets and selections |
+| handle `isFocused()`, `isBusy()`, `isDirty()`, `isAlive()`, `destroy()` | optional |
 | `minimalChange(old, next)` | the range to replace, or `null` if equal |
 | `caretRect(input, offset)` | a caret's `DOMRect` in an `<input>` or `<textarea>` |
 | `html.selectionIn(root, selection)`, `html.select(root, positions)`, `html.caretRectAt(root, position)` | the same for HTML editors |
+| `prosemirror.toDraft(doc, position)`, `prosemirror.toEditor(doc, index)`, `prosemirror.replacement(state, next)`, `prosemirror.buildDocument(schema, json)`, `prosemirror.geometry(view, anchor, head)` | the same for ProseMirror and TipTap editors, as `filament-rich-editor` uses them |
 
 The types are in [`resources/js/types.d.ts`](../resources/js/types.d.ts) (`AdapterDefinition`, `AdapterHandle`, `AdapterContext`).

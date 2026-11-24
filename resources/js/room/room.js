@@ -1,5 +1,4 @@
-import { AdapterBinding } from '../bindings/adapter.js'
-import { bindings as bindingTypes } from '../bindings/index.js'
+import { bindingFor } from '../bindings/index.js'
 import { Document } from '../crdt/document.js'
 import { FormDom, plain } from '../dom.js'
 import { reveal } from '../ui/containers.js'
@@ -272,9 +271,9 @@ export class Room {
         let changed = false
 
         for (const [field, kind] of Object.entries(this.config.fields)) {
-            if (this.failed.has(field) || this.document.kind(field) !== kind || !bindingTypes[kind]) continue
+            if (this.failed.has(field) || this.document.kind(field) !== kind) continue
 
-            const Type = this.config.adapters?.[field] ? AdapterBinding : bindingTypes[kind]
+            const Type = bindingFor(kind)
             const binding = this.bindings.get(field) ?? new Type(this, field)
 
             this.bindings.set(field, binding)

@@ -146,6 +146,7 @@ interface Window {
         registerAdapter(name: string, definition: AdapterDefinition): void
         minimalChange: typeof import('./adapters/registry.js').minimalChange
         html: typeof import('./adapters/html.js')
+        prosemirror: typeof import('./adapters/prosemirror.js')
         caretRect(input: HTMLInputElement | HTMLTextAreaElement, offset: number): DOMRect | null
     }
 }
@@ -185,11 +186,21 @@ interface AdapterContext {
     changed(): void
     /** Call whenever the caret or selection moves. */
     moved(): void
+    /** Undo this person's own typing, not colleagues'. For `text` adapters: call on Ctrl+Z instead of the editor's own undo. */
+    undo(): void
+    /** Redo this person's own typing. */
+    redo(): void
+    /**
+     * The editor threw on a change. Nothing is lost: the draft is shown again with the caret kept.
+     * Repeated failures make the field merge on save. `details` are reported where `reportEditorErrors()` is on.
+     */
+    recover(error: unknown, details?: { selection?: unknown; doc?: unknown }): void
 }
 
 /**
  * One attached editor. Positions are UTF-16 offsets into `read()` for text,
- * and `positions` units (see `adapters/html.js`) for HTML.
+ * and draft positions (one per character, block or embed) for HTML and rich:
+ * see `adapters/html.js` and `adapters/prosemirror.js`.
  */
 interface AdapterHandle {
     /** The editor's content: a string for text and HTML, anything JSON for a value. */
@@ -200,6 +211,10 @@ interface AdapterHandle {
     setSelection?(selection: { anchor: number; head: number }): void
     /** Where a caret at this position is drawn, for other people's carets. */
     caretRect?(position: number): DOMRect | null
+    /** Somebody's caret and selection between two positions, if the editor can draw a selection. Used instead of `caretRect`. */
+    geometry?(range: { anchor: number; head: number }): Geometry | null
+    /** False when nothing changed since the last `read()`: reading is skipped. For editors where reading is costly. */
+    isDirty?(): boolean
     /** Whether the editor has focus; the wrapper containing the focus otherwise. */
     isFocused?(): boolean
     /** True during IME composition: no remote change is applied meanwhile. */
@@ -210,8 +225,11 @@ interface AdapterHandle {
 }
 
 interface AdapterDefinition {
-    /** `text` merges characters, `html` merges characters, blocks and marks, `value` takes the latest. */
-    format: 'text' | 'html' | 'value'
+    /**
+     * `text` merges characters; `html` and `rich` merge characters, blocks and marks, as an HTML string
+     * or as a ProseMirror / TipTap JSON document; `value` takes the latest.
+     */
+    format: 'text' | 'html' | 'rich' | 'value'
     /** Null while the editor is not ready yet: it is asked again shortly. False: it cannot be live here, and merges on save. */
     attach(context: AdapterContext): AdapterHandle | null | false
 }

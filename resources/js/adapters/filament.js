@@ -1,9 +1,24 @@
+import { hasLoneSurrogate, wellFormed } from '../crdt/id.js'
+import { normalizeValue, sameValue } from '../crdt/document.js'
+import { modelOf, plain } from '../dom.js'
+import { measureText } from '../ui/measure-text.js'
+import { buildDocument, geometry, replacement, toDraft, toEditor } from './prosemirror.js'
 import { minimalChange } from './registry.js'
 
 /**
- * Adapters for Filament's own CodeMirror editors, and examples of what an
- * adapter does: read, write only what changed, and map the caret.
+ * The adapters for Filament's own fields: text inputs and textareas, pickers,
+ * the rich editor, and the Markdown and code editors. They use the same API
+ * as an adapter for a third-party editor, and nothing else: read, write only
+ * what changed, map the caret.
  */
+
+/** Marks the rich editor's transactions that come from the shared draft. */
+const REMOTE = 'filamentCollaboration'
+
+const normalizeText = (/** @type {unknown} */ value) => wellFormed(String(value ?? '')).replace(/\r\n?/g, '\n')
+
+/** A picker's state, as the draft holds it: CheckboxList keeps an object of choices. */
+const simplify = (/** @type {any} */ value) => normalizeValue(value && typeof value === 'object' ? Object.values(value) : value)
 
 /**
  * The Alpine component of a field's editor, once it has loaded.
@@ -18,8 +33,310 @@ function alpineData(element, component) {
     return root && window.Alpine ? window.Alpine.$data(root) : null
 }
 
+
+/** @param {(name: string, definition: AdapterDefinition) => void} register */
+function registerBuiltInAdapters(register) {
+    // TextInput (text, search, tel, url) and Textarea: merged by character, with carets and per-person undo.
+    register('filament-text-input', {
+        format: 'text',
+        attach({ element, statePath, wire, changed, moved, undo, redo }) {
+            const input = /** @type {HTMLInputElement | HTMLTextAreaElement | undefined} */ (
+                [...element.querySelectorAll('input, textarea')].find((node) => modelOf(node) === statePath)
+            )
+
+            if (!input) return null
+
+            const events = new AbortController()
+            const { signal } = events
+            const state = () => String(wire.$get(statePath, false) ?? '')
+            let composing = false
+            // What the input and the Livewire state held when this last saw them.
+            let typed = input.value
+            let stated = state()
+
+            const remember = () => {
+                typed = input.value
+                stated = state()
+            }
+
+            input.addEventListener(
+                'input',
+                () => {
+                    remember()
+                    changed()
+                },
+                { signal },
+            )
+            input.addEventListener('compositionstart', () => (composing = true), { signal })
+            input.addEventListener(
+                'compositionend',
+                () => {
+                    composing = false
+                    queueMicrotask(changed)
+                },
+                { signal },
+            )
+
+            // Ctrl+Z only undoes this person's typing, not colleagues'.
+            input.addEventListener(
+                'keydown',
+                (event) => {
+                    if (!(event instanceof KeyboardEvent) || !(event.ctrlKey || event.metaKey) || event.altKey) return
+
+                    const key = event.key.toLowerCase()
+                    const direction = key === 'z' ? (event.shiftKey ? 'redo' : 'undo') : key === 'y' ? 'redo' : null
+
+                    if (!direction) return
+
+                    event.preventDefault()
+                    ;(direction === 'undo' ? undo : redo)()
+                },
+                { signal },
+            )
+            input.addEventListener(
+                'beforeinput',
+                (event) => {
+                    if (!(event instanceof InputEvent) || !['historyUndo', 'historyRedo'].includes(event.inputType)) return
+
+                    event.preventDefault()
+                    ;(event.inputType === 'historyUndo' ? undo : redo)()
+                },
+                { signal },
+            )
+
+            // Livewire makes a submitting form's inputs read-only until the response.
+            // A live input stays editable: Save gives the browser back what it typed.
+            if (input.form) {
+                let wasReadOnly = false
+
+                input.form.addEventListener('submit', () => (wasReadOnly = input.readOnly), { signal, capture: true })
+                input.form.addEventListener(
+                    'submit',
+                    () =>
+                        queueMicrotask(() => {
+                            if (!wasReadOnly && input.isConnected) input.readOnly = false
+                        }),
+                    { signal },
+                )
+            }
+
+            for (const name of ['select', 'keyup', 'pointerup']) input.addEventListener(name, moved, { signal })
+
+            return {
+                // The state wins only when the server changed it, for example another field's `afterStateUpdated()`.
+                read: () => (input.value === typed && state() !== stated ? state() : input.value),
+                write(value) {
+                    if (normalizeText(input.value) !== value || hasLoneSurrogate(input.value)) {
+                        const { scrollTop, scrollLeft } = input
+
+                        input.value = value
+                        input.scrollTop = scrollTop
+                        input.scrollLeft = scrollLeft
+                    }
+
+                    if (hasLoneSurrogate(state()) || normalizeText(state()) !== value) wire.$set(statePath, value, false)
+
+                    remember()
+                },
+                selection() {
+                    const start = input.selectionStart ?? 0
+                    const end = input.selectionEnd ?? 0
+
+                    return input.selectionDirection === 'backward' ? { anchor: end, head: start } : { anchor: start, head: end }
+                },
+                setSelection: ({ anchor, head }) => input.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head), anchor > head ? 'backward' : 'forward'),
+                geometry: ({ anchor, head }) => measureText(input, anchor, head),
+                isFocused: () => document.activeElement === input,
+                isBusy: () => composing && input.isConnected,
+                isAlive: () => input.isConnected,
+                destroy: () => events.abort(),
+            }
+        },
+    })
+
+    // Selects, toggles, dates, tags and other pickers: the latest choice wins, through the Livewire state.
+    register('filament-value', {
+        format: 'value',
+        attach({ statePath, wire }) {
+            const read = () => simplify(plain(wire.$get(statePath, false)))
+
+            return {
+                read,
+                write(value) {
+                    if (!sameValue(value, read())) wire.$set(statePath, plain(value), false)
+                },
+            }
+        },
+    })
+
+    // Filament's RichEditor (TipTap): merged by character, block and mark, through its own ProseMirror.
+    register('filament-rich-editor', {
+        format: 'rich',
+        attach({ element, field, statePath, wire, changed, moved, recover }) {
+            const root = [...element.querySelectorAll('[data-rich-editor-key], [x-data*="richEditorFormComponent"]')].find((node) =>
+                node.getAttribute('x-data')?.includes(`statePath: '${statePath}'`),
+            )
+            /** @type {RichEditor | undefined} */
+            const editor = root ? window.Alpine?.$data(root)?.getEditor?.() : undefined
+
+            if (!root || !editor || editor.isDestroyed) return null
+
+            const pmState = () => window.FilamentRichEditor?.tiptap?.pmState
+            /** @type {Set<string>} uploads being stored */
+            const storing = new Set()
+            let dirty = false
+
+            /**
+             * Left alone, Livewire sends an edit inside a list as a path more than ten
+             * levels deep and then refuses it, so Save fails. Queue the field whole instead.
+             */
+            const sendWhole = () => {
+                if (!editor.isDestroyed) wire.__instance?.queueUpdate?.(statePath, editor.getJSON())
+            }
+
+            /**
+             * After a remote change the caret must still be where text can be typed:
+             * Enter at a position between blocks makes ProseMirror throw.
+             */
+            const keepCaretTypable = () => {
+                const pm = pmState()
+                const { state, view } = editor
+                const { $from, $to, empty } = state.selection
+
+                if (!pm || state.selection instanceof pm.NodeSelection || ($from.parent.inlineContent && $to.parent.inlineContent)) return
+
+                const near = pm.Selection.near(empty ? $from : $to, -1)
+
+                if (!near.eq(state.selection)) view.dispatch(state.tr.setSelection(near).setMeta(REMOTE, true).setMeta('addToHistory', false))
+            }
+
+            /**
+             * An upload is temporary until saved, and only its uploader's page has it.
+             * Store it at once, so whoever saves the shared draft keeps the image.
+             */
+            const storeUploads = () => {
+                /** @type {Record<string, unknown>} */
+                const uploads = wire.$get(`componentFileAttachments.${statePath}`, false) ?? {}
+
+                editor.state.doc.descendants((node) => {
+                    /** @type {string | null} */
+                    const id = node.type.name === 'image' ? node.attrs.id : null
+
+                    if (!id || storing.has(id) || !uploads[id]) return
+
+                    storing.add(id)
+                    wire.$call('storeCollaborationAttachment', field, id).then(
+                        (/** @type {{id: string, src?: string} | null} */ stored) => stored && replaceImage(id, stored),
+                        () => storing.delete(id),
+                    )
+                })
+            }
+
+            /**
+             * @param {string} id the temporary upload's id
+             * @param {{id: string, src?: string}} stored
+             */
+            const replaceImage = (id, stored) => {
+                if (editor.isDestroyed) return
+
+                const { state, view } = editor
+                const transaction = state.tr
+
+                state.doc.descendants((node, position) => {
+                    if (node.type.name === 'image' && node.attrs.id === id) {
+                        transaction.setNodeMarkup(position, null, { ...node.attrs, id: stored.id, src: stored.src ?? node.attrs.src })
+                    }
+                })
+
+                // An ordinary local change: it is shared like any other edit.
+                if (transaction.docChanged) view.dispatch(transaction.setMeta('addToHistory', false))
+            }
+
+            /** @param {{transaction?: import('prosemirror-state').Transaction}} props */
+            const onUpdate = ({ transaction }) => {
+                if (transaction?.getMeta(REMOTE)) return
+
+                dirty = true
+                changed()
+                sendWhole()
+                storeUploads()
+            }
+            const onSelection = () => moved()
+
+            // ProseMirror throws from its own key handlers, so only the page sees it.
+            const onError = (/** @type {ErrorEvent | PromiseRejectionEvent} */ event) => {
+                const error = event instanceof ErrorEvent ? event.error : event.reason
+                const own = editor.isFocused && !editor.isDestroyed && ((error instanceof Error && error.name === 'TransformError') || error instanceof RangeError)
+
+                if (!own) return
+
+                event.preventDefault()
+                recover(error, { selection: editor.state.selection.toJSON(), doc: editor.state.doc.toJSON() })
+            }
+
+            editor.on('update', onUpdate)
+            editor.on('selectionUpdate', onSelection)
+            window.addEventListener('error', onError)
+            window.addEventListener('unhandledrejection', onError)
+
+            return {
+                read() {
+                    dirty = false
+
+                    return /** @type {RichNode} */ (editor.state.doc.toJSON())
+                },
+                write(doc) {
+                    const { state, view, schema } = editor
+                    const transaction = replacement(state, buildDocument(schema, doc))
+
+                    if (!transaction.docChanged) return
+
+                    view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
+                    keepCaretTypable()
+                    sendWhole()
+                },
+                // Not while a local change is still to be read: its positions are not in the draft yet.
+                selection() {
+                    if (dirty) return null
+
+                    const { doc, selection } = editor.state
+
+                    return { anchor: toDraft(doc, selection.anchor), head: toDraft(doc, selection.head) }
+                },
+                setSelection({ anchor, head }) {
+                    const TextSelection = pmState()?.TextSelection
+                    const { state, view } = editor
+
+                    if (!TextSelection) return
+
+                    const from = state.doc.resolve(toEditor(state.doc, anchor))
+                    const to = state.doc.resolve(toEditor(state.doc, head))
+
+                    if (!from.parent.isTextblock || !to.parent.isTextblock) return
+
+                    view.dispatch(state.tr.setSelection(new TextSelection(from, to)).setMeta(REMOTE, true).setMeta('addToHistory', false))
+                    keepCaretTypable()
+                },
+                geometry: ({ anchor, head }) => geometry(editor.view, anchor, head),
+                isFocused: () => editor.isFocused,
+                isBusy: () => !!editor.view.composing,
+                isDirty: () => dirty,
+                isAlive: () => !editor.isDestroyed && root.isConnected && window.Alpine?.$data(root)?.getEditor?.() === editor,
+                destroy() {
+                    editor.off('update', onUpdate)
+                    editor.off('selectionUpdate', onSelection)
+                    window.removeEventListener('error', onError)
+                    window.removeEventListener('unhandledrejection', onError)
+                },
+            }
+        },
+    })
+}
+
 /** @param {(name: string, definition: AdapterDefinition) => void} register */
 export function registerFilamentAdapters(register) {
+    registerBuiltInAdapters(register)
+
     // MarkdownEditor: EasyMDE over CodeMirror 5.
     register('filament-markdown-editor', {
         format: 'text',
