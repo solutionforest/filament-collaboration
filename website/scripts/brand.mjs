@@ -66,20 +66,23 @@ const html = ({ eyebrow, title, description }) => `<!doctype html><html><head><s
     * { box-sizing: border-box; margin: 0; }
     body { width: 1200px; height: 630px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #fafafa; color: #18181b; position: relative; overflow: hidden;
         background-image: linear-gradient(rgb(24 24 27 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(24 24 27 / 5%) 1px, transparent 1px); background-size: 48px 48px; }
-    .card { position: absolute; inset: 40px; border: 1.5px solid rgb(24 24 27 / 14%); border-radius: 28px; background: rgb(255 255 255 / 92%); padding: 56px 60px; }
+    .card { position: absolute; inset: 40px; border: 1.5px solid rgb(24 24 27 / 14%); border-radius: 28px; background: rgb(255 255 255 / 92%); padding: 56px 60px 44px; display: flex; flex-direction: column; }
+    .text { margin: auto 0; padding: 24px 0; max-width: 600px; }
     .brand { display: flex; align-items: center; gap: 18px; font-size: 26px; font-weight: 700; }
     .brand svg { width: 56px; height: 56px; }
     .brand small { display: block; font-size: 17px; font-weight: 600; color: #71717a; }
-    .eyebrow { margin-top: 56px; font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #d97706; }
-    h1 { margin-top: 14px; max-width: 560px; font-size: 54px; line-height: 1.05; letter-spacing: -0.03em; }
-    p { margin-top: 22px; max-width: 540px; font-size: 23px; line-height: 1.45; color: #52525b; }
+    .eyebrow { font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #d97706; }
+    h1 { margin-top: 14px; font-size: 52px; line-height: 1.05; letter-spacing: -0.03em; }
+    p { margin-top: 20px; max-width: 560px; font-size: 22px; line-height: 1.45; color: #52525b; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .shot { position: absolute; right: -150px; bottom: -60px; width: 560px; border: 1.5px solid rgb(24 24 27 / 16%); border-radius: 18px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 35%); }
-    .url { position: absolute; left: 60px; bottom: 44px; font-size: 18px; font-weight: 600; color: #a1a1aa; }
+    .url { font-size: 18px; font-weight: 600; color: #a1a1aa; }
 </style></head><body><div class="card">
     <div class="brand">${mark}<div><small>Filament</small>Collaboration</div></div>
-    <div class="eyebrow">${escape(eyebrow)}</div>
-    <h1>${escape(title)}</h1>
-    <p>${escape(description)}</p>
+    <div class="text">
+        <div class="eyebrow">${escape(eyebrow)}</div>
+        <h1>${escape(title)}</h1>
+        <p>${escape(description)}</p>
+    </div>
     <span class="url">solutionforest.github.io/filament-collaboration</span>
 </div><img class="shot" src="${screenshot}"></body></html>`
 

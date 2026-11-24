@@ -5,7 +5,7 @@ import globals from 'globals'
 export default [
     // `scripts/` holds superseded browser scripts; the maintained ones are in `demo/tests/browser`.
     {
-        ignores: ['resources/dist/**', 'node_modules/**', 'scripts/**', 'demo/*', '!demo/tests', 'demo/tests/*', '!demo/tests/browser', '!demo/scripts', 'demo/scripts/browser-*', '!demo/packages', 'demo/packages/*/resources/dist/**'],
+        ignores: ['resources/dist/**', 'node_modules/**', 'scripts/**', 'demo/*', '!demo/tests', 'demo/tests/*', '!demo/tests/browser', '!demo/scripts', 'demo/scripts/browser-*', '!demo/packages', 'demo/packages/*/resources/dist/**', 'website/node_modules/**', 'website/src/**', 'website/.vitepress/cache/**', 'website/.vitepress/dist/**'],
     },
     js.configs.recommended,
     {
@@ -28,7 +28,7 @@ export default [
     },
     {
         // Node scripts; the browser tests also run code in the page, so they see both.
-        files: ['tests/js/**', 'demo/tests/browser/**', 'demo/scripts/**', 'demo/packages/vite.config.js', 'vite.config.js', 'eslint.config.js'],
+        files: ['tests/js/**', 'demo/tests/browser/**', 'demo/scripts/**', 'demo/packages/vite.config.js', 'vite.config.js', 'eslint.config.js', 'website/scripts/**'],
         languageOptions: { globals: { ...globals.node, ...globals.browser } },
         // `page.evaluate((x) => ..., x)` passes values into the page under the same name.
         rules: { 'no-console': 'off', 'no-shadow': 'off' },
