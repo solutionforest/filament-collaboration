@@ -21,7 +21,7 @@
 | | |
 | --- | --- |
 | **Live fields** | Text inputs, textareas and Filament's own `RichEditor`, Markdown and code editors merge character by character, also inside repeaters and builders. Selects, toggles, dates and tags take the latest choice. |
-| **Any editor** | TinyMCE, CKEditor, Quill, Trix or your own become live through a short JavaScript [adapter](docs/guide.md#adapters-for-other-editors); fields that cannot be live say who is editing them, and can lock. |
+| **Any editor, any component** | TinyMCE, CKEditor, Quill, Trix or your own fields become live through a short JavaScript adapter: **[make your own component live](docs/custom-components.md)**, step by step. Fields that cannot be live say who is editing them, and can lock. |
 | **See each other** | Avatars in the header, an outline and name on the field each person is in, their caret and selection, and who is on which record in tables. |
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
@@ -102,6 +102,8 @@ The **[usage guide](docs/guide.md)** walks through everything step by step:
 10. [Debugging](docs/guide.md#10-debugging)
 11. [Troubleshooting](docs/guide.md#11-troubleshooting)
 
+Your own fields: **[make your own component live](docs/custom-components.md)**, a step-by-step guide with a post composer and a star rating.
+
 How it works inside, and how fast it is: **[architecture and performance](docs/architecture.md)**.
 
 ## A taste
@@ -162,6 +164,10 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 | | |
 | --- | --- |
 | ![A live upload](docs/media/live-uploads.png) | ![A relation manager refreshed](docs/media/relation-manager.png) |
+
+**Your own components**: a post composer and a star rating from `demo/packages/filament-widgets`, live through adapters. [The guide](docs/custom-components.md) builds them step by step.
+
+![A custom composer and rating, live](docs/media/custom-components.png)
 
 The demo also has a **Translated pages** resource (English and Chinese, in tabs) and a **Checklist** relation manager on articles. To run it on Redis presence, set `FILAMENT_COLLABORATION_PRESENCE=redis` in `.env`.
 

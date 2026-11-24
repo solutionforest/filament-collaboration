@@ -12,7 +12,7 @@
         "tutorial": "node --no-warnings scripts/record-tutorial.mjs",
         "test:latency": "node --no-warnings tests/browser/latency.mjs",
         "test:chaos": "node --no-warnings tests/browser/chaos.mjs",
-        "build:editors": "for p in tinymce ckeditor quill trix; do PACKAGE=filament-$p vite build -c packages/vite.config.js || exit 1; done"
+        "build:editors": "for p in tinymce ckeditor quill trix widgets; do PACKAGE=filament-$p vite build -c packages/vite.config.js || exit 1; done"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

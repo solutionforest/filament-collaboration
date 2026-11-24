@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6d05b082c0b7004ac71c9effea735bb1",
+    "content-hash": "c029bcec8979f5d23edf74ec2ad4f360",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -899,7 +899,7 @@
         },
         {
             "name": "demo/filament-ckeditor",
-            "version": "dev-feat/translations",
+            "version": "dev-fix/mention-at-caret",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-ckeditor",
@@ -936,7 +936,7 @@
         },
         {
             "name": "demo/filament-quill",
-            "version": "dev-feat/translations",
+            "version": "dev-fix/mention-at-caret",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-quill",
@@ -973,7 +973,7 @@
         },
         {
             "name": "demo/filament-tinymce",
-            "version": "dev-feat/translations",
+            "version": "dev-fix/mention-at-caret",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-tinymce",
@@ -1010,7 +1010,7 @@
         },
         {
             "name": "demo/filament-trix",
-            "version": "dev-feat/translations",
+            "version": "dev-fix/mention-at-caret",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-trix",
@@ -1040,6 +1040,43 @@
                 "MIT"
             ],
             "description": "A Trix form field for Filament, made live by filament-collaboration through an adapter. A demo of what a third-party package does.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "demo/filament-widgets",
+            "version": "dev-fix/mention-at-caret",
+            "dist": {
+                "type": "path",
+                "url": "packages/filament-widgets",
+                "reference": "3aa81ace665a8b61b74cff6eae9f31b6133476b1"
+            },
+            "require": {
+                "filament/forms": "^5.8.3",
+                "php": "^8.3"
+            },
+            "suggest": {
+                "solutionforest/filament-collaboration": "Makes the fields live, the composer with carets"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Demo\\Widgets\\WidgetsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Demo\\Widgets\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Two custom Filament fields, a post composer and a star rating, made live by filament-collaboration through adapters. The example docs/custom-components.md walks through.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -6354,11 +6391,11 @@
         },
         {
             "name": "solutionforest/filament-collaboration",
-            "version": "dev-feat/translations",
+            "version": "dev-fix/mention-at-caret",
             "dist": {
                 "type": "path",
                 "url": "..",
-                "reference": "f0a1bb6ffc14b74bc59c1afba3c232fc201807de"
+                "reference": "a0fae117d389b6bb48526fe8e78ffcd8bd69c1dd"
             },
             "require": {
                 "filament/filament": "^5.8.3",
@@ -13714,6 +13751,7 @@
         "demo/filament-quill": 20,
         "demo/filament-tinymce": 20,
         "demo/filament-trix": 20,
+        "demo/filament-widgets": 20,
         "solutionforest/filament-collaboration": 20
     },
     "prefer-stable": true,

@@ -1,0 +1,77 @@
+.demo-composer {
+    border: 1px solid rgb(0 0 0 / 10%);
+    border-radius: 0.5rem;
+    background: #fff;
+}
+
+.demo-composer-input {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 0;
+    background: transparent;
+    font-size: 0.9375rem;
+    resize: vertical;
+}
+
+.demo-composer-input:focus {
+    outline: none;
+}
+
+.demo-composer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-top: 1px solid rgb(0 0 0 / 6%);
+    color: #71717a;
+    font-size: 0.75rem;
+}
+
+.demo-composer-footer svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke-width: 2.5;
+    transform: rotate(-90deg);
+}
+
+.demo-composer-footer circle:first-child {
+    stroke: rgb(0 0 0 / 10%);
+}
+
+.demo-composer-footer circle:last-child {
+    stroke: #f59e0b;
+    stroke-dasharray: 50.3;
+    stroke-linecap: round;
+}
+
+.demo-composer-over {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.demo-rating {
+    display: flex;
+    gap: 0.125rem;
+}
+
+.demo-rating button {
+    font-size: 1.5rem;
+    line-height: 1;
+    color: rgb(0 0 0 / 15%);
+}
+
+.demo-rating button.demo-rating-on {
+    color: #f59e0b;
+}
+
+.dark .demo-composer {
+    border-color: rgb(255 255 255 / 10%);
+    background: transparent;
+}
+
+.dark .demo-rating button {
+    color: rgb(255 255 255 / 20%);
+}

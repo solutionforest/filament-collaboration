@@ -487,6 +487,8 @@ For a picker, `ValueType::make([StarRating::class])` does the same without a cla
 
 ### Adapters for other editors
 
+> **New to adapters?** [Make your own component live](custom-components.md) builds two from scratch, a text composer with carets and a star rating, with tests.
+
 A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions. Filament's `MarkdownEditor` and `CodeEditor` are live through the adapters it ships, in `resources/js/adapters/filament.js`.
 
 **1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:

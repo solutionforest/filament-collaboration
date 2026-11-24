@@ -873,6 +873,39 @@ describe('editors made live by adapters', () => {
     }
 })
 
+describe('custom components, through adapters', () => {
+    const composer = (page) => page.locator('.fi-page .demo-composer-input')
+    const stars = (page) => page.locator('.fi-page .demo-rating')
+
+    test('two people typing in a custom composer both keep their words, with carets; a rating click reaches the other', async () => {
+        const id = await together()
+
+        await composer(alice).click()
+        await alice.keyboard.type('the fox', { delay: 25 })
+        await eventually(async () => assert.equal(await composer(bob).inputValue(), 'the fox'), 'Bob did not get the text')
+
+        await composer(alice).evaluate((input) => input.setSelectionRange(3, 3))
+        await composer(bob).evaluate((input) => {
+            input.focus()
+            input.setSelectionRange(7, 7)
+        })
+        await Promise.all([alice.keyboard.type(' quick', { delay: 70 }), bob.keyboard.type(' jumps', { delay: 65 })])
+
+        await eventually(async () => {
+            assert.equal(await composer(alice).inputValue(), 'the quick fox jumps')
+            assert.equal(await composer(bob).inputValue(), 'the quick fox jumps')
+        }, 'the typing did not merge')
+        await eventually(async () => assert.ok(await bob.locator('.fi-collab-caret:visible').count(), 'no caret'), 'Bob does not see where Alice is')
+        assert.match(await bob.locator('.fi-page .demo-composer-footer').innerText(), /261/)
+
+        await stars(alice).getByRole('radio', { name: '4 / 5' }).click()
+        await eventually(async () => assert.equal(await stars(bob).getByRole('radio', { name: '4 / 5' }).getAttribute('aria-checked'), 'true'), 'Bob did not get the rating')
+
+        await save(bob)
+        await eventually(() => assert.deepEqual([app.article(id).social_post, app.article(id).rating], ['the quick fox jumps', 4]), 'the components were not saved')
+    })
+})
+
 describe('third-party HTML editors, through adapters', () => {
     const call = (page, name, method, ...args) =>
         page.evaluate(({ name, method, args }) => window.Alpine.$data(document.querySelector(`.fi-page .demo-${name}`))[method](...args), { name, method, args })
@@ -1224,12 +1257,18 @@ describe('seeing each other', () => {
 
         const panel = alice.locator('[data-collaboration-comments]')
 
+        // Once the slide-over has slid in.
+        await eventually(async () => assert.ok(await panel.locator('textarea').evaluate((input) => input.getBoundingClientRect().right <= innerWidth)), 'the slide-over did not open')
         await panel.locator('[data-collaboration-comment-field]').selectOption('excerpt')
         await panel.locator('textarea').pressSequentially('Shorter, @Bo')
+        await panel.locator('.fi-collab-mentions').waitFor()
 
         // The list opens at the @, on the line below it, not under the whole box.
-        const box = await panel.locator('textarea').boundingBox()
-        const list = await panel.locator('.fi-collab-mentions').boundingBox()
+        // Measured in one frame: the slide-over may still be sliding in.
+        const { box, list } = await panel.evaluate((element) => ({
+            box: element.querySelector('textarea').getBoundingClientRect().toJSON(),
+            list: element.querySelector('.fi-collab-mentions').getBoundingClientRect().toJSON(),
+        }))
 
         assert.ok(list.y > box.y && list.y < box.y + 50, `the list is not under the first line: ${JSON.stringify({ box, list })}`)
         assert.ok(list.x > box.x + 40, `the list is not at the @: ${JSON.stringify({ box, list })}`)

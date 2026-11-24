@@ -8,6 +8,8 @@ use Demo\CkEditor\CkEditor;
 use Demo\Quill\QuillEditor;
 use Demo\TinyMce\TinyMceEditor;
 use Demo\Trix\TrixEditor;
+use Demo\Widgets\PostComposer;
+use Demo\Widgets\StarRating;
 use Filament\Forms\Components\Builder as BlockBuilder;
 use Filament\Forms\Components\Builder\Block;
 use Filament\Forms\Components\CodeEditor;
@@ -101,6 +103,13 @@ class DocumentForm
                             CkEditor::make('ckeditor_html')->label('CKEditor 5'),
                             QuillEditor::make('quill_html')->label('Quill'),
                             TrixEditor::make('trix_html')->label('Trix'),
+                        ])
+                        ->collapsible(),
+                    Section::make('Custom components')
+                        ->description('Two fields of your own, in packages/filament-widgets: a composer that merges by character with carets, and a rating where the latest choice wins. docs/custom-components.md builds them step by step.')
+                        ->schema([
+                            PostComposer::make('social_post')->label('Social post')->characterLimit(280),
+                            StarRating::make('rating')->label('Editor rating'),
                         ])
                         ->collapsible(),
                     Section::make('SEO')

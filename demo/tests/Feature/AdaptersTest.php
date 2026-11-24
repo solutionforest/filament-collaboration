@@ -94,3 +94,31 @@ it('keeps stored HTML exactly as it was when the draft did not change it', funct
     expect($article->fresh()->quill_html)->toBe($stored)
         ->and($article->fresh()->title)->toBe('HTML!');
 });
+
+it('makes custom components live through their adapters: a composer by character, a rating by value', function (): void {
+    $article = Document::create(['title' => 'Custom components']);
+    $alice = Editor::open($this, User::factory()->create(), $article);
+    $bob = Editor::open($this, User::factory()->create(), $article);
+
+    expect($alice->config['fields'])->toMatchArray(['social_post' => 'text', 'rating' => 'value'])
+        ->and($alice->config['adapters'])->toMatchArray(['social_post' => 'demo-post-composer', 'rating' => 'demo-star-rating']);
+
+    $alice->sync();
+    $bob->sync();
+    $alice->type('social_post', 'Shipping today')->type('rating', 4)->sync();
+    $bob->sync();
+    $bob->type('social_post', 'Shipping today!')->sync();
+    $alice->sync();
+
+    expect([$alice->value('social_post'), $alice->value('rating')])->toBe(['Shipping today!', 4])
+        ->and([$bob->value('social_post'), $bob->value('rating')])->toBe(['Shipping today!', 4]);
+});
+
+it('validates custom components like any field: the character limit and the number of stars', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(EditDocument::class, ['record' => Document::create(['title' => 'Limits'])->id])
+        ->fillForm(['social_post' => str_repeat('a', 281), 'rating' => 6])
+        ->call('save')
+        ->assertHasFormErrors(['social_post' => 'max', 'rating' => 'max']);
+});

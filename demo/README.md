@@ -27,7 +27,7 @@ What to try:
 | `npm run test:latency` | key press to another screen |
 | `npm run media` / `npm run tutorial` | the README's screenshots and video |
 
-`packages/` holds four small third-party-style field packages, TinyMCE, CKEditor 5, Quill and Trix, each made live by a JavaScript adapter: the examples to copy for your own editor. After changing one, run `npm run build:editors` and `php artisan filament:assets`.
+`packages/` holds four small third-party-style field packages, TinyMCE, CKEditor 5, Quill and Trix, each made live by a JavaScript adapter: the examples to copy for your own editor. `packages/filament-widgets` has two custom components, a post composer and a star rating, which [make your own component live](../docs/custom-components.md) builds step by step. After changing one, run `npm run build:editors` and `php artisan filament:assets`.
 
 `scripts/browser-*.mjs` are the earlier prototype's browser checks. They target its removed Yjs endpoints and no longer run; `npm run test:e2e` covers what they did.
 
