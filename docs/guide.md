@@ -489,7 +489,9 @@ For a picker, `ValueType::make([StarRating::class])` does the same without a cla
 
 > **New to adapters?** [Make your own component live](custom-components.md) builds two from scratch, a text composer with carets and a star rating, with tests.
 
-A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions. Filament's `MarkdownEditor` and `CodeEditor` are live through the adapters it ships, in `resources/js/adapters/filament.js`.
+A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions.
+
+**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. An adapter you write gets exactly what they get, and they are the best examples to copy. Only repeaters, builders and uploads, which are Filament's own structure rather than one editor, are bound differently.
 
 **1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:
 
@@ -509,6 +511,7 @@ An app can also name the adapter on one field: `TinyEditor::make('body')->collab
 | --- | --- | --- |
 | `FieldKind::Text` | `text`: a string | by character |
 | `FieldKind::RichText` | `html`: an HTML string | by character, block and mark; see [HTML editors](#html-editors) |
+| `FieldKind::RichText` | `rich`: a ProseMirror / TipTap JSON document | the same, for editors built on ProseMirror; `filamentCollaboration.prosemirror` has the helpers Filament's rich editor uses |
 | `FieldKind::Value` | `value`: any JSON | the latest change wins |
 
 **2. Register the adapter**, in JavaScript loaded on the panel:
@@ -545,7 +548,14 @@ window.filamentCollaboration
 
 `attach()` may also return `false` to say the editor cannot be live in this browser; the field then merges on save. The CodeMirror 6 adapter does this in Safari, where a change arriving mid-keystroke can lose that keystroke.
 
-Only `read` and `write` are required; without the selection methods, edits still merge but carets are not kept or shown. Write only what differs, so the editor keeps its own undo history: `minimalChange(old, next)` in `resources/js/adapters/registry.js` gives the range to replace.
+Only `read` and `write` are required; without the selection methods, edits still merge but carets are not kept or shown. The other capabilities Filament's own adapters use are open to yours:
+
+| | |
+| --- | --- |
+| `undo()` / `redo()` (on the context) | call them on Ctrl+Z instead of the editor's own undo: only this person's typing is undone, never a colleague's (`text` format) |
+| `recover(error, details)` (on the context) | the editor threw on a change: the draft is shown again, the error reported; repeated failures make the field merge on save |
+| `geometry({ anchor, head })` (on the handle) | a caret and a whole selection to draw, instead of `caretRect()` |
+| `isDirty()` (on the handle) | false when nothing changed since the last `read()`, for editors where reading is costly | Write only what differs, so the editor keeps its own undo history: `minimalChange(old, next)` in `resources/js/adapters/registry.js` gives the range to replace.
 
 If the adapter is missing, or throws, the field simply merges on save as before.
 

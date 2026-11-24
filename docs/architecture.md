@@ -19,6 +19,10 @@ sequenceDiagram
 
 With broadcasting on, the server also pushes the new operations to everyone in the room as soon as it stores them, and Bob's browser applies them without asking.
 
+## In the browser
+
+Every field that is not a list is bound through an **adapter**, Filament's own exactly like a third party's: `filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-markdown-editor` and `filament-code-editor` are registered with the same `registerAdapter()` an app uses, in `resources/js/adapters/filament.js`. One binding, `bindings/adapter.js`, connects any adapter to the shared draft: what is typed goes to the draft, what colleagues type is written back with the caret kept, per-person undo, carets to draw and recovery from editor errors. Repeaters, builders and uploads, which are Filament's own structure rather than one editor, have their own binding, `bindings/items.js`.
+
 ## The shared draft
 
 The draft is a CRDT, so edits made at the same time merge the same way in every browser and on the server:

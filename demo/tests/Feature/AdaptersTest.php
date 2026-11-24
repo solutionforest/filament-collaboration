@@ -4,6 +4,7 @@ use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Models\Document;
 use App\Models\User;
 use Filament\Forms\Components\Field;
+use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Schema;
 use Livewire\Livewire;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
@@ -121,4 +122,29 @@ it('validates custom components like any field: the character limit and the numb
         ->fillForm(['social_post' => str_repeat('a', 281), 'rating' => 6])
         ->call('save')
         ->assertHasFormErrors(['social_post' => 'max', 'rating' => 'max']);
+});
+
+it("edits Filament's own fields through adapters too, by the same API; only lists are bound otherwise", function (): void {
+    $editor = Editor::open($this, User::factory()->create(), Document::create(['title' => 'One code path']));
+
+    expect($editor->config['adapters'])->toMatchArray([
+        'title' => 'filament-text-input',
+        'excerpt' => 'filament-text-input',
+        'body_html' => 'filament-rich-editor',
+        'status' => 'filament-value',
+        'robots_noindex' => 'filament-value',
+        'newsletter_markdown' => 'filament-markdown-editor',
+        'tinymce_html' => 'demo-tinymce',
+    ])
+        ->and($editor->config['adapters'])->not->toHaveKeys(['key_points', 'gallery'])
+        ->and(array_keys($editor->config['adapters']))->toEqualCanonicalizing(
+            array_keys(array_filter($editor->config['fields'], fn (string $kind): bool => $kind !== 'items')),
+        );
+});
+
+it("keeps Filament's rich editor a document on save, and other rich editors HTML", function (): void {
+    $resolver = CollaborationPlugin::get()->getFieldResolver();
+    $schema = adapterSchema([RichEditor::make('body'), AdaptedEditor::make('notes')->collaborative(adapter: 'acme-editor', as: FieldKind::RichText)]);
+
+    expect($resolver->htmlFields($schema, ['body' => FieldKind::RichText, 'notes' => FieldKind::RichText]))->toBe(['notes']);
 });

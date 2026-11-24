@@ -441,7 +441,8 @@ describe('picked values', () => {
 
 describe('repeaters and builders', () => {
     const points = (page) => page.locator('.fi-page input[id*="key_points"][id$=".point"]')
-    const values = async (page) => Promise.all((await points(page).all()).map((input) => input.inputValue()))
+    // Read at once: an item removed between counting and reading would leave a locator waiting.
+    const values = (page) => points(page).evaluateAll((inputs) => inputs.map((input) => input.value))
 
     test('items added, edited and removed by two people', async () => {
         const id = await together()

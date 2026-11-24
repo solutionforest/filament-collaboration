@@ -1,7 +1,11 @@
+import { AdapterBinding } from './adapter.js'
 import { ItemsBinding } from './items.js'
-import { RichTextBinding } from './rich-text.js'
-import { TextBinding } from './text.js'
-import { ValueBinding } from './value.js'
 
-/** One binding per `FieldKind`. */
-export const bindings = { text: TextBinding, rich: RichTextBinding, value: ValueBinding, items: ItemsBinding }
+/**
+ * Lists (repeaters, builders, uploads) are Filament's own structure, bound
+ * here. Every other field goes through an adapter, Filament's own fields
+ * exactly like a third-party editor.
+ *
+ * @param {FieldKind} kind
+ */
+export const bindingFor = (kind) => (kind === 'items' ? ItemsBinding : AdapterBinding)

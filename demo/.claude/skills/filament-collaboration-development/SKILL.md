@@ -108,9 +108,9 @@ $table->columns([PresenceColumn::make()])
     ->recordActions([EditAction::make()->collaborate()]); // presence in the edit modal, and its save merges into open editors
 ```
 
-## Third-party editors: adapters
+## Adapters: third-party editors and Filament's own fields
 
-Make a field the package does not know live by naming an adapter in PHP and registering it in JavaScript.
+Filament's own fields are adapters too (`filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-markdown-editor`, `filament-code-editor`): copy them from `resources/js/adapters/filament.js`. Make a field the package does not know live the same way: name an adapter in PHP and register it in JavaScript. Formats: `text`, `html`, `rich` (a ProseMirror / TipTap document, with `api.prosemirror` helpers) and `value`. Optional: `undo()`/`redo()` and `recover(error)` on the context, `geometry()` and `isDirty()` on the handle.
 
 ```php
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
@@ -146,6 +146,8 @@ window.filamentCollaboration
 - `attach()` returning `false` means "cannot be live in this browser": the field merges on save.
 - Do not keep the editor on Alpine reactive data (`this.editor = ...`): Alpine's proxy breaks editors such as CKEditor and Quill. Keep it on the element.
 - For a picker-like custom field, `ValueType::make([StarRating::class])` in `->fieldTypes([...])` is enough, without JavaScript.
+- A text field inside an Alpine component (a `<textarea>` with `x-model`): after `setRangeText()` in `write()`, dispatch an `input` event so `x-model` and the Livewire state follow. `api.caretRect(input, offset)` measures carets in any input or textarea.
+- Step-by-step guide with a post composer and a star rating: `docs/custom-components.md` in the package repository; the code is in `demo/packages/filament-widgets`.
 
 ## Real time and scale
 

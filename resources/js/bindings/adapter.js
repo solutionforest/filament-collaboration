@@ -1,17 +1,33 @@
-import { canonical, toIndex, toOffset, wellFormed } from '../crdt/id.js'
+import { canonical, hasLoneSurrogate, toIndex, toOffset, wellFormed } from '../crdt/id.js'
 import { normalizeValue } from '../crdt/document.js'
 import { toDocument, toTokens } from '../crdt/rich-text.js'
 import { documentToHtml, htmlToDocument } from '../adapters/html.js'
 import { plain } from '../dom.js'
 import { adapters } from '../adapters/registry.js'
 import { Binding } from './binding.js'
+import { History } from './history.js'
+
+const RECOVERIES = 3
+const RECOVERY_WINDOW = 10_000
+
+/** The adapter each built-in kind of field uses when the server names none. */
+const BUILT_IN = /** @type {Record<string, string>} */ ({ text: 'filament-text-input', value: 'filament-value', rich: 'filament-rich-editor' })
 
 const normalizeText = (/** @type {unknown} */ value) => wellFormed(String(value ?? '')).replace(/\r\n?/g, '\n')
 
+/** @type {(value: unknown) => boolean} */
+const containsLoneSurrogate = (value) =>
+    typeof value === 'string'
+        ? hasLoneSurrogate(value)
+        : Array.isArray(value)
+          ? value.some(containsLoneSurrogate)
+          : !!value && typeof value === 'object' && Object.values(value).some(containsLoneSurrogate)
+
 /**
- * A field edited through an adapter (`adapters/registry.js`): somebody
- * else's editor, made live. The adapter knows the editor; this knows the
- * shared draft, exactly as the built-in bindings do.
+ * Every field that is not a list is edited through an adapter
+ * (`adapters/registry.js`): Filament's own text inputs, pickers and rich
+ * editor exactly like a third-party editor. The adapter knows the editor;
+ * this knows the shared draft.
  */
 export class AdapterBinding extends Binding {
     /** @type {AdapterHandle | null} */
@@ -24,6 +40,12 @@ export class AdapterBinding extends Binding {
     seen = ''
     /** @type {{anchor: Id | null, head: Id | null} | null} */
     anchors = null
+    /** @type {any} the draft's value before a remote change, for undo */
+    before = undefined
+    /** Undo and redo of this person's own typing, for text adapters that ask for it. */
+    history = new History()
+    /** @type {number[]} when the editor recovered, recently */
+    recoveries = []
     warned = false
     /** The adapter said this editor cannot be live here: it merges on save. */
     unsupported = false
@@ -31,11 +53,16 @@ export class AdapterBinding extends Binding {
     writing = false
 
     get name() {
-        return this.room.config.adapters?.[this.field] ?? ''
+        return this.room.config.adapters?.[this.field] ?? BUILT_IN[this.room.config.fields[this.field] ?? ''] ?? ''
     }
 
     get format() {
         return this.definition?.format ?? 'value'
+    }
+
+    /** Text and rich formats are sequences: characters, or blocks, characters and embeds. */
+    get isSequence() {
+        return this.format !== 'value'
     }
 
     /** A text field's characters, or a rich field's tokens. */
@@ -51,7 +78,8 @@ export class AdapterBinding extends Binding {
         if (this.unsupported) return false
 
         const definition = adapters.get(this.name)
-        const element = this.room.dom.wrapper(this.field)
+        // A picker works through the Livewire state: it needs no element of its own.
+        const element = this.room.dom.wrapper(this.field) ?? (definition?.format === 'value' ? this.room.dom.root : null)
 
         if (!definition || !element) return false
         if (this.handle && this.element === element && this.handle.isAlive?.() !== false) return true
@@ -66,11 +94,13 @@ export class AdapterBinding extends Binding {
                 wire: this.wire,
                 changed: () => this.collect(),
                 moved: () => this.room.cursorMoved(),
+                undo: () => this.travel('undo'),
+                redo: () => this.travel('redo'),
+                recover: (error, details) => this.recover(error, details),
             })
 
             if (handle === false) {
-                this.unsupported = true
-                this.room.bindingFailed(this.field)
+                this.giveUp(null)
 
                 return false
             }
@@ -87,19 +117,30 @@ export class AdapterBinding extends Binding {
         this.definition = definition
         this.element = element
 
-        const current = this.read()
+        let current
+
+        try {
+            current = this.read()
+        } catch (error) {
+            this.giveUp(error)
+
+            return false
+        }
+
         const initial = this.normalize(this.room.initialValue(this.field))
         const shared = this.document.value(this.field)
+        // A rich editor's document differs from the stored one in ways that do not matter until somebody types.
+        const mayHaveTyped = this.format !== 'rich' || this.focused()
 
         // Typed into before live editing connected: keep that.
-        if (canonical(current) !== canonical(initial) && canonical(this.normalize(shared)) === canonical(initial)) {
+        if (mayHaveTyped && canonical(current) !== canonical(initial) && canonical(this.normalize(shared)) === canonical(initial)) {
             this.seen = canonical(current)
             this.room.change(this.field, current, this.caret())
         } else {
             this.render()
         }
 
-        return true
+        return !this.unsupported
     }
 
     /**
@@ -114,9 +155,9 @@ export class AdapterBinding extends Binding {
     /** @param {unknown} value */
     normalize(value) {
         if (this.format === 'text') return normalizeText(value)
-        if (this.format !== 'html') return normalizeValue(plain(value))
+        if (this.format === 'value') return normalizeValue(plain(value))
 
-        // HTML, or a document already: in the form the draft holds it.
+        // HTML or a document: in the form the draft holds it.
         try {
             return toDocument(toTokens(typeof value === 'string' ? htmlToDocument(value) : /** @type {RichNode | null} */ (value)))
         } catch {
@@ -138,32 +179,63 @@ export class AdapterBinding extends Binding {
     }
 
     collect() {
-        if (!this.handle || this.isBusy || this.writing) return
+        const handle = this.handle
 
-        const value = this.read()
+        if (!handle || this.isBusy || this.writing || handle.isDirty?.() === false) return
+
+        let raw
+        let value
+
+        try {
+            raw = handle.read()
+            value = this.normalize(raw)
+        } catch (error) {
+            this.giveUp(error)
+
+            return
+        }
+
         const signature = canonical(value)
 
         if (signature === this.seen) return
 
         this.seen = signature
-        this.room.change(this.field, value, this.caret())
+
+        const caret = this.caret()
+
+        if (this.format === 'text') this.history.local(this.document.value(this.field), value, caret)
+
+        this.room.change(this.field, value, caret)
+
+        // Half an emoji: the draft holds well-formed text, and the editor must too.
+        if (containsLoneSurrogate(raw)) {
+            this.capture()
+            queueMicrotask(() => this.render(true))
+        }
     }
 
     capture() {
-        this.anchors = this.format === 'value' ? null : this.cursor()
+        this.before = this.document.value(this.field)
+        this.anchors = this.isSequence ? this.cursor() : null
     }
 
-    render() {
+    /** @param {boolean} force write even if the editor seems to show the draft already */
+    render(force = false) {
         const handle = this.handle
+        const anchors = this.anchors
+        const before = this.before
+
+        // Whatever happens, these belong to this render only.
+        this.anchors = null
+        this.before = undefined
 
         if (!handle) return
 
         const value = this.document.value(this.field)
-        const anchors = this.anchors
 
-        this.anchors = null
+        if (this.format === 'text' && before !== undefined && before !== value) this.history.remote(before, value)
 
-        if (canonical(this.normalize(value)) === canonical(this.read())) {
+        if (!force && canonical(this.normalize(value)) === canonical(this.read())) {
             this.seen = canonical(this.read())
 
             return
@@ -172,9 +244,10 @@ export class AdapterBinding extends Binding {
         this.writing = true
 
         try {
-            handle.write(this.format === 'html' ? documentToHtml(this.normalize(value)) : value)
+            handle.write(this.format === 'html' ? documentToHtml(this.normalize(value)) : this.format === 'rich' ? this.normalize(value) : value)
         } catch (error) {
-            this.warn(error)
+            this.writing = false
+            this.recover(error)
 
             return
         } finally {
@@ -189,6 +262,39 @@ export class AdapterBinding extends Binding {
 
             if (anchor !== null && head !== null) handle.setSelection?.({ anchor, head })
         }
+
+        // A picker other fields depend on: render the form again, as its own change would.
+        if (this.format === 'value' && before !== undefined && this.room.config.reactive.includes(this.field)) this.room.rerenderSoon()
+    }
+
+    /**
+     * Undo or redo this person's own typing, leaving colleagues' alone.
+     *
+     * @param {'undo' | 'redo'} direction
+     */
+    travel(direction) {
+        if (this.format !== 'text' || !this.handle) return
+
+        this.collect()
+
+        const result = this.history[direction](this.document.value(this.field))
+
+        if (!result) return
+
+        this.room.change(this.field, result.value, result.caret)
+        this.writing = true
+
+        try {
+            this.handle.write(result.value)
+        } finally {
+            this.writing = false
+        }
+
+        this.seen = canonical(this.read())
+
+        const offset = toOffset(result.value, result.caret)
+
+        this.handle.setSelection?.({ anchor: offset, head: offset })
     }
 
     /**
@@ -207,7 +313,7 @@ export class AdapterBinding extends Binding {
     /** @returns {Cursor | null} */
     cursor() {
         const sequence = this.sequence
-        const selection = this.format !== 'value' && this.focused() ? this.handle?.selection?.() : null
+        const selection = this.isSequence && this.focused() && !this.isBusy ? this.handle?.selection?.() : null
 
         if (!sequence || !selection) return null
 
@@ -221,13 +327,71 @@ export class AdapterBinding extends Binding {
      * @param {Cursor} cursor
      * @returns {Geometry | null}
      */
-    geometry({ head }) {
-        const offset = this.handle?.caretRect ? this.offsetOf(head) : null
-        const caret = offset === null ? null : (this.handle?.caretRect?.(offset) ?? null)
+    geometry({ anchor, head }) {
+        const handle = this.handle
 
-        if (!caret || !this.element) return null
+        if (!handle || !this.element) return null
+
+        const to = this.offsetOf(head)
+
+        if (to === null) return null
+
+        if (handle.geometry) {
+            const from = this.offsetOf(anchor) ?? to
+
+            return handle.geometry({ anchor: from, head: to })
+        }
+
+        const caret = handle.caretRect?.(to) ?? null
+
+        if (!caret) return null
 
         return { caret: new DOMRect(caret.left, caret.top, 2, caret.height), selection: [], clip: this.element.getBoundingClientRect() }
+    }
+
+    /**
+     * The editor refused a change. Nothing typed is lost, as every edit is in
+     * the shared draft already: report it, then show the draft again with the
+     * caret where it was. Repeated failures give up: the field merges on save.
+     *
+     * @param {unknown} error
+     * @param {{selection?: unknown, doc?: unknown}} [details]
+     */
+    recover(error, details = {}) {
+        if (!this.handle) return
+
+        const now = Date.now()
+
+        this.recoveries = [...this.recoveries.filter((at) => now - at < RECOVERY_WINDOW), now]
+        this.room.reportProblem(this.field, error, { key: this.room.lastKey, ...details })
+
+        if (this.recoveries.length > RECOVERIES) {
+            this.giveUp(error)
+
+            return
+        }
+
+        // The editor's caret is in a state the draft never had: let the editor map it through the reset.
+        try {
+            this.anchors = null
+            this.before = undefined
+            this.render(true)
+        } catch (failure) {
+            this.giveUp(failure)
+        }
+    }
+
+    /**
+     * This editor cannot be live here: it merges on save instead.
+     *
+     * @param {unknown} error null when the adapter said so itself
+     */
+    giveUp(error) {
+        if (error) console.warn(`[filament-collaboration] "${this.field}" will merge when saved instead.`, error)
+
+        this.unsupported = true
+        this.room.bindingFailed(this.field)
+        this.detach()
     }
 
     /** @param {unknown} error */

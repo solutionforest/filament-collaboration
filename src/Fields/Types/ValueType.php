@@ -16,6 +16,7 @@ use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
+use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 
@@ -23,7 +24,7 @@ use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
  * Fields picked rather than typed. Share your own with
  * `ValueType::make([StarRating::class])`.
  */
-class ValueType implements FieldType
+class ValueType implements FieldType, UsesAdapter
 {
     /** @param list<class-string<Field>> $components */
     final public function __construct(private readonly array $components) {}
@@ -84,5 +85,10 @@ class ValueType implements FieldType
         // A many-to-many loads through `modifyQueryUsing()`, often scoped to the user.
         return ($field instanceof Select && $field->isMultiple() && $field->hasRelationship())
             || ($field instanceof CheckboxList && filled($field->getRelationshipName()));
+    }
+
+    public function getAdapter(Field $field): string
+    {
+        return 'filament-value';
     }
 }

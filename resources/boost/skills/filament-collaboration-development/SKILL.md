@@ -108,9 +108,9 @@ $table->columns([PresenceColumn::make()])
     ->recordActions([EditAction::make()->collaborate()]); // presence in the edit modal, and its save merges into open editors
 ```
 
-## Third-party editors: adapters
+## Adapters: third-party editors and Filament's own fields
 
-Make a field the package does not know live by naming an adapter in PHP and registering it in JavaScript.
+Filament's own fields are adapters too (`filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-markdown-editor`, `filament-code-editor`): copy them from `resources/js/adapters/filament.js`. Make a field the package does not know live the same way: name an adapter in PHP and register it in JavaScript. Formats: `text`, `html`, `rich` (a ProseMirror / TipTap document, with `api.prosemirror` helpers) and `value`. Optional: `undo()`/`redo()` and `recover(error)` on the context, `geometry()` and `isDirty()` on the handle.
 
 ```php
 use SolutionForest\FilamentCollaboration\Enums\FieldKind;

@@ -8,6 +8,7 @@ use Closure;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
@@ -76,7 +77,8 @@ final readonly class FieldResolver
         foreach (FormState::fields($schema, withHidden: false) as $path => $field) {
             $path = (string) $path;
 
-            if (isset($live[$path]) && ($adapter = $this->adapterOf($field)) !== null) {
+            // Filament's own fields go through adapters too, named by their kind unless a type names one.
+            if (isset($live[$path]) && ($adapter = $this->adapterOf($field) ?? $live[$path]->defaultAdapter()) !== null) {
                 $adapters[$path] = $adapter;
             }
         }
@@ -116,7 +118,8 @@ final readonly class FieldResolver
         foreach (FormState::fields($schema) as $path => $field) {
             $path = (string) $path;
 
-            if (($kinds[$path] ?? null) === FieldKind::RichText && $this->adapterOf($field) !== null) {
+            // Filament's own rich editor keeps its document; other editors' adapters hand over HTML.
+            if (($kinds[$path] ?? null) === FieldKind::RichText && ! $field instanceof RichEditor && $this->adapterOf($field) !== null) {
                 $fields[] = $path;
             }
         }
