@@ -66,7 +66,14 @@ export default function demoTrix({ state }) {
             })
 
             this.$watch('state', (value) => {
-                if (trix.editor && (value ?? '') !== trix.value) trix.editor.loadHTML(value ?? '')
+                if (!trix.editor || (value ?? '') === trix.value) return
+
+                // Reloading moves the caret to the end: keep it where the person typing has it.
+                const range = document.activeElement === trix ? trix.editor.getSelectedRange() : null
+
+                trix.editor.loadHTML(value ?? '')
+
+                if (range) trix.editor.setSelectedRange(range)
             })
         },
 

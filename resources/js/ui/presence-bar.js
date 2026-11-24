@@ -157,7 +157,7 @@ export class PresenceBar {
         const person = this.room.presence.people.find((item) => item.key === key)
 
         return element('span', { class: 'fi-collab-notice', role: 'status' }, [
-            element('span', { text: translate(strings.following, { name: person?.name ?? '' }) }),
+            element('span', { text: translate(strings.following, { name: person?.name ?? this.room.followedName ?? '' }) }),
             element('button', {
                 type: 'button',
                 class: 'fi-collab-link',

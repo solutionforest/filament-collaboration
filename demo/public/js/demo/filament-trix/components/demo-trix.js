@@ -6429,7 +6429,9 @@ function pa({ state: e }) {
 			t.setAttribute("input", e.id), t.classList.add("trix-content"), this.$refs.editor.append(e, t), this.trix = t, t.addEventListener("trix-change", () => {
 				t.value !== this.state && (this.state = t.value);
 			}), this.$watch("state", (e) => {
-				t.editor && (e ?? "") !== t.value && t.editor.loadHTML(e ?? "");
+				if (!t.editor || (e ?? "") === t.value) return;
+				let n = document.activeElement === t ? t.editor.getSelectedRange() : null;
+				t.editor.loadHTML(e ?? ""), n && t.editor.setSelectedRange(n);
 			});
 		},
 		place(e) {
