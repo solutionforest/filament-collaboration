@@ -197,7 +197,8 @@ export class Overlay {
     }
 
     /**
-     * Initials on a tab, step or section header, for the people in a field it hides.
+     * Initials on a tab, step or section header's top right corner, for the
+     * people in a field it hides.
      *
      * @param {Element} header
      * @param {Person[]} present
@@ -211,11 +212,11 @@ export class Overlay {
         const people = [...new Map(present.map((person) => [person.key, person])).values()]
         const shown = people.slice(0, people.length > MAX_CHIPS ? MAX_CHIPS - 1 : MAX_CHIPS)
         shown.forEach((person, index) => {
-            shapes.push({ kind: 'chip', left: box.right - 6 - index * 14, top: box.top + 2, color: person.color, text: person.initials })
+            shapes.push({ kind: 'chip', left: box.right + 4 - index * 16, top: box.top + 2, color: person.color, text: person.initials })
         })
 
         if (people.length > shown.length) {
-            shapes.push({ kind: 'chip', left: box.right - 6 - shown.length * 14, top: box.top + 2, color: '#71717a', text: `+${people.length - shown.length}` })
+            shapes.push({ kind: 'chip', left: box.right + 4 - shown.length * 16, top: box.top + 2, color: '#71717a', text: `+${people.length - shown.length}` })
         }
     }
 

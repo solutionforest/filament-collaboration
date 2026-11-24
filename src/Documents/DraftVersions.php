@@ -72,8 +72,16 @@ final class DraftVersions
 
             $row = Data::map($row);
             $values = array_intersect_key(Data::decode($row['values'] ?? null), $labels);
-            $older = isset($rows[$index + 1]) ? array_intersect_key(Data::decode(Data::map($rows[$index + 1])['values'] ?? null), $labels) : [];
             $changed = [];
+
+            // The first version kept has nothing before it to compare with: it is where the history starts.
+            if (! isset($rows[$index + 1])) {
+                $versions[] = self::version($row, []);
+
+                continue;
+            }
+
+            $older = array_intersect_key(Data::decode(Data::map($rows[$index + 1])['values'] ?? null), $labels);
 
             foreach ($values as $field => $value) {
                 if (Data::encode($value) !== Data::encode($older[$field] ?? null)) {
@@ -81,16 +89,26 @@ final class DraftVersions
                 }
             }
 
-            $versions[] = [
-                'id' => Data::int($row['id'] ?? null),
-                'reason' => Data::string($row['reason'] ?? null),
-                'name' => Data::nullableString($row['user_name'] ?? null),
-                'at' => CarbonImmutable::createFromTimestamp(Data::int($row['created_at'] ?? null)),
-                'changed' => $changed,
-            ];
+            $versions[] = self::version($row, $changed);
         }
 
         return $versions;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  list<string>  $changed
+     * @return array{id: int, reason: string, name: string|null, at: CarbonImmutable, changed: list<string>}
+     */
+    private static function version(array $row, array $changed): array
+    {
+        return [
+            'id' => Data::int($row['id'] ?? null),
+            'reason' => Data::string($row['reason'] ?? null),
+            'name' => Data::nullableString($row['user_name'] ?? null),
+            'at' => CarbonImmutable::createFromTimestamp(Data::int($row['created_at'] ?? null)),
+            'changed' => $changed,
+        ];
     }
 
     /** @return array<string, mixed>|null the draft's values in a version */

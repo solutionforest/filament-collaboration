@@ -38,6 +38,9 @@ const REPORT_BYTES = 16_000
  * @property {number} [relations] raised whenever somebody changes related records in a relation manager
  */
 
+/** How long the person followed may be missing from the room before following stops. */
+const FOLLOW_GRACE = 10000
+
 /** @type {(milliseconds: number) => Promise<void>} */
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
@@ -59,6 +62,10 @@ export class Room {
     relations = null
     /** @type {string | null} */
     followedField = null
+    /** @type {number | null} when the person followed was last missing from the room, if they are now */
+    followedMissingSince = null
+    /** @type {string | null} their name, for while they are missing */
+    followedName = null
     /** The `data-collaboration` this room last checked, and whether it named another draft. */
     source = ''
     stale = false
@@ -815,7 +822,9 @@ export class Room {
      */
     follow(person) {
         this.following = person && !person.self ? person.key : null
+        this.followedName = this.following ? (person?.name ?? null) : null
         this.followedField = null
+        this.followedMissingSince = null
         this.followUp()
         this.bar.render()
     }
@@ -825,7 +834,16 @@ export class Room {
 
         const tabs = this.presence.people.filter((person) => person.key === this.following && !person.self)
 
-        if (!tabs.length) return this.follow(null)
+        // A reload or a slow heartbeat takes them out of the list for a moment; leaving takes longer.
+        if (!tabs.length) {
+            this.followedMissingSince ??= Date.now()
+
+            if (Date.now() - this.followedMissingSince > FOLLOW_GRACE) this.follow(null)
+
+            return
+        }
+
+        this.followedMissingSince = null
 
         const person = tabs.find((tab) => tab.field && !tab.idle) ?? tabs.find((tab) => tab.field)
 

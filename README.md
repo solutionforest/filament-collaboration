@@ -26,8 +26,12 @@
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
 | **Safe by default** | Every request is authorised again, every edit is validated, and fields a person cannot see never reach their browser. |
-| **Comments and history** | One slide-over: comments on fields with `@mentions` and notifications, and the draft's versions, restored for everybody in a click. See [Comments and version history](docs/guide.md#comments-and-version-history). |
+| **Comments and history** | One slide-over: comments on the record or a field with `@mentions` and notifications, and the draft's versions, restored for everybody in a click. See [Comments and version history](docs/guide.md#comments-and-version-history). |
+| **Nobody out of sight** | A colleague in a field behind a closed tab, wizard step or collapsed section shows on its header; **Follow** keeps your page on whichever field they are in. |
+| **Translations, uploads, relations** | Translated pages get one shared draft per language. Uploaded files appear for everyone at once. Relation managers refresh in colleagues' open copies. |
+| **Scales out** | Several app servers on one database, presence in Redis, changes over Reverb; a load test with 300 editors across two servers is included. |
 | **Merge on save for the rest** | Fields that cannot be live get a field-by-field three-way merge with a conflict dialog. |
+| **Ready for AI assistants** | Ships a [Laravel Boost](https://laravel.com/docs/boost) skill and guideline, so Claude Code, Cursor or Codex know how to use it in your app. |
 
 ## Requirements
 
@@ -135,18 +139,61 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 | ![Who is here](docs/media/people-panel.png) | ![Dark mode](docs/media/dark-mode.png) |
 | ![Quick edit](docs/media/quick-edit.png) | ![Phone](docs/media/mobile.png) |
 
+**Comments and history**, in one slide-over: comments on a field with `@mentions`, and versions of the shared draft to restore.
+
+| | |
+| --- | --- |
+| ![Comments with an @mention being picked](docs/media/comments.png) | ![The history, with a restore](docs/media/history.png) |
+
+**Out of sight, but not out of mind**: Bob is in a field behind the closed Publishing tab, so his initials are on the tab. Following him opens it.
+
+| | |
+| --- | --- |
+| ![Initials on a closed tab](docs/media/hidden-field.png) | ![Following a colleague](docs/media/follow.png) |
+
+**Two languages at once**, each in its own draft, and **editors from other packages**, live through an adapter:
+
+| | |
+| --- | --- |
+| ![A translated page, Bob in Chinese while Alice is in English](docs/media/translations.png) | ![TinyMCE and Quill, with carets](docs/media/third-party-editors.png) |
+
+**Uploads and relation managers**: a file Alice uploads is in Bob's form at once, and so are the tasks she adds to the checklist.
+
+| | |
+| --- | --- |
+| ![A live upload](docs/media/live-uploads.png) | ![A relation manager refreshed](docs/media/relation-manager.png) |
+
+The demo also has a **Translated pages** resource (English and Chinese, in tabs) and a **Checklist** relation manager on articles. To run it on Redis presence, set `FILAMENT_COLLABORATION_PRESENCE=redis` in `.env`.
+
+## With an AI assistant
+
+The package ships a [Laravel Boost](https://laravel.com/docs/boost) skill, `filament-collaboration-development`, and a short guideline. In an app that uses Boost, add the package to `boost.json` and update:
+
+```json
+{
+    "packages": ["solutionforest/filament-collaboration"]
+}
+```
+
+```bash
+php artisan boost:update
+```
+
+Your assistant then knows the traits, which fields are live, adapters, comments and history, relation managers, Redis presence and how to test them. The skill is in [`resources/boost/skills`](resources/boost/skills/filament-collaboration-development/SKILL.md), readable on its own too.
+
 ## Quality
 
 Each push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What |
 | --- | --- |
-| Pest | 281 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus the oldest supported Filament, 5.8.3; at least 95% line coverage |
+| Pest | 321 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, plus the oldest supported Filament, 5.8.3; at least 95% line coverage; the whole suite again with presence in Redis |
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
-| Browsers | 47 scenarios in Chromium with polling and with Reverb, and in WebKit |
+| Browsers | 54 scenarios in Chromium with polling and with Reverb, and in WebKit |
 | Chaos | [nightly](.github/workflows/chaos.yml): four browsers pressing random keys must converge with no editor error |
+| Load | [on demand](.github/workflows/load.yml): hundreds of editors across two servers, database or Redis presence, polling or Reverb |
 
 Run them yourself:
 
@@ -154,7 +201,8 @@ Run them yourself:
 cd demo
 vendor/bin/pest --coverage      # PHP tests
 vendor/bin/phpstan analyse      # static analysis, level 10
-npm run test:e2e                # real browsers; BROWSER=webkit, TRANSPORT=reverb
+npm run test:e2e                # real browsers; BROWSER=webkit, TRANSPORT=reverb, THROTTLE=8
+SERVERS=2 PRESENCE=redis npm run test:load -- 300 45   # many editors, two servers
 cd .. && npm run check          # JavaScript: lint, types and tests
 ```
 

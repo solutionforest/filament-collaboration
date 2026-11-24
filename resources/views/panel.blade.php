@@ -78,7 +78,7 @@
                     x-on:input="typed($event)"
                     x-on:keydown.enter.meta.prevent="post()"
                     x-on:keydown.enter.ctrl.prevent="post()"
-                    x-on:keydown.escape.stop="query = null"
+                    x-on:keydown.escape="if (query !== null) { query = null; $event.stopPropagation() }"
                     rows="3"
                     maxlength="{{ \SolutionForest\FilamentCollaboration\Comments\RecordComments::MAX_LENGTH }}"
                     placeholder="{{ __('filament-collaboration::collaboration.comments.placeholder') }}"

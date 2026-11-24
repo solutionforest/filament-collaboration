@@ -501,7 +501,7 @@ button.fi-collab-person-row:hover {
     border-color: rgb(255 255 255 / 10%);
 }
 
-.fi-collab-version-fields + .fi-collab-link,
+.fi-collab-version .fi-collab-link,
 .fi-collab-comment .fi-collab-link {
     justify-self: start;
 }
@@ -610,16 +610,18 @@ button.fi-collab-person-row:hover {
 
 /* Who is in a field that a closed tab, wizard step or collapsed section hides. */
 .fi-collab-chip {
-    width: 1.125rem;
-    height: 1.125rem;
+    width: 1.375rem;
+    height: 1.375rem;
     border: 2px solid #fff;
     border-radius: 9999px;
     background: var(--fi-collab-color);
     color: #fff;
-    font-size: 0.5rem;
+    font-size: 0.5625rem;
     font-weight: 700;
-    line-height: 0.875rem;
+    line-height: 1.125rem;
+    letter-spacing: -0.02em;
     text-align: center;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
     transform: translate(-100%, -50%);
 }
 

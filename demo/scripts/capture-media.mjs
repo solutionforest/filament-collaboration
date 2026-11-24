@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 import { crowd } from '../tests/browser/crowd.mjs'
 import { demo, start } from '../tests/browser/harness.mjs'
@@ -14,6 +14,12 @@ const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mill
 mkdirSync(media, { recursive: true })
 
 const app = await start({ optimized: true })
+
+// Uploaded images are served from this run's storage, as `storage:link` would for an app.
+const storageLink = path.join(demo, 'public/storage')
+const linked = !existsSync(storageLink)
+
+if (linked) symlinkSync(path.join(app.env.LARAVEL_STORAGE_PATH, 'app/public'), storageLink)
 let pulse
 let members = []
 
@@ -173,6 +179,10 @@ try {
     await shoot(mobile, 'mobile', { 'button.fi-collab-stack .fi-collab-avatar': 4, '.fi-collab-status': 1 })
     await phone.close()
 
+    // What came later: comments and history, fields out of sight, following,
+    // translations, live uploads, third-party editors and relation managers.
+    await captureFeatures({ alice, bob })
+
     // A hundred people on one article, each a real session syncing.
     clearInterval(pulse)
 
@@ -209,5 +219,127 @@ try {
     assert.deepEqual(app.problems, [], 'the browser reported problems')
 } finally {
     clearInterval(pulse)
+    if (linked) rmSync(storageLink, { force: true })
     await app.stop()
+}
+
+/** Goes to a translated page and waits until its fields are live. */
+async function editPage(page, id) {
+    await page.goto(`${app.base}/admin/pages/${id}/edit`)
+    await page.waitForFunction(() => window.filamentCollaboration?.inspect().some((room) => room.fields.length && room.fields.every(([, , state]) => state.startsWith('live'))), undefined, {
+        timeout: 25000,
+    })
+}
+
+async function closeModal(page) {
+    await page.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Close' }).last().click()
+    await wait(700)
+}
+
+/** Calls a method of the page's Livewire component. */
+function wire(page, method, ...args) {
+    return page.evaluate(
+        ({ method, args }) => window.Livewire.find(document.querySelector('.fi-page').closest('[wire\\:id]').getAttribute('wire:id'))[method](...args),
+        { method, args },
+    )
+}
+
+async function captureFeatures({ alice, bob }) {
+    // Comments, on the record and on a field, with a mention being picked.
+    await wire(bob, 'postCollaborationComment', 'Can we lead with the release date? @Alice Chen', 'title')
+    await wire(bob, 'postCollaborationComment', 'The second paragraph repeats the intro; I will trim it after lunch.')
+    await wire(alice, 'postCollaborationComment', 'Checked every link in the body. All good.', 'body_html')
+    await alice.reload()
+    await app.edit(alice, 3)
+    await alice.getByRole('button', { name: /Comments & history/ }).click()
+
+    const panel = alice.locator('[data-collaboration-comments]')
+
+    await panel.locator('[data-collaboration-comment-field]').selectOption('excerpt')
+    await panel.locator('textarea').pressSequentially('Shorter, maybe? @Bo', { delay: 20 })
+    await wait(500)
+    await shoot(alice, 'comments', { '[data-collaboration-comment]': 3, '.fi-collab-mention': 1, '.fi-collab-mentions button': 1 })
+
+    // The history: a save, and the edits before it.
+    await panel.locator('textarea').fill('')
+    await bob.locator('[id="form.title"]').click()
+    await bob.keyboard.press('End')
+    await bob.keyboard.type(' (updated)', { delay: 30 })
+    await wait(1500)
+    await bob.getByRole('button', { name: 'Save changes' }).first().click()
+    await wait(2500)
+    await closeModal(alice)
+    await alice.getByRole('button', { name: /Comments & history/ }).click()
+    await alice.getByRole('tab', { name: 'History' }).click()
+    await shoot(alice, 'history', { '.fi-collab-version': 2, '[data-collaboration-history] .fi-collab-link': 1 })
+    await closeModal(alice)
+
+    // A translated page in tabs: Bob is in the slug, behind the closed Publishing tab and section.
+    await Promise.all([editPage(alice, 2), editPage(bob, 2)])
+    await bob.getByRole('tab', { name: 'Publishing' }).click()
+    await bob.locator('.fi-section-header', { hasText: 'Address' }).click()
+    await bob.locator('[id="form.slug"]').click()
+    await wait(2500)
+    await shoot(alice, 'hidden-field', { '.fi-collab-chip': 1 })
+
+    // Following Bob opens the tab and the section for Alice.
+    await alice.locator('[data-collaboration-people]').click()
+    await alice.getByRole('button', { name: 'Follow', exact: true }).first().click()
+    await wait(2000)
+    await shoot(alice, 'follow', { '.fi-collab-notice': 1, '.fi-collab-outline': 1 })
+    await alice.getByRole('button', { name: 'Stop following' }).first().click()
+
+    // Two languages at once: Bob in Chinese, Alice in English, each in their own draft.
+    await Promise.all([editPage(alice, 1), editPage(bob, 1)])
+    await alice.locator('[id="form.title"]').click()
+    await wire(bob, '$set', 'activeLocale', 'zh_HK')
+    await bob.waitForFunction(() => /[一-鿿]/.test(document.querySelector('[id="form.title"]')?.value ?? ''), undefined, { timeout: 15000 })
+    await wait(1500)
+    await bob.locator('[id="form.title"]').click()
+    await bob.keyboard.press('End')
+    await bob.keyboard.type('（草稿）', { delay: 40 })
+    await wait(2500)
+    await shoot(bob, 'translations', { 'button.fi-collab-stack .fi-collab-avatar': 1 })
+
+    // Back on the article, the lower sections: live uploads, editors from other packages, a relation manager.
+    await Promise.all([app.edit(alice, 4), app.edit(bob, 4)])
+
+    const gallery = (page) => page.locator('.fi-section', { hasText: 'Gallery' }).first()
+
+    await gallery(alice).scrollIntoViewIfNeeded()
+    await gallery(alice).locator('input[type=file]').setInputFiles(path.join(media, 'public-article.png'))
+    await gallery(bob).scrollIntoViewIfNeeded()
+    await assertVisible(bob, '.fi-section:has-text("Gallery") .filepond--item', 1, 'live-uploads')
+    await wait(2500)
+    await shoot(gallery(bob), 'live-uploads', { '.filepond--item': 1 })
+
+    const editors = (page) => page.locator('.fi-section', { hasText: 'Third-party editors' }).first()
+    const place = (page, name, position) => page.evaluate(({ name, position }) => window.Alpine.$data(document.querySelector(`.fi-page .demo-${name}`)).place(position), { name, position })
+
+    // Below the sticky top bar, heading included.
+    for (const page of [alice, bob]) {
+        await editors(page).evaluate((section) => window.scrollTo(0, section.getBoundingClientRect().top + window.scrollY - 96))
+    }
+    await place(alice, 'tinymce', 1)
+    await alice.keyboard.type('Alice types in TinyMCE, ', { delay: 20 })
+    await place(bob, 'quill', 1)
+    await bob.keyboard.type('Bob types in Quill.', { delay: 20 })
+    await wait(3000)
+    await shoot(alice, 'third-party-editors', { '.fi-collab-caret': 1, '.fi-collab-outline': 1 }, { clip: await editors(alice).boundingBox() })
+
+    const checklist = (page) => page.locator('.fi-resource-relation-manager, [wire\\:id]').filter({ has: page.getByRole('heading', { name: 'Checklist' }) }).last()
+
+    for (const task of ['Check every link', 'Add a cover image', 'Ask legal about the quote']) {
+        await alice.getByRole('button', { name: 'New task' }).click()
+        await alice.locator('.fi-modal.fi-modal-open input[id$=".title"]').fill(task)
+        await alice.locator('.fi-modal.fi-modal-open').getByRole('button', { name: 'Create', exact: true }).click()
+        await wait(800)
+    }
+
+    await checklist(bob).scrollIntoViewIfNeeded()
+    await assertVisible(bob, 'td:has-text("Ask legal about the quote")', 1, 'relation-manager')
+    await shoot(checklist(bob), 'relation-manager', { 'td:has-text("Check every link")': 1 })
+
+    // Back where the crowd is, for the shots after this.
+    await Promise.all([app.edit(alice, 3), app.edit(bob, 3)])
 }
