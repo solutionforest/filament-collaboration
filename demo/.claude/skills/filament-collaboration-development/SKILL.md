@@ -86,7 +86,7 @@ CollaborationPlugin::make()
 $panel->databaseNotifications(); // mentioned people get a Filament database notification
 ```
 
-One slide-over: **Comments** (on the record or a field, resolve and reopen, `@mentions`) and **History** (versions every 5 minutes while editing, on save and around a restore; restoring applies for everybody). Listen to `SolutionForest\FilamentCollaboration\Events\CommentPosted` (`record`, `by`, `comment`, `url`) to send comments elsewhere.
+`CollaborationPlugin::make()->commentsAndHistory(false)` (or a closure given `$record`) turns it off: no button, and no posting or restoring. One slide-over: **Comments** (on the record or a field, resolve and reopen, `@mentions`) and **History** (versions every 5 minutes while editing, on save and around a restore; restoring applies for everybody). Listen to `SolutionForest\FilamentCollaboration\Events\CommentPosted` (`record`, `by`, `comment`, `url`) to send comments elsewhere.
 
 ## Relation managers
 

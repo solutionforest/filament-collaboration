@@ -77,6 +77,10 @@ trait HasComments
     {
         $this->authorizeAccess();
 
+        if (! $this->hasCollaborationPanel()) {
+            return;
+        }
+
         $body = trim($body);
         $field = $field === '' ? null : $field;
         $user = Filament::auth()->user();
@@ -106,6 +110,10 @@ trait HasComments
     {
         $this->authorizeAccess();
 
+        if (! $this->hasCollaborationPanel()) {
+            return;
+        }
+
         $comments = app(RecordComments::class);
         $room = $this->getCollaborationCommentsRoom();
         $comment = $comments->find($room, $id);
@@ -131,6 +139,13 @@ trait HasComments
         $isAuthor = $comment->authorType === $user::class && $comment->authorId === Data::string($user->getAuthIdentifier());
 
         return $isAuthor || $this->isCollaborationLive();
+    }
+
+    /** Whether this page offers comments and history: `CollaborationPlugin::make()->commentsAndHistory()`. */
+    #[Unexposed]
+    public function hasCollaborationPanel(): bool
+    {
+        return CollaborationPlugin::find()?->hasCommentsAndHistory($this->getRecord(), $this) ?? false;
     }
 
     protected function getCollaborationCommentsRoom(): string

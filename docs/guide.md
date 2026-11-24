@@ -213,6 +213,14 @@ protected function getHeaderActions(): array
 }
 ```
 
+**Optional.** Turn it off for the whole panel, or decide per resource or per record. Off, the button is not rendered, and the page refuses to post, resolve or restore, even if asked directly. Versions are still kept, so turning it back on shows the history:
+
+```php
+CollaborationPlugin::make()->commentsAndHistory(false);
+
+CollaborationPlugin::make()->commentsAndHistory(fn (Model $record): bool => ! $record instanceof Invoice);
+```
+
 A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
 
 ![The history: who changed which fields, and a restore](media/history.png)
@@ -358,6 +366,7 @@ CollaborationPlugin::make()
 | `presenceRenderHook()` | header actions | where the avatars render; use one of Filament's page hooks |
 | `fieldTypes()` | none | your own field types, tried before the built-in ones; see [Extending](#9-extending) |
 | `debug()` | off | shows `CollaborationDebugAction`; see [Debugging](#10-debugging) |
+| `commentsAndHistory()` | on | `false`, or a closure given `$record` and `$livewire`: no comments and history button, and no posting or restoring; see [Comments](#comments-and-version-history) |
 | `mentionable($users, notify:)` | none | who can be `@mentioned` in comments; see [Comments](#comments-and-version-history) |
 | `reportEditorErrors()` | off | logs rich editor errors with their content; see [Debugging](#10-debugging) |
 | `lockWhileEditing()` | off | fields that cannot be live are read-only for others while somebody is in them |

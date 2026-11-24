@@ -3,12 +3,15 @@
 use App\Filament\Resources\Documents\Pages\EditDocument;
 use App\Models\Document;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\Comments\RecordComments;
 use SolutionForest\FilamentCollaboration\Events\CommentPosted;
+use Tests\Support\Editor;
 use Tests\TestCase;
 
 function arrangeComments(TestCase $test): void
@@ -140,4 +143,30 @@ it('keeps the comments of a record in the trash', function (): void {
     $this->article->delete();
 
     expect(DB::table('filament_collaboration_comments')->count())->toBe(1);
+});
+
+it('offers no comments and history when the plugin turns them off: no button, and nothing can be posted or restored', function (): void {
+    arrangeComments($this);
+    CollaborationPlugin::get()->commentsAndHistory(false);
+    $alice = Editor::open($this, $this->alice, $this->article);
+    $alice->sync();
+    $alice->type('title', 'Good')->sync();
+
+    $page = commentsPage($this, $this->alice)->assertActionHidden(CollaborationPanelAction::class);
+    $version = DB::table('filament_collaboration_versions')->value('id');
+
+    $page->call('postCollaborationComment', 'Hidden')->call('restoreCollaborationVersion', $version);
+
+    expect(DB::table('filament_collaboration_comments')->count())->toBe(0)
+        ->and(DB::table('filament_collaboration_versions')->count())->toBe(1);
+});
+
+it('can offer comments and history on some records only', function (): void {
+    arrangeComments($this);
+    $other = Document::create(['title' => 'Locked']);
+    CollaborationPlugin::get()->commentsAndHistory(fn (Model $record): bool => $record->is($this->article));
+
+    commentsPage($this, $this->alice)->assertActionVisible(CollaborationPanelAction::class);
+
+    Livewire::test(EditDocument::class, ['record' => $other->id])->assertActionHidden(CollaborationPanelAction::class);
 });

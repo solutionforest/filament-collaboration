@@ -306,7 +306,7 @@ trait InteractsWithCollaboration
         $room = $this->getCollaborationRoom();
         $values = app(DraftVersions::class)->values($room, $id);
 
-        if ($values === null || ! $this->canRestoreCollaborationVersions()) {
+        if ($values === null || ! $this->hasCollaborationPanel() || ! $this->canRestoreCollaborationVersions()) {
             return;
         }
 
