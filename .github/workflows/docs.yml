@@ -44,12 +44,11 @@ jobs:
         uses: lycheeverse/lychee-action@v2
         with:
           # Pages between themselves are checked above, and the site is only live after this run.
-          # Links into this repository only work once it is public.
+          # Links into this repository are checked too: lychee uses the workflow's token.
           args: >-
             --no-progress --root-dir website/.vitepress/dist
             --exclude 'solutionforest\.github\.io'
             --exclude '^file://'
-            ${{ github.event.repository.visibility != 'public' && '--exclude github\.com/solutionforest/filament-collaboration' || '' }}
             'website/.vitepress/dist/**/*.html'
           fail: true
 

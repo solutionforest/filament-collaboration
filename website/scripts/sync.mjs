@@ -49,6 +49,15 @@ const readme = sections(read('README.md'), 2)
 const readmePart = (name) => readme.find(({ heading }) => heading === name)?.body ?? ''
 
 /**
+ * Relative links in markdown from `from`, rewritten as if written in `to`:
+ * for a README section placed on a page whose links are read from docs/.
+ */
+const rebase = (markdown, from, to) =>
+    markdown.replace(/(!?\[[^\]]*\])\(([^)\s#]+)(#[^)\s]*)?\)/g, (match, text, file, anchor = '') =>
+        /^[a-z]+:/.test(file) ? match : `${text}(${path.posix.relative(path.posix.dirname(to), path.posix.join(path.posix.dirname(from), file))}${anchor})`,
+    )
+
+/**
  * Every page: where it goes, where it comes from (for "edit this page"), its title and description.
  *
  * @type {{path: string, source: string, title: string, description: string, body: string}[]}
@@ -93,7 +102,7 @@ const pages = [
         source: 'docs/guide.md',
         title: 'Configuration',
         description: 'Every plugin option, every environment variable, presence in Redis and PHPStan.',
-        body: `${readmePart('Configuration')}\n${section(6).body}`,
+        body: `${rebase(readmePart('Configuration'), 'README.md', 'docs/guide.md')}\n${section(6).body}`,
     },
     {
         path: 'adapters/index.md',
