@@ -263,6 +263,10 @@ cd .. && npm run check          # JavaScript: lint, types and tests
 
 More in the guide's [troubleshooting](docs/guide.md#11-troubleshooting).
 
+## Changelog and versions
+
+Releases follow [Semantic Versioning](https://semver.org); every change is in [CHANGELOG.md](CHANGELOG.md). Until 1.0.0, a minor version may include breaking changes, listed under **Changed**.
+
 ## License
 
 MIT: see [LICENSE](LICENSE).

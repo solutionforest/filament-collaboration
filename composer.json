@@ -2,6 +2,11 @@
     "name": "solutionforest/filament-collaboration",
     "description": "Google Docs-style collaborative editing for Filament: live fields, presence, cursors and merge on save, over plain HTTP with its own CRDT.",
     "keywords": ["laravel", "filament", "filament-plugin", "collaboration", "crdt", "presence", "real-time", "collaborative editing"],
+    "homepage": "https://github.com/solutionforest/filament-collaboration",
+    "support": {
+        "issues": "https://github.com/solutionforest/filament-collaboration/issues",
+        "source": "https://github.com/solutionforest/filament-collaboration"
+    },
     "license": "MIT",
     "authors": [
         {
