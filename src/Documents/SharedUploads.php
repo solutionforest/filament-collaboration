@@ -37,10 +37,27 @@ final class SharedUploads
         $this->settle($this->uploads()->where('room', $room)->get()->all(), deleteUnused: false);
     }
 
-    /** After a discard: what the saved record does not hold, nobody can reach any more. */
-    public function discard(string $room): int
+    /** A record deleted for good: the files only its drafts had, whatever drafts or history say. */
+    public function forget(string $room): int
     {
-        return $this->settle($this->uploads()->where('room', $room)->get()->all(), keepDrafts: false);
+        return $this->settle($this->uploads()->where('room', $room)->get()->all(), keepDrafts: false, keepHistory: false);
+    }
+
+    /**
+     * After a discard: the files only the discarded fields had. Files still in
+     * the draft, such as a colleague's in a field this person cannot edit, stay.
+     *
+     * @param  list<string>|null  $fields  the fields discarded; null for all
+     */
+    public function discard(string $room, ?array $fields = null): int
+    {
+        $uploads = $this->uploads()->where('room', $room);
+
+        if ($fields !== null) {
+            $uploads->whereIn('field', $fields === [] ? [''] : $fields);
+        }
+
+        return $this->settle($uploads->get()->all());
     }
 
     /** Deletes images inserted more than `$seconds` ago that neither a record nor a draft uses. */
@@ -50,8 +67,8 @@ final class SharedUploads
 
         $this->uploads()
             ->where('created_at', '<=', now()->getTimestamp() - $seconds)
-            ->orderBy('room')
-            ->chunk(500, function ($uploads) use (&$deleted): void {
+            // By id: rows are deleted on the way, and offsets would skip others.
+            ->chunkById(500, function ($uploads) use (&$deleted): void {
                 $deleted += $this->settle($uploads->all());
             });
 
@@ -114,7 +131,7 @@ final class SharedUploads
      * @param  array<mixed>  $uploads
      * @return int how many files were deleted
      */
-    private function settle(array $uploads, bool $keepDrafts = true, bool $deleteUnused = true): int
+    private function settle(array $uploads, bool $keepDrafts = true, bool $deleteUnused = true, bool $keepHistory = true): int
     {
         $drafts = [];
         $forget = [];
@@ -132,6 +149,9 @@ final class SharedUploads
             if ($saved !== null && in_array($path, self::filesIn($saved, $field), true)) {
                 $forget[] = $upload['id'];
             } elseif ($keepDrafts && $draft !== null && in_array($path, self::filesIn($draft, $field), true)) {
+                continue;
+            } elseif ($keepHistory && $this->isInHistory($room, $path)) {
+                // A kept version has it: restoring that version must find the file.
                 continue;
             } elseif ($deleteUnused) {
                 try {
@@ -165,6 +185,15 @@ final class SharedUploads
         }
 
         return [Document::from(Data::decode($row['state'] ?? null)), Document::from(Data::decode($row['saved_state'] ?? null))];
+    }
+
+    /** Whether one of the room's kept versions, or its languages', still has this file. */
+    private function isInHistory(string $room, string $path): bool
+    {
+        $rooms = Database::table('documents')->where('room', $room)->orWhere('parent_room', $room)->pluck('room')->all();
+        $pattern = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], substr(Data::encode($path), 1, -1)).'%';
+
+        return Database::table('versions')->whereIn('room', [$room, ...$rooms])->where('values', 'like', $pattern)->exists();
     }
 
     private function uploads(): Builder

@@ -77,6 +77,8 @@ export class AdapterBinding extends Binding {
     unsupported = false
     /** True while writing: the editor's own change events then are ours. */
     writing = false
+    /** True while recovering: an error then gives up at once instead of recovering again. */
+    recovering = false
 
     get name() {
         return this.room.config.adapters?.[this.field] ?? BUILT_IN[this.room.config.fields[this.field] ?? ''] ?? ''
@@ -435,6 +437,13 @@ export class AdapterBinding extends Binding {
     recover(error, details = {}) {
         if (!this.handle) return
 
+        // Showing the draft failed too: the same error would only repeat.
+        if (this.recovering) {
+            this.giveUp(error)
+
+            return
+        }
+
         const now = Date.now()
 
         this.recoveries = [...this.recoveries.filter((at) => now - at < RECOVERY_WINDOW), now]
@@ -447,12 +456,16 @@ export class AdapterBinding extends Binding {
         }
 
         // The editor's caret is in a state the draft never had: let the editor map it through the reset.
+        this.recovering = true
+
         try {
             this.anchors = null
             this.before = undefined
             this.render(true)
         } catch (failure) {
             this.giveUp(failure)
+        } finally {
+            this.recovering = false
         }
     }
 

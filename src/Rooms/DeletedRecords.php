@@ -155,7 +155,7 @@ final readonly class DeletedRecords
 
         foreach ($documents as $document) {
             $document = Data::map($document);
-            $this->uploads->discard(Data::string($document['room'] ?? null));
+            $this->uploads->forget(Data::string($document['room'] ?? null));
             $this->versions->forget(Data::string($document['room'] ?? null));
             Database::table('updates')->where('document_id', $document['id'] ?? null)->delete();
             Database::table('documents')->where('id', $document['id'] ?? null)->delete();

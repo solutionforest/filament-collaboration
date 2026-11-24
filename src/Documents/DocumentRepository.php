@@ -275,6 +275,9 @@ final class DocumentRepository
     public function discard(string $room, array $fields): void
     {
         $this->transaction($room, function (SharedDraft $draft) use ($fields): void {
+            // Colleagues' unsaved typing goes too: keep it in the history, as a restore does.
+            $this->versions->capture($draft, 'discard', null, always: true);
+
             $operations = [];
 
             foreach ($fields as $field) {
@@ -442,7 +445,8 @@ final class DocumentRepository
             return;
         }
 
-        if ($this->presence->hasRecentEditors($room, Data::int(config('filament-collaboration.compact_after'), 1800))) {
+        // A language's draft: people are present in the record's room, not the draft's.
+        if ($this->presence->hasRecentEditors($draft->parentRoom ?? $room, Data::int(config('filament-collaboration.compact_after'), 1800))) {
             return;
         }
 

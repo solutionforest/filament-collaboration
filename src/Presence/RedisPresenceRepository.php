@@ -71,7 +71,8 @@ class RedisPresenceRepository implements PresenceRepository
             $redis->command('zremrangebyscore', [self::key('scope', $participant->scope), '-inf', (string) ($now - $timeout * 3)]);
         }
 
-        $this->forgetGone($room, $now - $timeout * 3);
+        // Long enough for `hasRecentEditors()`, which keeps a busy draft from being compacted.
+        $this->forgetGone($room, $now - max($timeout * 3, Data::int(config('filament-collaboration.compact_after'), 1800)));
 
         return $change;
     }

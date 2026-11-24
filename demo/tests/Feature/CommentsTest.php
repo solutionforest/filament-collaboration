@@ -170,3 +170,16 @@ it('can offer comments and history on some records only', function (): void {
 
     Livewire::test(EditDocument::class, ['record' => $other->id])->assertActionHidden(CollaborationPanelAction::class);
 });
+
+it('sends what people typed as text in notifications, and keeps a field comment for the page', function (): void {
+    arrangeComments($this);
+
+    commentsPage($this, $this->alice)
+        ->call('postCollaborationComment', '@Bob Martinez see <a href="https://evil.test">this</a>')
+        ->call('postCollaborationComment', '@Bob Martinez the secret figure is wrong', 'excerpt');
+
+    $notifications = $this->bob->notifications()->oldest()->get();
+
+    expect($notifications[0]->data['body'])->toContain('&lt;a href=')->not->toContain('<a href')
+        ->and($notifications[1]->data['body'])->toBeNull();
+});

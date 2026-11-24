@@ -136,9 +136,14 @@ trait HasComments
             return false;
         }
 
+        // Not a comment on a field this person cannot see, whose id they might guess.
+        if ($comment->field !== null && ! isset($this->getCollaborationFieldLabels()[$comment->field])) {
+            return false;
+        }
+
         $isAuthor = $comment->authorType === $user::class && $comment->authorId === Data::string($user->getAuthIdentifier());
 
-        return $isAuthor || $this->isCollaborationLive();
+        return $isAuthor || $this->mayEditCollaborationRecord();
     }
 
     /** Whether this page offers comments and history: `CollaborationPlugin::make()->commentsAndHistory()`. */
@@ -146,6 +151,16 @@ trait HasComments
     public function hasCollaborationPanel(): bool
     {
         return CollaborationPlugin::find()?->hasCommentsAndHistory($this->getRecord(), $this) ?? false;
+    }
+
+    /** Whoever may edit the record, live or not, may resolve its comments. */
+    protected function mayEditCollaborationRecord(): bool
+    {
+        try {
+            return static::getResource()::canEdit($this->getRecord()) === true;
+        } catch (Throwable) {
+            return $this->isCollaborationLive();
+        }
     }
 
     protected function getCollaborationCommentsRoom(): string
@@ -169,10 +184,13 @@ trait HasComments
     protected function notifyCollaborationMentions(Authenticatable $author, Comment $comment, ?string $url): void
     {
         $record = $this->getRecordTitle();
-        $title = __('filament-collaboration::collaboration.comments.mentioned', [
+        // Filament renders a notification's title and body as HTML: what people typed is text.
+        $title = e(__('filament-collaboration::collaboration.comments.mentioned', [
             'name' => $comment->authorName,
             'record' => $record instanceof Htmlable ? strip_tags($record->toHtml()) : $record,
-        ]);
+        ]));
+        // A comment on a field may be about something a mentioned person cannot see: they read it on the page.
+        $body = $comment->field === null ? e(Str::limit($comment->body, 200)) : null;
 
         foreach ($comment->mentions as $mention) {
             $user = $mention->user();
@@ -181,7 +199,7 @@ trait HasComments
                 continue;
             }
 
-            $notification = Notification::make()->title($title)->body(Str::limit($comment->body, 200))->icon('heroicon-o-at-symbol');
+            $notification = Notification::make()->title($title)->body($body)->icon('heroicon-o-at-symbol');
 
             if ($url !== null) {
                 $notification->actions([Action::make('view')->label(__('filament-collaboration::collaboration.comments.view'))->url($url)->markAsRead()]);

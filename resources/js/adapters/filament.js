@@ -301,7 +301,8 @@ function registerBuiltInAdapters(register) {
                     const { state, view, schema } = editor
                     const transaction = replacement(state, buildDocument(schema, doc))
 
-                    if (!transaction.docChanged) return
+                    // Unchanged after an error the editor threw: its caret may be where nothing can be typed.
+                    if (!transaction.docChanged) return keepCaretTypable()
 
                     view.dispatch(transaction.setMeta(REMOTE, true).setMeta('addToHistory', false))
                     keepCaretTypable()
@@ -474,6 +475,8 @@ function listAdapter({ element, field, statePath, wire, changed, moved }, { uplo
     const { signal } = events
     const prefix = `${statePath}.`
     let storing = false
+    /** @type {Set<string>} temporary files the server refused (Filament shows why): not sent again */
+    const refused = new Set()
 
     /** @returns {Record<string, any>} */
     const state = () => {
@@ -487,11 +490,17 @@ function listAdapter({ element, field, statePath, wire, changed, moved }, { uplo
 
     /** Stores what was just uploaded; the stored files then come back as state. */
     const store = () => {
-        if (storing || !Object.keys(temporary()).length) return
+        const waiting = Object.values(temporary()).filter((file) => !refused.has(file))
+
+        if (storing || !waiting.length) return
 
         storing = true
         wire.$call('storeCollaborationUpload', field)
-            .catch(() => {})
+            .then(() => {
+                // Still temporary after storing: refused, for example by the field's rules. Filament shows why.
+                for (const file of Object.values(temporary())) if (waiting.includes(file)) refused.add(file)
+            })
+            .catch(() => waiting.forEach((file) => refused.add(file)))
             .finally(() => {
                 storing = false
                 changed()

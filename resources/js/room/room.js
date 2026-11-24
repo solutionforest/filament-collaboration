@@ -845,9 +845,18 @@ export class Room {
 
         const person = tabs.find((tab) => tab.field && !tab.idle) ?? tabs.find((tab) => tab.field)
 
-        if (!person?.field || person.field === this.followedField) return
+        // Out of every field: coming back to the same one is a move to follow again.
+        if (!person?.field) {
+            this.followedField = null
 
-        this.followedField = person.field
+            return
+        }
+
+        if (person.field === this.followedField) return
+
+        // Only once the field is on the page: a field still rendering is tried again on the next update.
+        if (this.dom.wrapper(person.field)) this.followedField = person.field
+
         this.jumpTo(person)
     }
 

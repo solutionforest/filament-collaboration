@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
+use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
+use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 
@@ -66,7 +69,7 @@ it('leaves an image to the record once a save puts it there', function (): void 
     Storage::disk('public')->assertExists($path);
 });
 
-it('deletes an image nobody saved when the draft is discarded', function (): void {
+it('keeps an image a discard removed while the history has it, so restoring finds it, and deletes it once nothing has it', function (): void {
     arrangeUploads($this);
     $alice = Editor::open($this, $this->alice, $this->article);
     $alice->sync();
@@ -75,11 +78,34 @@ it('deletes an image nobody saved when the draft is discarded', function (): voi
     $this->actingAs($this->bob);
     Livewire::test(EditDocument::class, ['record' => $this->article->id])->callAction('discardSharedDraft');
 
+    // The draft from before the discard is in the history, with the image.
+    expect(DB::table('filament_collaboration_versions')->orderByDesc('id')->value('reason'))->toBe('discard');
+    Storage::disk('public')->assertExists($path);
+
+    DB::table('filament_collaboration_versions')->delete();
+    $this->travel(25)->hours();
+    $this->artisan('filament-collaboration:prune-uploads')->assertSuccessful();
+
     Storage::disk('public')->assertMissing($path);
     expect(trackedUploads())->toBe(0);
 });
 
-it('prunes old images that neither a record nor a draft uses', function (): void {
+it("leaves a colleague's upload alone when somebody discards only the fields they may edit", function (): void {
+    arrangeUploads($this);
+    $alice = Editor::open($this, $this->alice, $this->article);
+    $alice->sync();
+    $path = insertImage($this, $alice);
+    $room = app(RoomResolver::class)->forRecord($this->article);
+
+    // Somebody for whom the article body is not live discards: only their fields go.
+    app(DocumentRepository::class)->discard($room, ['title', 'excerpt']);
+    app(SharedUploads::class)->discard($room, ['title', 'excerpt']);
+
+    Storage::disk('public')->assertExists($path);
+    expect(trackedUploads())->toBe(1);
+});
+
+it('prunes old images that neither a record, a draft nor the history uses', function (): void {
     arrangeUploads($this);
     $alice = Editor::open($this, $this->alice, $this->article);
     $alice->sync();
@@ -91,6 +117,12 @@ it('prunes old images that neither a record nor a draft uses', function (): void
     Storage::disk('public')->assertExists($removed);
 
     $this->travel(25)->hours();
+
+    // A kept version still has the removed image: restoring it must find the file.
+    $this->artisan('filament-collaboration:prune-uploads')->assertSuccessful();
+    Storage::disk('public')->assertExists($removed);
+
+    DB::table('filament_collaboration_versions')->delete();
     $this->artisan('filament-collaboration:prune-uploads')
         ->expectsOutputToContain('Deleted 1 unused image.')
         ->assertSuccessful();

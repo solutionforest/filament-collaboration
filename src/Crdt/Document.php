@@ -624,8 +624,12 @@ final class Document
         return $clean;
     }
 
-    /** @param list<string> $allowed */
-    private static function isAllowed(mixed $value, array $allowed): bool
+    /**
+     * Whether a picked value is among the options this editor was offered.
+     *
+     * @param  list<string>  $allowed
+     */
+    public static function isAllowed(mixed $value, array $allowed): bool
     {
         foreach (is_array($value) ? $value : [$value] as $item) {
             $item = is_bool($item) ? ($item ? '1' : '0') : $item;

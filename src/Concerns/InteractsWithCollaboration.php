@@ -20,6 +20,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Crdt\Document;
 use SolutionForest\FilamentCollaboration\Crdt\Html;
 use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
 use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
@@ -310,7 +311,19 @@ trait InteractsWithCollaboration
             return;
         }
 
-        $fields = array_map(strval(...), array_keys($this->getCollaborationLiveFields()));
+        $live = $this->getCollaborationLiveFields();
+        $allowed = $this->getCollaborationAllowedValues();
+        $fields = [];
+
+        // The fields this person may edit, with only the options they were offered, as when they pick.
+        foreach ($live as $field => $kind) {
+            $field = (string) $field;
+
+            if ($kind !== FieldKind::Value || ! isset($allowed[$field]) || Document::isAllowed($values[$field] ?? null, $allowed[$field])) {
+                $fields[] = $field;
+            }
+        }
+
         $name = Identity::current()->name ?? __('filament-collaboration::collaboration.someone');
 
         app(SaveLock::class)->block($room, fn () => app(DocumentRepository::class)->restore($room, $values, $fields, $name));
@@ -333,8 +346,11 @@ trait InteractsWithCollaboration
                 $room = $this->getCollaborationRoom();
                 $fields = array_map(strval(...), array_keys($this->getCollaborationLiveFields()));
 
-                app(SaveLock::class)->block($room, fn () => app(DocumentRepository::class)->discard($room, $fields));
-                app(SharedUploads::class)->discard($room);
+                // The files only the discarded fields had go too, under the same lock as saves.
+                app(SaveLock::class)->block($room, function () use ($room, $fields): void {
+                    app(DocumentRepository::class)->discard($room, $fields);
+                    app(SharedUploads::class)->discard($room, $fields);
+                });
             });
     }
 
