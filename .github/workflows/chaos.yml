@@ -17,8 +17,7 @@ env:
 
 jobs:
   chaos:
-    # Our runners include macOS machines, where setup-php can take minutes or fail.
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
       run:

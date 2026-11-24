@@ -396,6 +396,8 @@ it('shows which blog field another editor is working on', function (): void {
 });
 
 it('keeps presence usable with one hundred editors on the same article', function (): void {
+    // Opening a hundred tabs can take longer than the presence timeout on a slow runner: they all arrive at once here.
+    $this->freezeTime();
     $document = Document::create(['title' => 'Busy desk', 'slug' => 'busy-desk', 'status' => 'draft']);
     $editors = User::factory()->count(100)->create();
     $fields = ['title', 'seo_title', 'body_html', 'relatedPosts', 'excerpt'];

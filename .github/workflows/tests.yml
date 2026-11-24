@@ -17,9 +17,14 @@ env:
 jobs:
   php:
     name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }} · Filament ${{ matrix.filament }}
-    # Our runners include macOS machines, where setup-php can take minutes or fail.
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Redis for the Redis presence tests; scripts/start-redis.sh finds it running.
+    services:
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -74,8 +79,7 @@ jobs:
 
   javascript:
     name: JavaScript · lint, types, tests
-    # Our runners include macOS machines, where setup-php can take minutes or fail.
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -95,8 +99,7 @@ jobs:
 
   browser:
     name: Browsers · ${{ matrix.browser }} · ${{ matrix.transport }}
-    # Our runners include macOS machines, where setup-php can take minutes or fail.
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
