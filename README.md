@@ -20,17 +20,20 @@
 
 | | |
 | --- | --- |
-| **Live fields** | Text inputs, textareas and Filament's own `RichEditor`, Markdown and code editors merge character by character, also inside repeaters and builders. Selects, toggles, dates and tags take the latest choice. |
-| **Any editor, any component** | TinyMCE, CKEditor, Quill, Trix or your own fields become live through a short JavaScript adapter: **[make your own component live](docs/custom-components.md)**, step by step. Fields that cannot be live say who is editing them, and can lock. |
+| **Live fields** | Text inputs, textareas and Filament's own `RichEditor`, Markdown and code editors merge character by character. Selects, toggles, dates and tags take the latest choice. |
+| **Lists and uploads** | Repeaters and builders: adding, removing and moving items merge, and text inside items merges by character, with carets. Uploaded files are stored at once and appear for everyone; whoever saves keeps them. |
+| **One adapter API for every field** | Filament's own fields and third-party editors go through the same JavaScript adapters: formats `text`, `html`, `rich` (ProseMirror / TipTap), `value` and `items` (lists). TinyMCE, CKEditor, Quill, Trix or your own components become live the same way: **[make your own component live](docs/custom-components.md)**, step by step. |
+| **Fields that cannot be live** | They show who is editing them, can lock while somebody is in them (`lockWhileEditing()`), and merge field by field on save. |
 | **See each other** | Avatars in the header, an outline and name on the field each person is in, their caret and selection, and who is on which record in tables. |
 | **Real merging** | Two people typing in the same sentence both keep their words. Undo only undoes your own typing. Edits survive going offline and reloading. |
 | **Polling or WebSockets** | Works on plain HTTP through your Laravel app, with nothing to install. Add Laravel Reverb and a keystroke reaches others in about 60 ms instead of 350 ms. |
 | **Safe by default** | Every request is authorised again, every edit is validated, and fields a person cannot see never reach their browser. |
-| **Comments and history** | One slide-over: comments on the record or a field with `@mentions` and notifications, and the draft's versions, restored for everybody in a click. Optional: `commentsAndHistory(false)`, or a closure per resource or record. See [Comments and version history](docs/guide.md#comments-and-version-history). |
+| **Comments and history** | A chat icon in the header, with the open-comments count as its badge, opens one slide-over: comments on the record or a field with `@mentions` and database notifications, and the draft's versions, any of them restored for everybody in a click. Optional: `commentsAndHistory(false)`, or a closure per resource or record. See [Comments and version history](docs/guide.md#comments-and-version-history). |
 | **Nobody out of sight** | A colleague in a field behind a closed tab, wizard step or collapsed section shows on its header; **Follow** keeps your page on whichever field they are in. |
 | **Translations, uploads, relations** | Translated pages get one shared draft per language. Uploaded files appear for everyone at once. Relation managers refresh in colleagues' open copies. |
 | **Scales out** | Several app servers on one database, presence in Redis, changes over Reverb; a load test with 300 editors across two servers is included. |
 | **Merge on save for the rest** | Fields that cannot be live get a field-by-field three-way merge with a conflict dialog. |
+| **Permissions, deletes and audit** | A `collaborate` policy ability decides who edits live; `Permissions::changed()` renews open tabs. A record deleted while open tells the others who deleted it, lets them copy their text, and restore it if the policy allows. `audit()` keeps a per-minute trail of who changed which field, and `SharedDraftSaved` names everybody who contributed. |
 | **Ready for AI assistants** | Ships a [Laravel Boost](https://laravel.com/docs/boost) skill and guideline, so Claude Code, Cursor or Codex know how to use it in your app. |
 
 ## Requirements
@@ -42,6 +45,7 @@
 | Filament | 5.8.3+ |
 | Database | MySQL / MariaDB, PostgreSQL, SQLite |
 | Cache | any store with atomic locks, shared by all app servers (Redis, database; file on one server) |
+| Optional | Laravel Reverb (or any Pusher-compatible broadcaster) for pushed changes; Redis for presence across many servers |
 
 Every combination of PHP and Laravel is tested on each push, see [Quality](#quality).
 
@@ -67,6 +71,8 @@ public function panel(Panel $panel): Panel
 }
 ```
 
+Filament publishes the package's JavaScript and CSS with its other assets. If the panel shows no avatars, or `collaboration.js` answers 404, run `php artisan filament:assets`.
+
 **3. Add a trait to your resource pages**
 
 ```php
@@ -85,6 +91,41 @@ class ListPosts extends ListRecords
 ```
 
 That's it. Open the same record in two browsers and start typing.
+
+**4. Optional: comments and history.** Add the header action to an edit page:
+
+```php
+use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
+
+protected function getHeaderActions(): array
+{
+    return [CollaborationPanelAction::make()];
+}
+```
+
+**Optional: real time and scale.** Changes arrive by polling with nothing else to run. For pushes, set up [Laravel Reverb](https://laravel.com/docs/reverb) and turn on `broadcasting()` ([guide](docs/guide.md#5-real-time-with-reverb)). For many app servers, keep presence in Redis with `FILAMENT_COLLABORATION_PRESENCE=redis` ([guide](docs/guide.md#many-servers-and-presence-in-redis)).
+
+## Configuration
+
+Behaviour is set on the plugin, in your panel provider; every option is optional:
+
+```php
+CollaborationPlugin::make()
+    ->liveEditing(fn (?Model $record): bool => ! $record?->is_locked) // live, or merge on save only
+    ->broadcasting()                     // push changes over Reverb instead of polling
+    ->commentsAndHistory(false)          // no comments & history icon; or fn (Model $record): bool
+    ->mentionable(fn (Model $record) => User::query()->where('team_id', $record->team_id))
+    ->lockWhileEditing()                 // fields that cannot be live are read-only while somebody is in them
+    ->audit()                            // a per-minute trail of who changed which field
+    ->scopeRoomsUsing(fn () => auth()->user()?->team_id)
+    ->pollingInterval(400)
+    ->avatarLimit(5)
+    ->debug(fn (): bool => app()->isLocal());
+```
+
+Per field: `->collaborative(false)` turns a field off, `->collaborative('edit-seo')` makes it live only for those a Gate ability allows, and `->collaborative(adapter: 'my-editor', as: FieldKind::Text)` names an adapter.
+
+Deployment settings are environment variables, in `config/filament-collaboration.php`: `FILAMENT_COLLABORATION_PRESENCE` (`database` or `redis`), `FILAMENT_COLLABORATION_CACHE_STORE` (locks shared by all servers), `FILAMENT_COLLABORATION_PRESENCE_TIMEOUT`, `FILAMENT_COLLABORATION_TOKEN_LIFETIME` and more. Every option, with its default: [Configuration](docs/guide.md#6-configuration).
 
 ## Usage guide
 
@@ -141,7 +182,7 @@ Sign in at `/admin` as `alice@example.test` and, in another browser, `bob@exampl
 | ![Who is here](docs/media/people-panel.png) | ![Dark mode](docs/media/dark-mode.png) |
 | ![Quick edit](docs/media/quick-edit.png) | ![Phone](docs/media/mobile.png) |
 
-**Comments and history**, in one slide-over: comments on a field with `@mentions`, and versions of the shared draft to restore.
+**Comments and history**, in one slide-over behind the chat icon: comments on a field with `@mentions`, and versions of the shared draft to restore.
 
 | | |
 | --- | --- |
@@ -197,7 +238,7 @@ Each push runs [`tests.yml`](.github/workflows/tests.yml):
 | PHPStan | level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
-| Browsers | 54 scenarios in Chromium with polling and with Reverb, and in WebKit |
+| Browsers | 54 scenarios, plus a check that no browser reported an error, in Chromium with polling and with Reverb, and in WebKit |
 | Chaos | [nightly](.github/workflows/chaos.yml): four browsers pressing random keys must converge with no editor error |
 | Load | [on demand](.github/workflows/load.yml): hundreds of editors across two servers, database or Redis presence, polling or Reverb |
 
