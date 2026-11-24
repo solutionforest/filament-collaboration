@@ -3,6 +3,7 @@ import { Room } from './room/room.js'
 import * as html from './adapters/html.js'
 import { minimalChange, registerAdapter } from './adapters/registry.js'
 import { registerFilamentAdapters } from './adapters/filament.js'
+import { measureText } from './ui/measure-text.js'
 import { renderInspector } from './ui/inspector.js'
 
 /** @type {Map<HTMLElement, {source: string, room: Room}>} */
@@ -73,6 +74,8 @@ function boot() {
         // For adapters: change only what differs, and map HTML editors' carets.
         minimalChange,
         html,
+        // Where a caret at this offset of an input or textarea is, in viewport coordinates.
+        caretRect: (input, offset) => measureText(input, offset, offset)?.caret ?? null,
     }
 
     registerFilamentAdapters(registerAdapter)

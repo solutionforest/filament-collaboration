@@ -50,6 +50,8 @@ class Document extends Model
         'ckeditor_html',
         'quill_html',
         'trix_html',
+        'social_post',
+        'rating',
         'gallery',
     ];
 
@@ -57,6 +59,7 @@ class Document extends Model
     {
         return [
             'workspace_id' => 'integer',
+            'rating' => 'integer',
             'author_id' => 'integer',
             'tags' => 'array',
             'key_points' => 'array',

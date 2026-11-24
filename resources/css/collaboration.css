@@ -549,8 +549,6 @@ button.fi-collab-person-row:hover {
 .fi-collab-mentions {
     position: absolute;
     z-index: 10;
-    inset-inline-start: 0.5rem;
-    top: 100%;
     min-width: 12rem;
     padding: 0.25rem;
     border: 1px solid rgb(0 0 0 / 10%);

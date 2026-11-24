@@ -327,6 +327,26 @@ async function captureFeatures({ alice, bob }) {
     await wait(3000)
     await shoot(alice, 'third-party-editors', { '.fi-collab-caret': 1, '.fi-collab-outline': 1 }, { clip: await editors(alice).boundingBox() })
 
+    // Custom components, live through the adapters docs/custom-components.md builds.
+    const custom = (page) => page.locator('.fi-section', { hasText: 'Custom components' }).first()
+
+    for (const page of [alice, bob]) {
+        await custom(page).evaluate((section) => window.scrollTo(0, section.getBoundingClientRect().top + window.scrollY - 96))
+    }
+
+    await alice.locator('.fi-page .demo-composer-input').click()
+    await alice.keyboard.type('Our spring update is out: a calmer, faster reader. ', { delay: 15 })
+    await bob.waitForFunction(() => document.querySelector('.fi-page .demo-composer-input')?.value.endsWith('reader. '), undefined, { timeout: 15000 })
+    await bob.locator('.fi-page .demo-composer-input').evaluate((input) => {
+        input.focus()
+        input.setSelectionRange(input.value.length, input.value.length)
+    })
+    await bob.keyboard.type('Read it today!', { delay: 20 })
+    await bob.locator('.fi-page .demo-rating').getByRole('radio', { name: '4 / 5' }).click()
+    await bob.locator('.fi-page .demo-composer-input').focus()
+    await wait(3000)
+    await shoot(alice, 'custom-components', { '.fi-collab-caret': 1, '.demo-rating-on': 4 }, { clip: await custom(alice).boundingBox() })
+
     const checklist = (page) => page.locator('.fi-resource-relation-manager, [wire\\:id]').filter({ has: page.getByRole('heading', { name: 'Checklist' }) }).last()
 
     for (const task of ['Check every link', 'Add a cover image', 'Ask legal about the quote']) {

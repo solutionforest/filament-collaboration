@@ -146,6 +146,8 @@ window.filamentCollaboration
 - `attach()` returning `false` means "cannot be live in this browser": the field merges on save.
 - Do not keep the editor on Alpine reactive data (`this.editor = ...`): Alpine's proxy breaks editors such as CKEditor and Quill. Keep it on the element.
 - For a picker-like custom field, `ValueType::make([StarRating::class])` in `->fieldTypes([...])` is enough, without JavaScript.
+- A text field inside an Alpine component (a `<textarea>` with `x-model`): after `setRangeText()` in `write()`, dispatch an `input` event so `x-model` and the Livewire state follow. `api.caretRect(input, offset)` measures carets in any input or textarea.
+- Step-by-step guide with a post composer and a star rating: `docs/custom-components.md` in the package repository; the code is in `demo/packages/filament-widgets`.
 
 ## Real time and scale
 

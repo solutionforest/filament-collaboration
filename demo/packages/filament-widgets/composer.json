@@ -1,0 +1,25 @@
+{
+    "name": "demo/filament-widgets",
+    "description": "Two custom Filament fields, a post composer and a star rating, made live by filament-collaboration through adapters. The example docs/custom-components.md walks through.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "filament/forms": "^5.8.3"
+    },
+    "suggest": {
+        "solutionforest/filament-collaboration": "Makes the fields live, the composer with carets"
+    },
+    "autoload": {
+        "psr-4": {
+            "Demo\\Widgets\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Demo\\Widgets\\WidgetsServiceProvider"
+            ]
+        }
+    }
+}
