@@ -221,7 +221,7 @@ CollaborationPlugin::make()->commentsAndHistory(false);
 CollaborationPlugin::make()->commentsAndHistory(fn (Model $record): bool => ! $record instanceof Invoice);
 ```
 
-A version is kept at most every five minutes while people edit, on every save, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore** puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
+A version is kept at most every five minutes while people edit, on every save, before a discard, and before and after a restore, up to the last 100 per draft, in `filament_collaboration_versions`. **Restore**, on any version including the newest (colleagues may have changed the draft since), puts the draft back as it was, for everybody in the room at once; the draft from before the restore stays in the list, so a restore can be undone. It changes only the live fields the person may edit, and nothing is saved until somebody saves. On a translated page each language has its own history.
 
 ![The history: who changed which fields, and a restore](media/history.png)
 
