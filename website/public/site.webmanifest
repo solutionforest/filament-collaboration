@@ -1,0 +1,27 @@
+{
+    "name": "Filament Collaboration",
+    "short_name": "Collaboration",
+    "description": "Google Docs-style collaborative editing for Filament",
+    "start_url": "/filament-collaboration/",
+    "scope": "/filament-collaboration/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#f59e0b",
+    "icons": [
+        {
+            "src": "/filament-collaboration/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/filament-collaboration/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "/filament-collaboration/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}

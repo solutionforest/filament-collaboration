@@ -9,6 +9,7 @@
 /.github export-ignore
 /demo export-ignore
 /docs export-ignore
+/website export-ignore
 /tests export-ignore
 /resources/js export-ignore
 /resources/css export-ignore

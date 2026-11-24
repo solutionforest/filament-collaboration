@@ -1,0 +1,16 @@
+{
+    "name": "filament-collaboration-website",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "sync": "node scripts/sync.mjs",
+        "dev": "npm run sync && vitepress dev",
+        "build": "npm run sync && vitepress build",
+        "preview": "vitepress preview",
+        "brand": "node scripts/brand.mjs",
+        "check": "node scripts/check-links.mjs"
+    },
+    "devDependencies": {
+        "vitepress": "^1.6.4"
+    }
+}
