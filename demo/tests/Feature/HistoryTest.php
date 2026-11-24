@@ -30,7 +30,7 @@ it('keeps a version every few minutes while people edit, not every keystroke', f
     expect(DB::table('filament_collaboration_versions')->pluck('reason')->all())->toBe(['edit', 'edit']);
 });
 
-it('lists versions newest first, with who and which fields changed', function (): void {
+it('lists versions newest first, with who and which fields changed since the one before', function (): void {
     arrangeHistory($this);
     $alice = Editor::open($this, $this->alice, $this->article);
     $alice->sync();
@@ -42,7 +42,8 @@ it('lists versions newest first, with who and which fields changed', function ()
     $versions = Livewire::test(EditDocument::class, ['record' => $this->article->id])->instance()->getCollaborationVersions();
 
     expect($versions[0])->toMatchArray(['reason' => 'edit', 'name' => 'Alice Chen', 'changed' => ['excerpt']])
-        ->and($versions[1]['changed'])->toContain('title');
+        // Where the history starts: nothing before it to compare with.
+        ->and($versions[1]['changed'])->toBe([]);
 });
 
 it('restores the draft from a version for everybody, keeping the current one in the history', function (): void {

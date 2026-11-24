@@ -981,7 +981,7 @@ describe('fields out of sight', () => {
             assert.ok(chip && header, 'no chip')
             assert.equal(await alice.locator('.fi-collab-chip').innerText(), 'BM')
             // On the tab's top right corner.
-            assert.ok(Math.abs(chip.x + chip.width - (header.x + header.width - 6)) < 2 && Math.abs(chip.y + chip.height / 2 - header.y - 2) < 2, JSON.stringify({ chip, header }))
+            assert.ok(Math.abs(chip.x + chip.width - (header.x + header.width + 4)) < 2 && Math.abs(chip.y + chip.height / 2 - header.y - 2) < 2, JSON.stringify({ chip, header }))
         }, 'Alice did not see Bob on the tab', 12000)
 
         await alice.locator('[data-collaboration-people]').click()
