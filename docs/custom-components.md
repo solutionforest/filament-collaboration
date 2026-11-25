@@ -17,30 +17,19 @@ The steps below are what `make:collaborative-field` writes for you. It asks for 
 php artisan make:collaborative-field
 ```
 
-```
- What is the field called?
- › ReviewStatus
-
- What does it hold?
- ○ Text: merged character by character, with carets (a composer, a notes box)
- › A choice: the latest change wins (a rating, a status, a colour)
-
- Step                                         File
- 1. The field                                 app/Forms/Components/ReviewStatus.php
- 2. Its view                                  resources/views/forms/components/review-status.blade.php
- 3 and 5. Its Alpine component and adapter    resources/js/collaboration/review-status.js
- 4 and 6. Loads it and names its adapter      app/Providers/CollaborativeFieldsServiceProvider.php
-
- Create these files? › Yes
-```
+![make:collaborative-field asks for the field's name and what it holds, lists the four files it will write, and says how to use the field](media/make-collaborative-field.png)
 
 Then use it in a form on a page with `InteractsWithCollaboration`:
 
 ```php
 use App\Forms\Components\ReviewStatus;
 
-ReviewStatus::make('review_status')->options(['draft' => 'Draft', 'ready' => 'Ready']);
+ReviewStatus::make('review_status')->options(['draft' => 'Needs work', 'edit' => 'In edit', 'ready' => 'Ready to publish']);
 ```
+
+Open the record in two browsers, and both fields are live. Here Bob sees Alice's caret in a text field made with `--kind=text`, and the choice he picked in `ReviewStatus`:
+
+![Two generated fields, live: Alice's named caret in Team notes, and In edit picked in Review status](media/generated-fields.png)
 
 The script is plain JavaScript, with no build step. The command publishes it with `php artisan filament:assets`; run that again after changing it. Without questions: `php artisan make:collaborative-field ReviewStatus --kind=choice`. `--force` overwrites files that exist, and `--no-assets` skips publishing.
 
