@@ -414,6 +414,22 @@ With a Redis or Memcached cache store, each draft's head (its position, version 
 
 To measure your own setup, run the demo's load test with two servers: `SERVERS=2 PRESENCE=redis npm run test:load -- 300 45`. Add `TRANSPORT=reverb` to push over Reverb. It checks that everybody sees everybody across both servers, that every editor ends with the same text, and that no typing is lost. The **Load** workflow runs it on a CI runner.
 
+### Several panels
+
+Add the plugin to each panel that should be live; each panel's settings are its own. A panel without the plugin shows the same resources as usual, with no presence.
+
+People on different panels share a record's room, and so edit it together, when the panels' rooms are scoped the same way: give each panel the same `scopeRoomsUsing()`, or none. Each page syncs through its own panel's endpoint, `{panel}/_collaboration/sync`, and a token from one panel is refused on another.
+
+A panel may sign people in with a guard of its own (`->authGuard('editors')`). The Reverb channel asks every session guard, so whoever is in the room may listen, even when one browser is signed in to two panels as different people.
+
+### Laravel Octane
+
+The package runs on [Laravel Octane](https://laravel.com/docs/octane), which keeps the application in memory between requests. It keeps no request's state in static properties or singletons: the push notifier is scoped to the request, and everything else is read again on each one. Register field types with `CollaborationPlugin::registerFieldTypes()` in a service provider's `boot()`, which runs once per worker, rather than per request.
+
+Octane workers each have their own memory, so give them a shared cache store, such as Redis, as you would several servers. A cache store each worker keeps for itself, such as `array`, never turns on the draft cache.
+
+The **Octane** job runs two editors on a single Swoole worker, so every request goes through the same application: `OCTANE=swoole OCTANE_WORKERS=1 npm run test:octane` in `demo/`. `OCTANE=swoole npm run test:e2e` runs every browser scenario on Octane.
+
 ### PHPStan
 
 So PHPStan knows about `collaborative()` and `collaborate()`, include the extension. With `phpstan/extension-installer` this happens by itself; otherwise:

@@ -26,7 +26,7 @@ class Editor
 
     private int $number = 0;
 
-    public function __construct(private TestCase $test, public User $user) {}
+    public function __construct(private TestCase $test, public User $user, public ?string $guard = null) {}
 
     public static function open(TestCase $test, User $user, Article $article, string $page = 'edit'): self
     {
@@ -38,11 +38,11 @@ class Editor
         return self::openUrl($test, $user, $url);
     }
 
-    /** Any page with a room, such as a translated page in one language. */
-    public static function openUrl(TestCase $test, User $user, string $url): self
+    /** Any page with a room, such as a translated page in one language, signed in with any guard. */
+    public static function openUrl(TestCase $test, User $user, string $url, ?string $guard = null): self
     {
-        $editor = new self($test, $user);
-        $html = (string) $test->actingAs($user)->get($url)->assertOk()->getContent();
+        $editor = new self($test, $user, $guard);
+        $html = (string) $test->actingAs($user, $guard)->get($url)->assertOk()->getContent();
 
         if (preg_match('/data-collaboration="([^"]+)"/', $html, $match) !== 1) {
             throw new \RuntimeException('The page has no collaboration room.');
@@ -67,7 +67,7 @@ class Editor
     /** @param array<string, mixed> $extra */
     public function send(array $extra = []): TestResponse
     {
-        return $this->test->actingAs($this->user)->postJson($this->config['url'], [
+        return $this->test->actingAs($this->user, $this->guard)->postJson($this->config['url'], [
             'token' => $this->config['token'],
             'epoch' => $this->epoch,
             'since' => $this->sequence,

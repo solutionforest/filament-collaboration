@@ -110,13 +110,21 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
 
     for (let extra = 1; extra < servers; extra++) ports.push(await freePort())
 
+    // OCTANE=swoole serves the app from Laravel Octane, which keeps it in memory between requests.
     const processes = ports.map((listen) =>
-        spawn('php', [...options, '-S', `127.0.0.1:${listen}`, path.join(demo, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], {
-            cwd: path.join(demo, 'public'),
-            env,
-            stdio: 'ignore',
-            detached: true,
-        }),
+        process.env.OCTANE
+            ? spawn('php', ['artisan', 'octane:start', `--server=${process.env.OCTANE}`, '--host=127.0.0.1', `--port=${listen}`, `--workers=${process.env.OCTANE_WORKERS ?? 4}`, '--task-workers=0'], {
+                  cwd: demo,
+                  env,
+                  stdio: 'ignore',
+                  detached: true,
+              })
+            : spawn('php', [...options, '-S', `127.0.0.1:${listen}`, path.join(demo, 'vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php')], {
+                  cwd: path.join(demo, 'public'),
+                  env,
+                  stdio: 'ignore',
+                  detached: true,
+              }),
     )
 
     const websockets = reverb

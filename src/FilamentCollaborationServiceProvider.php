@@ -26,6 +26,7 @@ use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
 use SolutionForest\FilamentCollaboration\Presence\Identity;
 use SolutionForest\FilamentCollaboration\Presence\RedisPresenceRepository;
 use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
+use SolutionForest\FilamentCollaboration\Support\Data;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -57,14 +58,62 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
      * Only people syncing in a room, in the same audience, may hear it: they
      * passed the room's authorisation to get there. Registered on the default
      * broadcaster, so call this again if you switch broadcaster at runtime.
+     *
+     * Each panel may sign people in with a guard of its own, so every session
+     * guard is asked, and whoever of them is in the room may listen.
      */
     public static function registerChannel(): void
     {
+        $guards = self::sessionGuards();
+
         Broadcast::channel(
             RoomChanged::channel('{room}').'.{audience}',
-            fn (Authenticatable $user, string $room, string $audience): bool => app(PresenceRepository::class)
-                ->isPresent($room, Identity::for($user)->key, $audience),
+            static function (Authenticatable $user, string $room, string $audience) use ($guards): bool {
+                $presence = app(PresenceRepository::class);
+                $people = [$user];
+
+                foreach ($guards as $guard) {
+                    $signedIn = request()->user($guard);
+
+                    if ($signedIn instanceof Authenticatable) {
+                        $people[] = $signedIn;
+                    }
+                }
+
+                foreach ($people as $person) {
+                    if ($presence->isPresent($room, Identity::for($person)->key, $audience)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+            ['guards' => $guards],
         );
+    }
+
+    /**
+     * The session guards, the default one first.
+     *
+     * @return list<string>
+     */
+    private static function sessionGuards(): array
+    {
+        $guards = [];
+
+        foreach (Data::map(config('auth.guards')) as $name => $guard) {
+            if ((Data::map($guard)['driver'] ?? null) === 'session') {
+                $guards[] = (string) $name;
+            }
+        }
+
+        $default = Data::nullableString(config('auth.defaults.guard'));
+
+        if ($default !== null && in_array($default, $guards, true)) {
+            $guards = [$default, ...array_values(array_diff($guards, [$default]))];
+        }
+
+        return $guards === [] && $default !== null ? [$default] : $guards;
     }
 
     public function packageBooted(): void
