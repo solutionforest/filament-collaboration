@@ -13,6 +13,9 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 /** The newsroom at a glance. */
 class NewsroomStats extends StatsOverviewWidget
 {
+    // Rendered with the page, like the panel's notifications: a lazy load cut short by leaving the page is reported as an error.
+    protected static bool $isLazy = false;
+
     protected static ?int $sort = 1;
 
     protected ?string $pollingInterval = '15s';

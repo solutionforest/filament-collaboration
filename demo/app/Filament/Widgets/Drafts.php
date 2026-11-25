@@ -13,6 +13,9 @@ use Filament\Widgets\TableWidget;
 /** What is not published yet: drafts and articles in review. */
 class Drafts extends TableWidget
 {
+    // Rendered with the page, like the panel's notifications: a lazy load cut short by leaving the page is reported as an error.
+    protected static bool $isLazy = false;
+
     protected static ?int $sort = 3;
 
     protected int|string|array $columnSpan = 'full';
