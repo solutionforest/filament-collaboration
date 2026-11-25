@@ -141,14 +141,22 @@ interface Window {
     Livewire?: { find(id: string | null): Wire | undefined; dispatch(event: string, params?: Record<string, unknown>): void }
     Echo?: any
     FilamentRichEditor?: { tiptap?: { pmState?: typeof import('prosemirror-state') } }
-    filamentCollaboration?: {
-        inspect(): Array<ReturnType<import('./room/room.js').Room['inspect']>>
-        registerAdapter(name: string, definition: AdapterDefinition): void
-        minimalChange: typeof import('./adapters/registry.js').minimalChange
-        html: typeof import('./adapters/html.js')
-        prosemirror: typeof import('./adapters/prosemirror.js')
-        caretRect(input: HTMLInputElement | HTMLTextAreaElement, offset: number): DOMRect | null
-    }
+    FilamentCollaboration?: CollaborationApi
+    /** The name before 0.3.0. */
+    filamentCollaboration?: CollaborationApi
+}
+
+/** `window.FilamentCollaboration`. */
+interface CollaborationApi {
+    /** Teaches the package an editor: `FilamentCollaboration.adapter('trix', { format: 'html', attach })`. */
+    adapter(name: string, definition: AdapterDefinition): CollaborationApi
+    /** The former name of `adapter()`. */
+    registerAdapter(name: string, definition: AdapterDefinition): CollaborationApi
+    inspect(): Array<ReturnType<import('./room/room.js').Room['inspect']>>
+    minimalChange: typeof import('./adapters/registry.js').minimalChange
+    html: typeof import('./adapters/html.js')
+    prosemirror: typeof import('./adapters/prosemirror.js')
+    caretRect(input: HTMLInputElement | HTMLTextAreaElement, offset: number): DOMRect | null
 }
 
 /** Where to draw somebody's caret and selection, in viewport coordinates. */

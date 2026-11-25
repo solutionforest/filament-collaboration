@@ -158,7 +158,7 @@ An adapter tells the package three things: how to **find** the editor in a field
 ### A text field, with carets
 
 ```js
-api.registerAdapter('demo-post-composer', {
+FilamentCollaboration.adapter('demo-post-composer', {
     format: 'text',
     attach({ element, changed, moved }) {
         const input = element.querySelector('.demo-composer-input')
@@ -208,7 +208,7 @@ What each part is for:
 - **`write()` must change only what differs.** Replacing the whole value moves the caret to the end and wipes the editor's undo history. `api.minimalChange(old, next)` gives the range to replace.
 - **`changed()`** must be called on every content change, and **`moved()`** on every caret move. Calling them too often is harmless; missing one delays that change until the next.
 - **`selection()` and `setSelection()`** keep your own caret in place when a colleague's change arrives above it. Without them, edits still merge, but the caret is not kept.
-- **`caretRect(offset)`** returns a `DOMRect` in viewport coordinates, for drawing other people's carets. `api.caretRect(input, offset)` measures one in any `<input>` or `<textarea>`. For HTML editors, `api.html.caretRectAt(root, position)` does the same.
+- **`caretRect(offset)`** returns a `DOMRect` in viewport coordinates, for drawing other people's carets. `FilamentCollaboration.caretRect(input, offset)` measures one in any `<input>` or `<textarea>`. For HTML editors, `FilamentCollaboration.html.caretRectAt(root, position)` does the same.
 - **`isBusy()`** returning true makes remote changes wait, for example during IME composition.
 - **`isAlive()`** returning false makes the package attach again, for example after the field was re-rendered.
 - **`undo()` and `redo()`**, on the context, undo only this person's typing. Call them from Ctrl+Z instead of the editor's own undo, as Filament's text inputs do.
@@ -216,7 +216,7 @@ What each part is for:
 ### A picker: the latest value wins
 
 ```js
-api.registerAdapter('demo-star-rating', {
+FilamentCollaboration.adapter('demo-star-rating', {
     format: 'value',
     attach({ element, changed }) {
         const root = element.querySelector('.demo-rating')
@@ -256,17 +256,11 @@ FilamentAsset::register([
 ], 'demo/filament-widgets');
 ```
 
-Your script may load before or after this package's, so register like this:
+Your script may load before or after this package's: `FilamentCollaboration` is defined in the panel's `<head>` before any script, and an adapter registered before the package has started waits until it does. So the adapters are simply registered at the top of the file:
 
 ```js
-function registerAdapters(api) {
-    api.registerAdapter('demo-post-composer', { /* ... */ })
-    api.registerAdapter('demo-star-rating', { /* ... */ })
-}
-
-window.filamentCollaboration
-    ? registerAdapters(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => registerAdapters(event.detail), { once: true })
+FilamentCollaboration.adapter('demo-post-composer', { /* ... */ })
+FilamentCollaboration.adapter('demo-star-rating', { /* ... */ })
 ```
 
 Then build it and publish the assets: in the demo, `npm run build:editors` and `php artisan filament:assets`.
@@ -322,7 +316,7 @@ it('makes custom components live through their adapters', function (): void {
 
 | | |
 | --- | --- |
-| `registerAdapter(name, { format, attach })` | `format`: `'text'`, `'html'`, `'rich'`, `'value'` or `'items'` |
+| `FilamentCollaboration.adapter(name, { format, attach })` | `format`: `'text'`, `'html'`, `'rich'`, `'value'` or `'items'`; returns `FilamentCollaboration`. `registerAdapter()` is its name before 0.3.0 |
 | `attach({ field, element, statePath, wire, changed, moved, undo, redo, recover })` | returns a handle; `null` to be asked again; `false` to merge on save |
 | context `undo()` / `redo()` | undo only this person's typing; call on Ctrl+Z (`text`) |
 | context `recover(error, details)` | the editor threw: show the draft again, report it, give up after repeated failures |

@@ -5,51 +5,43 @@ import 'ckeditor5/ckeditor5.css'
 /**
  * The adapter. CKEditor keeps its own model of the selection, so a DOM
  * range is turned into a model range to move the caret.
- *
- * @param {any} api window.filamentCollaboration
  */
-function registerAdapter(api) {
-    api.registerAdapter('demo-ckeditor', {
-        format: 'html',
-        attach({ element, changed, moved }) {
-            const root = element.querySelector('.demo-ckeditor')
-            // Kept on the element, never behind Alpine's reactive proxy, which editors do not survive.
-            const editor = root?.demoEditor
+FilamentCollaboration.adapter('demo-ckeditor', {
+    format: 'html',
+    attach({ element, changed, moved }) {
+        const root = element.querySelector('.demo-ckeditor')
+        // Kept on the element, never behind Alpine's reactive proxy, which editors do not survive.
+        const editor = root?.demoEditor
 
-            if (!editor) return null
+        if (!editor) return null
 
-            const content = () => editor.editing.view.getDomRoot()
-            const document = editor.model.document
+        const content = () => editor.editing.view.getDomRoot()
+        const document = editor.model.document
 
-            document.on('change:data', changed)
-            document.selection.on('change:range', moved)
+        document.on('change:data', changed)
+        document.selection.on('change:range', moved)
 
-            return {
-                read: () => editor.getData(),
-                write: (html) => editor.setData(html),
-                selection: () => api.html.selectionIn(content(), window.getSelection()),
-                setSelection(positions) {
-                    const range = api.html.select(content(), positions)
-                    const view = range && editor.editing.view.domConverter.domRangeToView(range)
+        return {
+            read: () => editor.getData(),
+            write: (html) => editor.setData(html),
+            selection: () => FilamentCollaboration.html.selectionIn(content(), window.getSelection()),
+            setSelection(positions) {
+                const range = FilamentCollaboration.html.select(content(), positions)
+                const view = range && editor.editing.view.domConverter.domRangeToView(range)
 
-                    if (view) editor.model.change((writer) => writer.setSelection(editor.editing.mapper.toModelRange(view)))
-                },
-                caretRect: (position) => api.html.caretRectAt(content(), position),
-                isFocused: () => editor.editing.view.document.isFocused,
-                isBusy: () => editor.editing.view.document.isComposing,
-                isAlive: () => editor.state !== 'destroyed' && !!content()?.isConnected,
-                destroy() {
-                    document.off('change:data', changed)
-                    document.selection.off('change:range', moved)
-                },
-            }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? registerAdapter(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => registerAdapter(/** @type {CustomEvent} */ (event).detail), { once: true })
+                if (view) editor.model.change((writer) => writer.setSelection(editor.editing.mapper.toModelRange(view)))
+            },
+            caretRect: (position) => FilamentCollaboration.html.caretRectAt(content(), position),
+            isFocused: () => editor.editing.view.document.isFocused,
+            isBusy: () => editor.editing.view.document.isComposing,
+            isAlive: () => editor.state !== 'destroyed' && !!content()?.isConnected,
+            destroy() {
+                document.off('change:data', changed)
+                document.selection.off('change:range', moved)
+            },
+        }
+    },
+})
 
 /** The field itself: CKEditor 5, its HTML in the Livewire state. */
 export default function demoCkEditor({ state }) {
@@ -84,7 +76,7 @@ export default function demoCkEditor({ state }) {
 
             editor.editing.view.focus()
 
-            const range = window.filamentCollaboration.html.select(editor.editing.view.getDomRoot(), { anchor: position, head: position })
+            const range = FilamentCollaboration.html.select(editor.editing.view.getDomRoot(), { anchor: position, head: position })
             const view = editor.editing.view.domConverter.domRangeToView(range)
 
             editor.model.change((writer) => writer.setSelection(editor.editing.mapper.toModelRange(view)))

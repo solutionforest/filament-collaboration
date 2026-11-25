@@ -26569,36 +26569,32 @@ var jD = {
 	blockLeft: { className: "table-style-block-align-left" },
 	blockRight: { className: "table-style-block-align-right" }
 };
-jD.right.className, jD.center.className, jD.blockLeft.className, jD.blockRight.className, jD.blockLeft.className, jD.blockRight.className;
 // packages/filament-ckeditor/resources/js/editor.js
-function MD(e) {
-	e.registerAdapter("demo-ckeditor", {
-		format: "html",
-		attach({ element: t, changed: n, moved: r }) {
-			let i = t.querySelector(".demo-ckeditor")?.demoEditor;
-			if (!i) return null;
-			let a = () => i.editing.view.getDomRoot(), o = i.model.document;
-			return o.on("change:data", n), o.selection.on("change:range", r), {
-				read: () => i.getData(),
-				write: (e) => i.setData(e),
-				selection: () => e.html.selectionIn(a(), window.getSelection()),
-				setSelection(t) {
-					let n = e.html.select(a(), t), r = n && i.editing.view.domConverter.domRangeToView(n);
-					r && i.model.change((e) => e.setSelection(i.editing.mapper.toModelRange(r)));
-				},
-				caretRect: (t) => e.html.caretRectAt(a(), t),
-				isFocused: () => i.editing.view.document.isFocused,
-				isBusy: () => i.editing.view.document.isComposing,
-				isAlive: () => i.state !== "destroyed" && !!a()?.isConnected,
-				destroy() {
-					o.off("change:data", n), o.selection.off("change:range", r);
-				}
-			};
-		}
-	});
-}
-window.filamentCollaboration ? MD(window.filamentCollaboration) : window.addEventListener("filament-collaboration:init", (e) => MD(e.detail), { once: !0 });
-function ND({ state: e }) {
+jD.right.className, jD.center.className, jD.blockLeft.className, jD.blockRight.className, jD.blockLeft.className, jD.blockRight.className, FilamentCollaboration.adapter("demo-ckeditor", {
+	format: "html",
+	attach({ element: e, changed: t, moved: n }) {
+		let r = e.querySelector(".demo-ckeditor")?.demoEditor;
+		if (!r) return null;
+		let i = () => r.editing.view.getDomRoot(), a = r.model.document;
+		return a.on("change:data", t), a.selection.on("change:range", n), {
+			read: () => r.getData(),
+			write: (e) => r.setData(e),
+			selection: () => FilamentCollaboration.html.selectionIn(i(), window.getSelection()),
+			setSelection(e) {
+				let t = FilamentCollaboration.html.select(i(), e), n = t && r.editing.view.domConverter.domRangeToView(t);
+				n && r.model.change((e) => e.setSelection(r.editing.mapper.toModelRange(n)));
+			},
+			caretRect: (e) => FilamentCollaboration.html.caretRectAt(i(), e),
+			isFocused: () => r.editing.view.document.isFocused,
+			isBusy: () => r.editing.view.document.isComposing,
+			isAlive: () => r.state !== "destroyed" && !!i()?.isConnected,
+			destroy() {
+				a.off("change:data", t), a.selection.off("change:range", n);
+			}
+		};
+	}
+});
+function MD({ state: e }) {
 	return {
 		state: e,
 		async init() {
@@ -26644,7 +26640,7 @@ function ND({ state: e }) {
 		place(e) {
 			let t = this.$el.demoEditor;
 			t.editing.view.focus();
-			let n = window.filamentCollaboration.html.select(t.editing.view.getDomRoot(), {
+			let n = FilamentCollaboration.html.select(t.editing.view.getDomRoot(), {
 				anchor: e,
 				head: e
 			}), r = t.editing.view.domConverter.domRangeToView(n);
@@ -26658,4 +26654,4 @@ function ND({ state: e }) {
 		}
 	};
 }
-export { ND as default };
+export { MD as default };

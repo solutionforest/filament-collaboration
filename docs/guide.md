@@ -527,7 +527,7 @@ For a picker, `ValueType::make([StarRating::class])` does the same without a cla
 
 A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in its own JavaScript object. An **adapter** is a short script that tells this package how to read and write that editor and where its caret is. The package does the rest: merging, carets, presence, saving, permissions.
 
-**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), repeaters and builders (`filament-repeater`), uploads (`filament-file-upload`), and the Markdown and code editors are all adapters registered with `registerAdapter()`, in `resources/js/adapters/filament.js`. Every field goes through this one API. An adapter you write gets exactly what they get, and they are the best examples to copy.
+**Filament's own fields use the same API.** Text inputs and textareas (`filament-text-input`), pickers (`filament-value`), the rich editor (`filament-rich-editor`), repeaters and builders (`filament-repeater`), uploads (`filament-file-upload`), and the Markdown and code editors are all adapters registered with `FilamentCollaboration.adapter()`, in `resources/js/adapters/filament.js`. Every field goes through this one API. An adapter you write gets exactly what they get, and they are the best examples to copy.
 
 **1. Say which fields use it**, in PHP. A package does this once, in its service provider's `boot()`:
 
@@ -547,41 +547,37 @@ An app can also name the adapter on one field: `TinyEditor::make('body')->collab
 | --- | --- | --- |
 | `FieldKind::Text` | `text`: a string | by character |
 | `FieldKind::RichText` | `html`: an HTML string | by character, block and mark; see [HTML editors](#html-editors) |
-| `FieldKind::RichText` | `rich`: a ProseMirror / TipTap JSON document | the same, for editors built on ProseMirror; `filamentCollaboration.prosemirror` has the helpers Filament's rich editor uses |
+| `FieldKind::RichText` | `rich`: a ProseMirror / TipTap JSON document | the same, for editors built on ProseMirror; `FilamentCollaboration.prosemirror` has the helpers Filament's rich editor uses |
 | `FieldKind::Value` | `value`: any JSON | the latest change wins |
 | `FieldKind::Items` | `items`: items by key, each an object of sub-fields, as a repeater keeps them | adding, removing and moving merge; text sub-fields by character, with carets; other sub-fields the latest change. Positions carry the item and sub-field: `{ item, path, anchor, head }` |
 
-**2. Register the adapter**, in JavaScript loaded on the panel:
+**2. Register the adapter**, in JavaScript loaded on the panel, with `FilamentCollaboration.adapter()`, as you would register an Alpine component with `Alpine.data()`:
 
 ```js
-function register({ registerAdapter }) {
-    registerAdapter('my-editor', {
-        format: 'text',
-        attach({ element, changed, moved }) {
-            const editor = MyEditor.instanceIn(element) // however your editor is found
+FilamentCollaboration.adapter('my-editor', {
+    format: 'text',
+    attach({ element, changed, moved }) {
+        const editor = MyEditor.instanceIn(element) // however your editor is found
 
-            if (!editor) return null // not ready yet: asked again shortly
+        if (!editor) return null // not ready yet: asked again shortly
 
-            editor.on('change', changed)
-            editor.on('selectionchange', moved)
+        editor.on('change', changed)
+        editor.on('selectionchange', moved)
 
-            return {
-                read: () => editor.getText(),
-                write: (text) => editor.setText(text), // better: change only what differs; see minimalChange()
-                selection: () => editor.getSelection(), // { anchor, head }, UTF-16 offsets into read()
-                setSelection: ({ anchor, head }) => editor.select(anchor, head),
-                caretRect: (offset) => editor.coordsAt(offset), // a DOMRect, for other people's carets
-                isFocused: () => editor.hasFocus(),
-                destroy: () => editor.off('change', changed),
-            }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? register(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => register(event.detail), { once: true })
+        return {
+            read: () => editor.getText(),
+            write: (text) => editor.setText(text), // better: change only what differs; see minimalChange()
+            selection: () => editor.getSelection(), // { anchor, head }, UTF-16 offsets into read()
+            setSelection: ({ anchor, head }) => editor.select(anchor, head),
+            caretRect: (offset) => editor.coordsAt(offset), // a DOMRect, for other people's carets
+            isFocused: () => editor.hasFocus(),
+            destroy: () => editor.off('change', changed),
+        }
+    },
+})
 ```
+
+`FilamentCollaboration` is defined in the panel's `<head>`, before any script, so your script may load before or after the package's: an adapter registered early waits until the package starts. `adapter()` returns `FilamentCollaboration`, so several can be chained. Before 0.3.0 it was called `registerAdapter()`, which still works.
 
 `attach()` may also return `false` to say the editor cannot be live in this browser; the field then merges on save. The CodeMirror 6 adapter does this in Safari, where a change arriving mid-keystroke can lose that keystroke.
 
@@ -604,17 +600,17 @@ The demo's `packages/` folder has working adapters for TinyMCE, CKEditor 5, Quil
 
 TinyMCE, CKEditor, Quill, Trix and most WYSIWYG editors hold HTML. Merging HTML by character could break its tags, so an adapter with `format: 'html'` hands over HTML, and the package turns it into the same document the built-in rich editor shares: paragraphs, headings, bold, italic, underline, strike, code, links, lists, quotes, tables, images and line breaks. Those merge by character, block and mark, with carets; anything else in the HTML is kept as its text. On save, the field gets HTML back.
 
-Carets are positions in that document. `filamentCollaboration.html` maps them to and from the editor's DOM, so an HTML adapter is mostly glue:
+Carets are positions in that document. `FilamentCollaboration.html` maps them to and from the editor's DOM, so an HTML adapter is mostly glue:
 
 ```js
-registerAdapter('tinymce', {
+FilamentCollaboration.adapter('tinymce', {
     format: 'html',
     attach({ element, changed, moved }) {
         const editor = element.querySelector('.my-tinymce')?.editor // however you keep it
 
         if (!editor?.initialized) return null
 
-        const html = window.filamentCollaboration.html
+        const html = FilamentCollaboration.html
         const body = () => editor.getBody()
 
         editor.on('input change undo redo', changed)
