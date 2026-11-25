@@ -8,6 +8,10 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+### Added
+
+- **`php artisan make:collaborative-field`**, the custom component guide as a step-by-step command with Laravel Prompts. It asks for the field's name and what it holds (text merged by character with carets, or a choice where the latest change wins), then writes the field, its view, its Alpine component and adapter in plain JavaScript, and a service provider that loads the script and names the adapter, and publishes the script.
+
 ### Changed
 
 - **The demo is a real blog and its CMS.** Fieldnotes now has a home page, article pages, archives by category, tag and author with search, static pages edited in the CMS, a 404 page, Open Graph tags, an RSS feed and a sitemap. The CMS gains a dashboard (with who is editing what now), Categories, Tags and Authors, a cover image on articles, and 18 articles written for the demo, with generated covers. The package itself is unchanged.

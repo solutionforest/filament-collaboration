@@ -1,0 +1,20 @@
+{{-- Made by `php artisan make:collaborative-field`. wire:ignore keeps Livewire from replacing the textarea while somebody types. --}}
+<x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
+    <x-filament::input.wrapper class="fi-fo-textarea" :disabled="$isDisabled()" :valid="! $errors->has($getStatePath())">
+        <div
+            wire:ignore
+            x-load
+            x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('{{ asset }}') }}"
+            x-data="{{ alpine }}({ state: $wire.$entangle(@js($getStatePath())) })"
+        >
+            <textarea
+                id="{{ $getId() }}"
+                x-model="state"
+                rows="{{ $getRows() }}"
+                placeholder="{{ $getPlaceholder() }}"
+                @disabled($isDisabled())
+                data-collaboration-input
+            ></textarea>
+        </div>
+    </x-filament::input.wrapper>
+</x-dynamic-component>

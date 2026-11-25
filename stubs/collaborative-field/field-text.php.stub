@@ -1,0 +1,33 @@
+<?php
+
+namespace {{ namespace }};
+
+use Closure;
+use Filament\Forms\Components\Concerns\HasPlaceholder;
+use Filament\Forms\Components\Field;
+
+/**
+ * A text field that several people can type in at once: their words merge
+ * character by character, and each sees where the others' carets are.
+ * Made by `php artisan make:collaborative-field`.
+ */
+class {{ class }} extends Field
+{
+    use HasPlaceholder;
+
+    protected string $view = '{{ view }}';
+
+    protected int|Closure $rows = 4;
+
+    public function rows(int|Closure $rows): static
+    {
+        $this->rows = $rows;
+
+        return $this;
+    }
+
+    public function getRows(): int
+    {
+        return (int) $this->evaluate($this->rows);
+    }
+}

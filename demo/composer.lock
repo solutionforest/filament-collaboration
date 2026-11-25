@@ -899,7 +899,7 @@
         },
         {
             "name": "demo/filament-ckeditor",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-ckeditor",
@@ -936,7 +936,7 @@
         },
         {
             "name": "demo/filament-quill",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-quill",
@@ -973,7 +973,7 @@
         },
         {
             "name": "demo/filament-tinymce",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-tinymce",
@@ -1010,7 +1010,7 @@
         },
         {
             "name": "demo/filament-trix",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-trix",
@@ -1047,7 +1047,7 @@
         },
         {
             "name": "demo/filament-widgets",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "packages/filament-widgets",
@@ -6391,15 +6391,16 @@
         },
         {
             "name": "solutionforest/filament-collaboration",
-            "version": "dev-perf/draft-head-cache",
+            "version": "dev-feat/make-collaborative-field",
             "dist": {
                 "type": "path",
                 "url": "..",
-                "reference": "301c8b201d18bf91a8a33eb70ce4e2166326b7f9"
+                "reference": "bca2876c8a1e923b369b668445569ee3603bc46f"
             },
             "require": {
                 "filament/filament": "^5.8.3",
                 "illuminate/contracts": "^12.0 || ^13.0",
+                "laravel/prompts": "^0.3",
                 "php": "^8.3",
                 "spatie/laravel-package-tools": "^1.92"
             },

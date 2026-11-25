@@ -1,0 +1,29 @@
+<?php
+
+namespace {{ namespace }};
+
+use Filament\Support\Assets\AlpineComponent;
+use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Support\ServiceProvider;
+use SolutionForest\FilamentCollaboration\CollaborationPlugin;
+use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\FilamentCollaboration\Fields\Types\AdapterType;
+
+/**
+ * Fields made with `php artisan make:collaborative-field`: each one's script,
+ * and the adapter that makes it live.
+ */
+class CollaborativeFieldsServiceProvider extends ServiceProvider
+{
+    public function boot(): void
+    {
+        $fields = [
+            // make:collaborative-field adds each field below this line.
+        ];
+
+        foreach ($fields as $class => [$adapter, $kind]) {
+            FilamentAsset::register([AlpineComponent::make($adapter, resource_path("js/collaboration/{$adapter}.js"))]);
+            CollaborationPlugin::registerFieldTypes(AdapterType::make([$class], adapter: $adapter, kind: $kind));
+        }
+    }
+}
