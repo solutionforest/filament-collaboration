@@ -136,6 +136,7 @@ export default defineConfig({
             {
                 text: 'Reference',
                 items: [
+                    { text: 'How it works with Filament', link: '/how-it-works' },
                     { text: 'Architecture and performance', link: '/architecture' },
                     { text: 'Debugging', link: '/guide/debugging' },
                     { text: 'Troubleshooting', link: '/guide/troubleshooting' },

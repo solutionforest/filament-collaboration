@@ -197,6 +197,7 @@ The full documentation is at **[solutionforest.github.io/filament-collaboration]
   10. [Debugging](docs/guide.md#10-debugging)
   11. [Troubleshooting](docs/guide.md#11-troubleshooting)
 - **[Make your own component live](docs/custom-components.md)**: build a post composer and a star rating, and their adapters.
+- **[How it works with Filament](docs/how-it-works.md)**: how the browser script works with Filament, and why not Yjs.
 - **[Architecture and performance](docs/architecture.md)**: how an edit travels, and load-test results.
 
 ## Try the demo
