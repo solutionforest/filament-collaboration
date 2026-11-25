@@ -1,6 +1,6 @@
 ---
 name: filament-collaboration-development
-description: "Use when working with solutionforest/filament-collaboration: real-time collaborative editing of Filament records. Trigger on CollaborationPlugin, InteractsWithCollaboration, HasPresence, PresenceColumn, ->collaborative(), ->lockWhileEditing(), CollaborationPanelAction, comments, @mentions, version history, SharesRelationChanges, adapters for third-party editors (registerAdapter, AdapterType), Reverb broadcasting for collaboration, or Redis presence. Tasks include making a resource collaborative, choosing which fields are live, permissions, translated pages, uploads, comments and history, relation managers, scaling presence, and testing."
+description: "Use when working with solutionforest/filament-collaboration: real-time collaborative editing of Filament records. Trigger on CollaborationPlugin, InteractsWithCollaboration, HasPresence, PresenceColumn, ->collaborative(), ->lockWhileEditing(), CollaborationPanelAction, comments, @mentions, version history, SharesRelationChanges, adapters for third-party editors (FilamentCollaboration.adapter, AdapterType), Reverb broadcasting for collaboration, or Redis presence. Tasks include making a resource collaborative, choosing which fields are live, permissions, translated pages, uploads, comments and history, relation managers, scaling presence, and testing."
 license: MIT
 metadata:
   author: solutionforest
@@ -124,25 +124,20 @@ TinyEditor::make('body')->collaborative(adapter: 'tinymce', as: FieldKind::RichT
 ```
 
 ```js
-function register({ registerAdapter, minimalChange }) {
-    registerAdapter('tinymce', {
-        format: 'html', // 'text' merges by character, 'html' by character, block and mark, 'value' takes the latest
-        attach({ element, changed, moved }) {
-            const editor = findEditorIn(element)
-            if (!editor) return null // not ready: asked again shortly
-            editor.on('input', changed)
-            editor.on('selectionchange', moved)
-            return { read: () => editor.getContent(), write: (html) => editor.setContent(html) }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? register(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => register(event.detail), { once: true })
+// FilamentCollaboration is defined in the panel's <head>, so this works whichever script loads first.
+FilamentCollaboration.adapter('tinymce', {
+    format: 'html', // 'text' merges by character, 'html' by character, block and mark, 'value' takes the latest
+    attach({ element, changed, moved }) {
+        const editor = findEditorIn(element)
+        if (!editor) return null // not ready: asked again shortly
+        editor.on('input', changed)
+        editor.on('selectionchange', moved)
+        return { read: () => editor.getContent(), write: (html) => editor.setContent(html) }
+    },
+})
 ```
 
-- Only `read` and `write` are required; add `selection`, `setSelection`, `caretRect`, `isFocused`, `isBusy` for carets. Write only what differs (`minimalChange(old, next)`) so the editor keeps its undo history.
+- Only `read` and `write` are required; add `selection`, `setSelection`, `caretRect`, `isFocused`, `isBusy` for carets. Write only what differs (`FilamentCollaboration.minimalChange(old, next)`) so the editor keeps its undo history.
 - `attach()` returning `false` means "cannot be live in this browser": the field merges on save.
 - Do not keep the editor on Alpine reactive data (`this.editor = ...`): Alpine's proxy breaks editors such as CKEditor and Quill. Keep it on the element.
 - For a picker-like custom field, `ValueType::make([StarRating::class])` in `->fieldTypes([...])` is enough, without JavaScript.

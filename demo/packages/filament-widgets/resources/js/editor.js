@@ -3,83 +3,75 @@ import '../css/editor.css'
 /**
  * The adapters: how filament-collaboration reads and writes each field.
  * docs/custom-components.md walks through them.
- *
- * @param {any} api window.filamentCollaboration
  */
-function registerAdapters(api) {
-    // A text field: merged character by character, with carets.
-    api.registerAdapter('demo-post-composer', {
-        format: 'text',
-        attach({ element, changed, moved }) {
-            /** @type {HTMLTextAreaElement | null} */
-            const input = element.querySelector('.demo-composer-input')
+// A text field: merged character by character, with carets.
+FilamentCollaboration.adapter('demo-post-composer', {
+    format: 'text',
+    attach({ element, changed, moved }) {
+        /** @type {HTMLTextAreaElement | null} */
+        const input = element.querySelector('.demo-composer-input')
 
-            // The Alpine component loads lazily: not ready yet, asked again shortly.
-            if (!input) return null
+        // The Alpine component loads lazily: not ready yet, asked again shortly.
+        if (!input) return null
 
-            const events = new AbortController()
-            const { signal } = events
-            let composing = false
+        const events = new AbortController()
+        const { signal } = events
+        let composing = false
 
-            input.addEventListener('input', changed, { signal })
-            for (const name of ['select', 'keyup', 'pointerup', 'focus']) input.addEventListener(name, moved, { signal })
-            input.addEventListener('compositionstart', () => (composing = true), { signal })
-            input.addEventListener('compositionend', () => (composing = false), { signal })
+        input.addEventListener('input', changed, { signal })
+        for (const name of ['select', 'keyup', 'pointerup', 'focus']) input.addEventListener(name, moved, { signal })
+        input.addEventListener('compositionstart', () => (composing = true), { signal })
+        input.addEventListener('compositionend', () => (composing = false), { signal })
 
-            return {
-                read: () => input.value,
-                write(value) {
-                    // Change only what differs, so the caret and the undo history survive.
-                    const change = api.minimalChange(input.value, value)
+        return {
+            read: () => input.value,
+            write(value) {
+                // Change only what differs, so the caret and the undo history survive.
+                const change = FilamentCollaboration.minimalChange(input.value, value)
 
-                    if (!change) return
+                if (!change) return
 
-                    input.setRangeText(change.insert, change.from, change.to, 'preserve')
-                    // Tell Alpine's x-model, so the Livewire state follows.
-                    input.dispatchEvent(new Event('input', { bubbles: true }))
-                },
-                selection: () => {
-                    const backward = input.selectionDirection === 'backward'
+                input.setRangeText(change.insert, change.from, change.to, 'preserve')
+                // Tell Alpine's x-model, so the Livewire state follows.
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+            },
+            selection: () => {
+                const backward = input.selectionDirection === 'backward'
 
-                    return { anchor: backward ? input.selectionEnd : input.selectionStart, head: backward ? input.selectionStart : input.selectionEnd }
-                },
-                setSelection: ({ anchor, head }) => input.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head), anchor > head ? 'backward' : 'forward'),
-                caretRect: (offset) => api.caretRect(input, offset),
-                isFocused: () => document.activeElement === input,
-                isBusy: () => composing,
-                isAlive: () => input.isConnected,
-                destroy: () => events.abort(),
-            }
-        },
-    })
+                return { anchor: backward ? input.selectionEnd : input.selectionStart, head: backward ? input.selectionStart : input.selectionEnd }
+            },
+            setSelection: ({ anchor, head }) => input.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head), anchor > head ? 'backward' : 'forward'),
+            caretRect: (offset) => FilamentCollaboration.caretRect(input, offset),
+            isFocused: () => document.activeElement === input,
+            isBusy: () => composing,
+            isAlive: () => input.isConnected,
+            destroy: () => events.abort(),
+        }
+    },
+})
 
-    // A picker: the latest choice wins, so it only reads and writes a value.
-    api.registerAdapter('demo-star-rating', {
-        format: 'value',
-        attach({ element, changed }) {
-            const root = element.querySelector('.demo-rating')
-            const data = root && window.Alpine?.$data(root)
+// A picker: the latest choice wins, so it only reads and writes a value.
+FilamentCollaboration.adapter('demo-star-rating', {
+    format: 'value',
+    attach({ element, changed }) {
+        const root = element.querySelector('.demo-rating')
+        const data = root && window.Alpine?.$data(root)
 
-            if (!data || !('state' in data)) return null
+        if (!data || !('state' in data)) return null
 
-            const events = new AbortController()
+        const events = new AbortController()
 
-            root.addEventListener('demo-widget-change', changed, { signal: events.signal })
+        root.addEventListener('demo-widget-change', changed, { signal: events.signal })
 
-            return {
-                read: () => data.state ?? null,
-                write: (value) => (data.state = value ?? null),
-                isFocused: () => root.contains(document.activeElement),
-                isAlive: () => root.isConnected,
-                destroy: () => events.abort(),
-            }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? registerAdapters(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => registerAdapters(/** @type {CustomEvent} */ (event).detail), { once: true })
+        return {
+            read: () => data.state ?? null,
+            write: (value) => (data.state = value ?? null),
+            isFocused: () => root.contains(document.activeElement),
+            isAlive: () => root.isConnected,
+            destroy: () => events.abort(),
+        }
+    },
+})
 
 /** The fields themselves: a post composer and a star rating, their state entangled with Livewire. */
 export default function demoWidget({ type, state, limit = 280, stars = 5 }) {

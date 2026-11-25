@@ -9,6 +9,7 @@ use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Support\Concerns\EvaluatesClosures;
 use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use LogicException;
@@ -75,8 +76,17 @@ class CollaborationPlugin implements Plugin
         });
     }
 
+    /**
+     * Defined in the head, before any script: an adapter's script may call
+     * `FilamentCollaboration.adapter()` before the package has loaded, and the
+     * call waits in this queue until it does.
+     */
+    public const ADAPTER_QUEUE_SCRIPT = 'window.FilamentCollaboration=window.FilamentCollaboration||{queue:[],adapter(n,d){this.queue.push([n,d]);return this}};';
+
     public function boot(Panel $panel): void
     {
+        FilamentView::registerRenderHook(PanelsRenderHook::HEAD_START, static fn (): string => '<script>'.self::ADAPTER_QUEUE_SCRIPT.'</script>');
+
         // Registered at boot, so `presenceRenderHook()` may be chained in any order.
         // The panel has registered its own hooks by now, so this one is registered directly.
         FilamentView::registerRenderHook($this->getPresenceRenderHook(), function (): string {

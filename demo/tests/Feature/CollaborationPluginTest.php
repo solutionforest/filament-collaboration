@@ -118,3 +118,14 @@ it('leaves options that depend on other fields to the save', function (): void {
     expect($resolver->allowedValues($schema, ['category' => FieldKind::Value, 'subcategory' => FieldKind::Value, 'featured' => FieldKind::Value]))
         ->toBe(['category' => ['a'], 'featured' => ['0', '1']]);
 });
+
+it('defines the adapter queue in the head, before any script, so adapters may load first', function (): void {
+    $user = User::factory()->create();
+    $html = (string) $this->actingAs($user)->get(DocumentResource::getUrl('index'))->assertOk()->getContent();
+
+    $stub = strpos($html, '<script>'.CollaborationPlugin::ADAPTER_QUEUE_SCRIPT.'</script>');
+
+    expect($stub)->not->toBeFalse()
+        ->and($stub)->toBeLessThan(strpos($html, '</head>'))
+        ->and(strpos($html, '<script'))->toBe($stub);
+});

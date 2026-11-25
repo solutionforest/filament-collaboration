@@ -27,6 +27,11 @@ export default [
         },
     },
     {
+        // The package's global, like Alpine's: defined in the page's head before any script.
+        files: ['demo/packages/*/resources/js/**'],
+        languageOptions: { globals: { FilamentCollaboration: 'readonly' } },
+    },
+    {
         // Node scripts; the browser tests also run code in the page, so they see both.
         files: ['tests/js/**', 'demo/tests/browser/**', 'demo/scripts/**', 'demo/packages/vite.config.js', 'vite.config.js', 'eslint.config.js', 'website/scripts/**'],
         languageOptions: { globals: { ...globals.node, ...globals.browser } },

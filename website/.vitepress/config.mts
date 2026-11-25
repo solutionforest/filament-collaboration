@@ -97,7 +97,7 @@ export default defineConfig({
             { text: 'Adapters', link: '/adapters/', activeMatch: '^/adapters/' },
             { text: 'Architecture', link: '/architecture' },
             {
-                text: 'v0.2.0',
+                text: 'v0.3.0',
                 items: [
                     { text: 'Changelog', link: '/changelog' },
                     { text: 'Releases', link: `${repo}/releases` },

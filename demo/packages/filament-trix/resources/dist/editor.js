@@ -6393,38 +6393,34 @@ var ua = {
 		attachmentGalleryFilter: zr
 	})
 };
+// packages/filament-trix/resources/js/editor.js
 Object.assign(ua, Yr), window.Trix = ua, setTimeout((function() {
 	customElements.get("trix-toolbar") || customElements.define("trix-toolbar", Ji), customElements.get("trix-editor") || customElements.define("trix-editor", la);
-}), 0);
-// packages/filament-trix/resources/js/editor.js
-function da(e) {
-	e.registerAdapter("demo-trix", {
-		format: "html",
-		attach({ element: t, changed: n, moved: r }) {
-			let i = t.querySelector("trix-editor");
-			if (!i?.editor) return null;
-			let a = new AbortController();
-			return i.addEventListener("trix-change", n, { signal: a.signal }), i.addEventListener("trix-selection-change", r, { signal: a.signal }), {
-				read: () => i.innerHTML,
-				write: (e) => i.editor.loadHTML(e),
-				selection: () => e.html.selectionIn(i, window.getSelection()),
-				setSelection: (t) => e.html.select(i, t),
-				caretRect: (t) => e.html.caretRectAt(i, t),
-				isFocused: () => document.activeElement === i,
-				isAlive: () => i.isConnected,
-				destroy: () => a.abort()
-			};
-		}
-	});
-}
-window.filamentCollaboration ? da(window.filamentCollaboration) : window.addEventListener("filament-collaboration:init", (e) => da(e.detail), { once: !0 });
-var fa = 0;
-function pa({ state: e }) {
+}), 0), FilamentCollaboration.adapter("demo-trix", {
+	format: "html",
+	attach({ element: e, changed: t, moved: n }) {
+		let r = e.querySelector("trix-editor");
+		if (!r?.editor) return null;
+		let i = new AbortController();
+		return r.addEventListener("trix-change", t, { signal: i.signal }), r.addEventListener("trix-selection-change", n, { signal: i.signal }), {
+			read: () => r.innerHTML,
+			write: (e) => r.editor.loadHTML(e),
+			selection: () => FilamentCollaboration.html.selectionIn(r, window.getSelection()),
+			setSelection: (e) => FilamentCollaboration.html.select(r, e),
+			caretRect: (e) => FilamentCollaboration.html.caretRectAt(r, e),
+			isFocused: () => document.activeElement === r,
+			isAlive: () => r.isConnected,
+			destroy: () => i.abort()
+		};
+	}
+});
+var da = 0;
+function fa({ state: e }) {
 	return {
 		state: e,
 		init() {
 			let e = document.createElement("input");
-			e.type = "hidden", e.id = `demo-trix-input-${++fa}`, e.value = this.state ?? "";
+			e.type = "hidden", e.id = `demo-trix-input-${++da}`, e.value = this.state ?? "";
 			let t = document.createElement("trix-editor");
 			t.setAttribute("input", e.id), t.classList.add("trix-content"), this.$refs.editor.append(e, t), this.trix = t, t.addEventListener("trix-change", () => {
 				t.value !== this.state && (this.state = t.value);
@@ -6435,7 +6431,7 @@ function pa({ state: e }) {
 			});
 		},
 		place(e) {
-			this.trix.focus(), window.filamentCollaboration.html.select(this.trix, {
+			this.trix.focus(), FilamentCollaboration.html.select(this.trix, {
 				anchor: e,
 				head: e
 			});
@@ -6445,4 +6441,4 @@ function pa({ state: e }) {
 		}
 	};
 }
-export { pa as default };
+export { fa as default };

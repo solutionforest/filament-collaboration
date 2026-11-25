@@ -12,48 +12,40 @@ import 'tinymce/skins/content/default/content.js'
 /**
  * The adapter: what filament-collaboration needs to make this editor live.
  * Positions come from its HTML helpers, which count as its shared document does.
- *
- * @param {any} api window.filamentCollaboration
  */
-function registerAdapter(api) {
-    api.registerAdapter('demo-tinymce', {
-        format: 'html',
-        attach({ element, changed, moved }) {
-            const root = element.querySelector('.demo-tinymce')
-            // Kept on the element, never behind Alpine's reactive proxy, which editors do not survive.
-            const editor = root?.demoEditor
+FilamentCollaboration.adapter('demo-tinymce', {
+    format: 'html',
+    attach({ element, changed, moved }) {
+        const root = element.querySelector('.demo-tinymce')
+        // Kept on the element, never behind Alpine's reactive proxy, which editors do not survive.
+        const editor = root?.demoEditor
 
-            if (!editor?.initialized) return null
+        if (!editor?.initialized) return null
 
-            const body = () => editor.getBody()
+        const body = () => editor.getBody()
 
-            editor.on('input change undo redo keyup', changed)
-            editor.on('SelectionChange', moved)
+        editor.on('input change undo redo keyup', changed)
+        editor.on('SelectionChange', moved)
 
-            return {
-                read: () => editor.getContent(),
-                write: (html) => editor.setContent(html),
-                selection: () => api.html.selectionIn(body(), editor.getDoc().getSelection()),
-                setSelection(positions) {
-                    const range = api.html.select(body(), positions)
+        return {
+            read: () => editor.getContent(),
+            write: (html) => editor.setContent(html),
+            selection: () => FilamentCollaboration.html.selectionIn(body(), editor.getDoc().getSelection()),
+            setSelection(positions) {
+                const range = FilamentCollaboration.html.select(body(), positions)
 
-                    if (range) editor.selection.setRng(range)
-                },
-                caretRect: (position) => api.html.caretRectAt(body(), position),
-                isFocused: () => editor.hasFocus(),
-                isAlive: () => !editor.removed && !!editor.getContainer()?.isConnected,
-                destroy() {
-                    editor.off('input change undo redo keyup', changed)
-                    editor.off('SelectionChange', moved)
-                },
-            }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? registerAdapter(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => registerAdapter(/** @type {CustomEvent} */ (event).detail), { once: true })
+                if (range) editor.selection.setRng(range)
+            },
+            caretRect: (position) => FilamentCollaboration.html.caretRectAt(body(), position),
+            isFocused: () => editor.hasFocus(),
+            isAlive: () => !editor.removed && !!editor.getContainer()?.isConnected,
+            destroy() {
+                editor.off('input change undo redo keyup', changed)
+                editor.off('SelectionChange', moved)
+            },
+        }
+    },
+})
 
 /** The field itself: TinyMCE, its HTML in the Livewire state. */
 export default function demoTinyMce({ state }) {
@@ -94,7 +86,7 @@ export default function demoTinyMce({ state }) {
         /** For the browser tests: put the caret at a position. */
         place(position) {
             this.editor.focus()
-            this.editor.selection.setRng(window.filamentCollaboration.html.select(this.editor.getBody(), { anchor: position, head: position }))
+            this.editor.selection.setRng(FilamentCollaboration.html.select(this.editor.getBody(), { anchor: position, head: position }))
         },
 
         text() {

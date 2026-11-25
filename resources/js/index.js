@@ -3,6 +3,7 @@ import { Room } from './room/room.js'
 import * as html from './adapters/html.js'
 import * as prosemirror from './adapters/prosemirror.js'
 import { minimalChange, registerAdapter } from './adapters/registry.js'
+import { createApi } from './api.js'
 import { registerFilamentAdapters } from './adapters/filament.js'
 import { measureText } from './ui/measure-text.js'
 import { renderInspector } from './ui/inspector.js'
@@ -67,24 +68,28 @@ function scan() {
 }
 
 function boot() {
-    if (window.filamentCollaboration) return
+    if (window.FilamentCollaboration?.inspect) return
 
-    window.filamentCollaboration = {
+    // Filament's own fields first, so an app may replace one of their adapters.
+    registerFilamentAdapters(registerAdapter)
+
+    const api = createApi(window.FilamentCollaboration, registerAdapter, {
         inspect: () => [...rooms.values()].map(({ room }) => room.inspect()),
-        registerAdapter,
         // For adapters: change only what differs, and map HTML editors' carets.
         minimalChange,
         html,
         // For ProseMirror and TipTap editors, as Filament's own rich editor uses them.
         prosemirror,
         // Where a caret at this offset of an input or textarea is, in viewport coordinates.
-        caretRect: (input, offset) => measureText(input, offset, offset)?.caret ?? null,
-    }
+        caretRect: (/** @type {HTMLInputElement | HTMLTextAreaElement} */ input, /** @type {number} */ offset) => measureText(input, offset, offset)?.caret ?? null,
+    })
 
-    registerFilamentAdapters(registerAdapter)
+    window.FilamentCollaboration = api
+    // The name before 0.3.0.
+    window.filamentCollaboration = api
 
-    // For adapters loaded before this script: they wait for this event.
-    window.dispatchEvent(new CustomEvent('filament-collaboration:init', { detail: window.filamentCollaboration }))
+    // For scripts that waited for the package before 0.3.0.
+    window.dispatchEvent(new CustomEvent('filament-collaboration:init', { detail: api }))
 
     setInterval(scan, 250)
     document.addEventListener('livewire:navigated', scan)

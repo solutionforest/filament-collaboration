@@ -5,40 +5,32 @@ import 'trix/dist/trix.css'
 /**
  * The adapter. Trix keeps its HTML in a hidden input and follows the DOM
  * selection, so the HTML helpers do the rest.
- *
- * @param {any} api window.filamentCollaboration
  */
-function registerAdapter(api) {
-    api.registerAdapter('demo-trix', {
-        format: 'html',
-        attach({ element, changed, moved }) {
-            const trix = element.querySelector('trix-editor')
+FilamentCollaboration.adapter('demo-trix', {
+    format: 'html',
+    attach({ element, changed, moved }) {
+        const trix = element.querySelector('trix-editor')
 
-            if (!trix?.editor) return null
+        if (!trix?.editor) return null
 
-            const events = new AbortController()
+        const events = new AbortController()
 
-            trix.addEventListener('trix-change', changed, { signal: events.signal })
-            trix.addEventListener('trix-selection-change', moved, { signal: events.signal })
+        trix.addEventListener('trix-change', changed, { signal: events.signal })
+        trix.addEventListener('trix-selection-change', moved, { signal: events.signal })
 
-            return {
-                // Its own HTML, not the hidden input, which only follows on the next change event.
-                read: () => trix.innerHTML,
-                write: (html) => trix.editor.loadHTML(html),
-                selection: () => api.html.selectionIn(trix, window.getSelection()),
-                setSelection: (positions) => api.html.select(trix, positions),
-                caretRect: (position) => api.html.caretRectAt(trix, position),
-                isFocused: () => document.activeElement === trix,
-                isAlive: () => trix.isConnected,
-                destroy: () => events.abort(),
-            }
-        },
-    })
-}
-
-window.filamentCollaboration
-    ? registerAdapter(window.filamentCollaboration)
-    : window.addEventListener('filament-collaboration:init', (event) => registerAdapter(/** @type {CustomEvent} */ (event).detail), { once: true })
+        return {
+            // Its own HTML, not the hidden input, which only follows on the next change event.
+            read: () => trix.innerHTML,
+            write: (html) => trix.editor.loadHTML(html),
+            selection: () => FilamentCollaboration.html.selectionIn(trix, window.getSelection()),
+            setSelection: (positions) => FilamentCollaboration.html.select(trix, positions),
+            caretRect: (position) => FilamentCollaboration.html.caretRectAt(trix, position),
+            isFocused: () => document.activeElement === trix,
+            isAlive: () => trix.isConnected,
+            destroy: () => events.abort(),
+        }
+    },
+})
 
 let inputs = 0
 
@@ -80,7 +72,7 @@ export default function demoTrix({ state }) {
         /** For the browser tests: put the caret at a position. */
         place(position) {
             this.trix.focus()
-            window.filamentCollaboration.html.select(this.trix, { anchor: position, head: position })
+            FilamentCollaboration.html.select(this.trix, { anchor: position, head: position })
         },
 
         text() {

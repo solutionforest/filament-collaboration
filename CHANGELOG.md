@@ -8,9 +8,19 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-25
+
+A JavaScript API in the style of Livewire and Alpine, and a page on how the package works with Filament.
+
 ### Added
 
+- **`FilamentCollaboration.adapter(name, definition)`** registers an adapter, the way `Alpine.data()` registers a component. `window.FilamentCollaboration` is defined in the panel's `<head>` before any script, so an adapter's script no longer needs to wait for the package: an adapter registered early is queued and registered when the package starts. `adapter()` returns `FilamentCollaboration`, so calls chain.
 - **How it works with Filament**, a new documentation page: how the browser script works with Filament's fields and Livewire, why the package has its own merge engine instead of Yjs, and which parts would work without Filament.
+
+### Changed
+
+- The package's global is now `window.FilamentCollaboration`, like `Livewire` and `Alpine`. `window.filamentCollaboration`, `registerAdapter()` and the `filament-collaboration:init` event still work, so existing adapters need no change.
+- The demo's TinyMCE, CKEditor, Quill, Trix and custom component adapters, the guide, the custom component tutorial and the Laravel Boost skill use `FilamentCollaboration.adapter()`.
 
 ### Fixed
 
@@ -60,6 +70,7 @@ The first release: Google Docs-style collaborative editing for Filament 5.
 - **A Laravel Boost skill and guideline** for AI assistants.
 - **Requirements:** PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+.
 
-[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/solutionforest/filament-collaboration/releases/tag/v0.1.0
