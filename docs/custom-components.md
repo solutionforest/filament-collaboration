@@ -9,6 +9,43 @@ Filament Collaboration knows Filament's own fields, and makes them live through 
 
 The code is in [`demo/packages/filament-widgets`](../demo/packages/filament-widgets). To see it run, open an article in the demo in two browsers and scroll to **Custom components**.
 
+## The quick way: let a command write it
+
+The steps below are what `make:collaborative-field` writes for you. It asks for the field's name and what it holds, then makes the field, its view, its Alpine component with its adapter, and a service provider that loads the script and names the adapter:
+
+```bash
+php artisan make:collaborative-field
+```
+
+```
+ What is the field called?
+ › ReviewStatus
+
+ What does it hold?
+ ○ Text: merged character by character, with carets (a composer, a notes box)
+ › A choice: the latest change wins (a rating, a status, a colour)
+
+ Step                                         File
+ 1. The field                                 app/Forms/Components/ReviewStatus.php
+ 2. Its view                                  resources/views/forms/components/review-status.blade.php
+ 3 and 5. Its Alpine component and adapter    resources/js/collaboration/review-status.js
+ 4 and 6. Loads it and names its adapter      app/Providers/CollaborativeFieldsServiceProvider.php
+
+ Create these files? › Yes
+```
+
+Then use it in a form on a page with `InteractsWithCollaboration`:
+
+```php
+use App\Forms\Components\ReviewStatus;
+
+ReviewStatus::make('review_status')->options(['draft' => 'Draft', 'ready' => 'Ready']);
+```
+
+The script is plain JavaScript, with no build step. The command publishes it with `php artisan filament:assets`; run that again after changing it. Without questions: `php artisan make:collaborative-field ReviewStatus --kind=choice`. `--force` overwrites files that exist, and `--no-assets` skips publishing.
+
+The generated field is a starting point: the rest of this guide explains each file, so you can change the markup, or make an editor of your own live.
+
 ## Before you start: which kind is your field?
 
 | Your field holds | Kind | Adapter `format` | Two people at once |
@@ -180,7 +217,7 @@ FilamentCollaboration.adapter('demo-post-composer', {
             read: () => input.value,
             write(value) {
                 // Change only what differs, so the caret and the undo history survive.
-                const change = api.minimalChange(input.value, value)
+                const change = FilamentCollaboration.minimalChange(input.value, value)
 
                 if (!change) return
 
@@ -191,7 +228,7 @@ FilamentCollaboration.adapter('demo-post-composer', {
             selection: () => ({ anchor: input.selectionStart, head: input.selectionEnd }),
             setSelection: ({ anchor, head }) => input.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head)),
             // Where to draw other people's carets.
-            caretRect: (offset) => api.caretRect(input, offset),
+            caretRect: (offset) => FilamentCollaboration.caretRect(input, offset),
             isFocused: () => document.activeElement === input,
             // Mid-composition (Chinese, Japanese input): remote changes wait.
             isBusy: () => composing,
@@ -205,7 +242,7 @@ FilamentCollaboration.adapter('demo-post-composer', {
 What each part is for:
 
 - **`read()` and `write(value)`** are the only required methods. Positions are UTF-16 offsets into the string `read()` returns.
-- **`write()` must change only what differs.** Replacing the whole value moves the caret to the end and wipes the editor's undo history. `api.minimalChange(old, next)` gives the range to replace.
+- **`write()` must change only what differs.** Replacing the whole value moves the caret to the end and wipes the editor's undo history. `FilamentCollaboration.minimalChange(old, next)` gives the range to replace.
 - **`changed()`** must be called on every content change, and **`moved()`** on every caret move. Calling them too often is harmless; missing one delays that change until the next.
 - **`selection()` and `setSelection()`** keep your own caret in place when a colleague's change arrives above it. Without them, edits still merge, but the caret is not kept.
 - **`caretRect(offset)`** returns a `DOMRect` in viewport coordinates, for drawing other people's carets. `FilamentCollaboration.caretRect(input, offset)` measures one in any `<input>` or `<textarea>`. For HTML editors, `FilamentCollaboration.html.caretRectAt(root, position)` does the same.

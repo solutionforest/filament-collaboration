@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Event;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
 use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
+use SolutionForest\FilamentCollaboration\Commands\MakeCollaborativeFieldCommand;
 use SolutionForest\FilamentCollaboration\Commands\PruneUploadsCommand;
 use SolutionForest\FilamentCollaboration\Commands\RefreshPermissionsCommand;
 use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
@@ -41,7 +42,7 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews(static::$name)
             ->hasTranslations()
-            ->hasCommands([RefreshPermissionsCommand::class, PruneUploadsCommand::class]);
+            ->hasCommands([RefreshPermissionsCommand::class, PruneUploadsCommand::class, MakeCollaborativeFieldCommand::class]);
     }
 
     public function packageRegistered(): void

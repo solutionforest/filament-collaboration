@@ -1,0 +1,31 @@
+{{-- Made by `php artisan make:collaborative-field`. wire:ignore keeps Livewire from replacing the buttons while somebody picks. --}}
+<x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
+    <div
+        wire:ignore
+        x-load
+        x-load-src="{{ \Filament\Support\Facades\FilamentAsset::getAlpineComponentSrc('{{ asset }}') }}"
+        x-data="{{ alpine }}({ state: $wire.$entangle(@js($getStatePath())) })"
+        id="{{ $getId() }}"
+        role="radiogroup"
+        class="{{ asset }}"
+        data-collaboration-choice
+    >
+        @foreach ($getOptions() as $value => $label)
+            <button
+                type="button"
+                role="radio"
+                x-bind:aria-checked="String(state === @js((string) $value))"
+                x-on:click="state = state === @js((string) $value) ? null : @js((string) $value)"
+                @disabled($isDisabled())
+            >{{ $label }}</button>
+        @endforeach
+    </div>
+
+    @once
+        <style>
+            .{{ asset }} { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+            .{{ asset }} button { padding: 0.375rem 0.875rem; border-radius: 0.5rem; border: 1px solid rgb(0 0 0 / 15%); font-size: 0.875rem; }
+            .{{ asset }} button[aria-checked='true'] { background: var(--primary-600); border-color: var(--primary-600); color: #fff; }
+        </style>
+    @endonce
+</x-dynamic-component>

@@ -1,0 +1,52 @@
+// {{ class }}: the field's Alpine component, and the adapter that makes it live.
+// Made by `php artisan make:collaborative-field`. Plain JavaScript: no build step.
+// After changing it, run `php artisan filament:assets`.
+
+// How the package reads and writes the textarea, and where its caret is.
+FilamentCollaboration.adapter('{{ adapter }}', {
+    format: 'text',
+    attach({ element, changed, moved }) {
+        const input = element.querySelector('[data-collaboration-input]')
+
+        // Not rendered yet: the package asks again shortly.
+        if (!input) return null
+
+        const events = new AbortController()
+        const { signal } = events
+        let composing = false
+
+        // Tell the package when the text or the caret changes.
+        input.addEventListener('input', changed, { signal })
+        for (const name of ['select', 'keyup', 'pointerup', 'focus']) input.addEventListener(name, moved, { signal })
+        input.addEventListener('compositionstart', () => (composing = true), { signal })
+        input.addEventListener('compositionend', () => (composing = false), { signal })
+
+        return {
+            read: () => input.value,
+            write(value) {
+                // Change only what differs, so the caret and the undo history survive.
+                const change = FilamentCollaboration.minimalChange(input.value, value)
+
+                if (!change) return
+
+                input.setRangeText(change.insert, change.from, change.to, 'preserve')
+                // Tell Alpine's x-model, so the Livewire state follows.
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+            },
+            selection: () => ({ anchor: input.selectionStart, head: input.selectionEnd }),
+            setSelection: ({ anchor, head }) => input.setSelectionRange(Math.min(anchor, head), Math.max(anchor, head)),
+            // Where to draw other people's carets.
+            caretRect: (offset) => FilamentCollaboration.caretRect(input, offset),
+            isFocused: () => document.activeElement === input,
+            // Mid-composition (Chinese, Japanese input): colleagues' changes wait.
+            isBusy: () => composing,
+            isAlive: () => input.isConnected,
+            destroy: () => events.abort(),
+        }
+    },
+})
+
+// The field's own Alpine component: the state, entangled with Livewire.
+export default function {{ alpine }}({ state }) {
+    return { state }
+}

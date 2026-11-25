@@ -1,0 +1,38 @@
+// {{ class }}: the field's Alpine component, and the adapter that makes it live.
+// Made by `php artisan make:collaborative-field`. Plain JavaScript: no build step.
+// After changing it, run `php artisan filament:assets`.
+
+// How the package reads and writes the choice: the latest change wins.
+FilamentCollaboration.adapter('{{ adapter }}', {
+    format: 'value',
+    attach({ element, changed }) {
+        const root = element.querySelector('[data-collaboration-choice]')
+        const data = root && window.Alpine?.$data(root)
+
+        // Not rendered yet: the package asks again shortly.
+        if (!data || !('state' in data)) return null
+
+        const events = new AbortController()
+
+        root.addEventListener('{{ adapter }}-change', changed, { signal: events.signal })
+
+        return {
+            read: () => data.state ?? null,
+            write: (value) => (data.state = value ?? null),
+            isFocused: () => root.contains(document.activeElement),
+            isAlive: () => root.isConnected,
+            destroy: () => events.abort(),
+        }
+    },
+})
+
+// The field's own Alpine component. A click has no input event, so it says when the choice changes.
+export default function {{ alpine }}({ state }) {
+    return {
+        state,
+
+        init() {
+            this.$watch('state', () => this.$el.dispatchEvent(new CustomEvent('{{ adapter }}-change')))
+        },
+    }
+}

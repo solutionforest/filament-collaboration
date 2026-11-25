@@ -1,0 +1,41 @@
+<?php
+
+namespace {{ namespace }};
+
+use Closure;
+use Filament\Forms\Components\Field;
+
+/**
+ * A choice between a few options, shared by everybody on the record: the
+ * latest change wins, as with Filament's own Select and Toggle.
+ * Made by `php artisan make:collaborative-field`.
+ */
+class {{ class }} extends Field
+{
+    protected string $view = '{{ view }}';
+
+    /** @var array<string, string>|Closure */
+    protected array|Closure $options = [];
+
+    /** @param array<string, string>|Closure $options value => label */
+    public function options(array|Closure $options): static
+    {
+        $this->options = $options;
+
+        return $this;
+    }
+
+    /** @return array<string, string> */
+    public function getOptions(): array
+    {
+        return (array) $this->evaluate($this->options);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Only the options offered may be saved, whoever picked them.
+        $this->in(fn ({{ class }} $component): array => array_keys($component->getOptions()));
+    }
+}
