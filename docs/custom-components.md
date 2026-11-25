@@ -27,9 +27,13 @@ use App\Forms\Components\ReviewStatus;
 ReviewStatus::make('review_status')->options(['draft' => 'Needs work', 'edit' => 'In edit', 'ready' => 'Ready to publish']);
 ```
 
-Open the record in two browsers, and both fields are live. Here Bob sees Alice's caret in a text field made with `--kind=text`, and the choice he picked in `ReviewStatus`:
+Open the record in two browsers, and both fields are live. This is Alice's screen while Bob types in a text field made with `--kind=text`; each person has a colour of their own, and Bob's is blue:
 
-![Two generated fields, live: Alice's named caret in Team notes, and In edit picked in Review status](media/generated-fields.png)
+![Alice's screen: Bob's blue outline and name on Team notes, his caret in the text, and In edit picked in Review status](media/generated-fields.png)
+
+1. **Bob is in this field**: its outline and his name take his colour.
+2. **Bob's caret**: where he is typing. It moves as he types, and his words merge with Alice's.
+3. **The selected option** of the choice field, in the panel's colour. Alice picked it, and Bob sees the same.
 
 The script is plain JavaScript, with no build step. The command publishes it with `php artisan filament:assets`; run that again after changing it. Without questions: `php artisan make:collaborative-field ReviewStatus --kind=choice`. `--force` overwrites files that exist, and `--no-assets` skips publishing.
 
