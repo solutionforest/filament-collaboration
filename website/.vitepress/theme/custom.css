@@ -433,3 +433,118 @@
 .dark .vp-doc .diagram-dark {
     display: block;
 }
+
+/* The lightbox: screenshots and doc images, larger, in a dialog. */
+.home-shot img,
+.vp-doc img:not(.no-lightbox) {
+    cursor: zoom-in;
+}
+
+.vp-doc img:focus-visible {
+    outline: 3px solid var(--vp-c-brand-1);
+    outline-offset: 3px;
+}
+
+.lightbox {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    margin: 0;
+    padding: 56px 72px 24px;
+    border: 0;
+    background: transparent;
+    overflow: hidden;
+}
+
+.lightbox::backdrop {
+    background: rgb(9 9 11 / 94%);
+}
+
+.lightbox-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    height: 100%;
+    margin: 0;
+    pointer-events: none;
+}
+
+.lightbox-figure img {
+    max-width: 100%;
+    max-height: calc(100% - 48px);
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 30px 80px -20px rgb(0 0 0 / 60%);
+    pointer-events: auto;
+}
+
+.lightbox-figure figcaption {
+    display: flex;
+    gap: 16px;
+    color: #e4e4e7;
+    font-size: 15px;
+    text-align: center;
+}
+
+.lightbox-count {
+    color: #a1a1aa;
+}
+
+.lightbox-close,
+.lightbox-nav {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: #fafafa;
+    background: rgb(255 255 255 / 12%);
+    font-size: 22px;
+    line-height: 1;
+}
+
+.lightbox-close:hover,
+.lightbox-nav:hover {
+    background: rgb(255 255 255 / 22%);
+}
+
+.lightbox-close:focus-visible,
+.lightbox-nav:focus-visible {
+    outline: 3px solid var(--vp-c-brand-2);
+}
+
+.lightbox-close {
+    top: 12px;
+    right: 16px;
+}
+
+.lightbox-nav {
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 30px;
+}
+
+.lightbox-prev {
+    left: 16px;
+}
+
+.lightbox-next {
+    right: 16px;
+}
+
+@media (max-width: 640px) {
+    .lightbox {
+        padding: 56px 8px 16px;
+    }
+
+    .lightbox-nav {
+        top: auto;
+        bottom: 12px;
+        transform: none;
+    }
+}

@@ -10,6 +10,7 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ### Added
 
+- **A lightbox on the documentation website**: the home page's screenshots, and every image and diagram in the docs, open larger, with their caption and arrows to the next.
 - **`php artisan make:collaborative-field`**, the custom component guide as a step-by-step command with Laravel Prompts. It asks for the field's name and what it holds (text merged by character with carets, or a choice where the latest change wins), then writes the field, its view, its Alpine component and adapter in plain JavaScript, and a service provider that loads the script and names the adapter, and publishes the script.
 
 ### Changed
