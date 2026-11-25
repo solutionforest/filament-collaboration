@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use SolutionForest\FilamentCollaboration\Crdt\Document;
-use SolutionForest\FilamentCollaboration\Crdt\InvalidOperation;
-use SolutionForest\FilamentCollaboration\Crdt\RichText;
-use SolutionForest\FilamentCollaboration\Crdt\RichTextSchema;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
-use SolutionForest\FilamentCollaboration\Support\Data;
+use SolutionForest\Collaboration\Crdt\Document;
+use SolutionForest\Collaboration\Crdt\InvalidOperation;
+use SolutionForest\Collaboration\Crdt\RichText;
+use SolutionForest\Collaboration\Crdt\RichTextSchema;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Support\Data;
 
 const KINDS = ['title' => FieldKind::Text, 'body' => FieldKind::RichText, 'status' => FieldKind::Value, 'items' => FieldKind::Items];
 

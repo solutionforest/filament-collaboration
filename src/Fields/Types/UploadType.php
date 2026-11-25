@@ -6,9 +6,10 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\FileUpload;
+use SolutionForest\Collaboration\Documents\SharedUploads;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 /**
  * Filament's `FileUpload`: its files, a list keyed like a repeater's items.
@@ -18,7 +19,7 @@ use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 class UploadType implements FieldType, UsesAdapter
 {
     /** The marker, in a field's allowed sub-paths, that its values must be stored files. */
-    public const FILES = "\0files";
+    public const FILES = SharedUploads::FILES;
 
     public function supports(Field $field): bool
     {

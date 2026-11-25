@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Commands;
 
 use Illuminate\Console\Command;
-use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
+use SolutionForest\Collaboration\Documents\SharedUploads;
 
 class PruneUploadsCommand extends Command
 {

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use SolutionForest\FilamentCollaboration\Crdt\Html;
-use SolutionForest\FilamentCollaboration\Crdt\RichText;
+use SolutionForest\Collaboration\Crdt\Html;
+use SolutionForest\Collaboration\Crdt\RichText;
 
 /** @param array<string, mixed> $document */
 function sharedForm(array $document): array

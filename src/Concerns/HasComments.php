@@ -13,13 +13,13 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use SolutionForest\Collaboration\Comments\Comment;
+use SolutionForest\Collaboration\Comments\RecordComments;
+use SolutionForest\Collaboration\Events\CommentPosted;
+use SolutionForest\Collaboration\Presence\Identity;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Comments\Comment;
-use SolutionForest\FilamentCollaboration\Comments\RecordComments;
-use SolutionForest\FilamentCollaboration\Events\CommentPosted;
-use SolutionForest\FilamentCollaboration\Presence\Identity;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
-use SolutionForest\FilamentCollaboration\Support\Data;
 use Throwable;
 
 /**

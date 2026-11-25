@@ -9,7 +9,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
 use Tests\Support\Editor;
 use Tests\Support\SchemaPage;

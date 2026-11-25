@@ -5,8 +5,8 @@ use App\Models\Document;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Documents\Contributor;
-use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
+use SolutionForest\Collaboration\Documents\Contributor;
+use SolutionForest\Collaboration\Events\SharedDraftSaved;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

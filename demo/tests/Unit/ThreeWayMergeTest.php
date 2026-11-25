@@ -1,6 +1,6 @@
 <?php
 
-use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
+use SolutionForest\Collaboration\Merge\ThreeWayMerge;
 
 it('keeps remote fields the local editor did not touch', function (): void {
     $result = ThreeWayMerge::merge(

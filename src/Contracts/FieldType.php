@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Contracts;
 
 use Filament\Forms\Components\Field;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 
 /** Register with `CollaborationPlugin::make()->fieldTypes([...])`. */
 interface FieldType

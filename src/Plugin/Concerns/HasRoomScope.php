@@ -6,7 +6,7 @@ namespace SolutionForest\FilamentCollaboration\Plugin\Concerns;
 
 use Closure;
 use Illuminate\Database\Eloquent\Model;
-use SolutionForest\FilamentCollaboration\Support\Data;
+use SolutionForest\Collaboration\Support\Data;
 
 trait HasRoomScope
 {

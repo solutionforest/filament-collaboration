@@ -6,8 +6,8 @@ namespace SolutionForest\FilamentCollaboration\Plugin\Concerns;
 
 use Closure;
 use Filament\View\PanelsRenderHook;
-use SolutionForest\FilamentCollaboration\Presence\Palette;
-use SolutionForest\FilamentCollaboration\Support\Data;
+use SolutionForest\Collaboration\Presence\Palette;
+use SolutionForest\Collaboration\Support\Data;
 
 trait HasPresenceAppearance
 {
@@ -48,7 +48,13 @@ trait HasPresenceAppearance
 
     public function getPalette(): Palette
     {
-        return new Palette(Data::strings($this->evaluate($this->colors)));
+        return new Palette($this->getColors());
+    }
+
+    /** @return list<string> */
+    public function getColors(): array
+    {
+        return Data::strings($this->evaluate($this->colors));
     }
 
     public function getPresenceRenderHook(): string

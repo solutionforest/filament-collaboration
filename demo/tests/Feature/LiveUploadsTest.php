@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
+use SolutionForest\Collaboration\Documents\SharedUploads;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

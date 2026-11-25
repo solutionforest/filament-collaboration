@@ -6,9 +6,10 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\TextInput;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 
 class TextInputType implements FieldType, UsesAdapter
 {
@@ -34,6 +35,8 @@ class TextInputType implements FieldType, UsesAdapter
     /** Typed inputs through the text adapter, masked and other inputs through the value adapter. */
     public function getAdapter(Field $field): ?string
     {
-        return $this->getKind($field)?->defaultAdapter();
+        $kind = $this->getKind($field);
+
+        return $kind === null ? null : FieldResolver::defaultAdapter($kind);
     }
 }

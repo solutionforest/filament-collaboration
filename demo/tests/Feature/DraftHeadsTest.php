@@ -5,7 +5,7 @@ use App\Models\User;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use SolutionForest\FilamentCollaboration\Documents\DraftHeads;
+use SolutionForest\Collaboration\Documents\DraftHeads;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

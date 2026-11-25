@@ -6,6 +6,7 @@ namespace SolutionForest\FilamentCollaboration\Support;
 
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Model;
+use SolutionForest\Collaboration\Support\Data;
 
 /**
  * Asks any Livewire component what it is showing.

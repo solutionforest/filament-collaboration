@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use SolutionForest\FilamentCollaboration\Presence\Initials;
-use SolutionForest\FilamentCollaboration\Presence\Palette;
+use SolutionForest\Collaboration\Presence\Initials;
+use SolutionForest\Collaboration\Presence\Palette;
 
 it('only uses colours that white text is readable on', function (string $color): void {
     $luminance = collect(str_split(substr($color, 1), 2))

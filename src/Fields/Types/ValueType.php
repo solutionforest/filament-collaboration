@@ -15,9 +15,9 @@ use Filament\Forms\Components\Slider;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 
 /**

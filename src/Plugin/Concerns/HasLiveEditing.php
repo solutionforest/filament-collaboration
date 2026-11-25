@@ -8,10 +8,10 @@ use Closure;
 use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\MarkdownEditor;
 use Illuminate\Database\Eloquent\Model;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
 use SolutionForest\FilamentCollaboration\Fields\Types;
-use SolutionForest\FilamentCollaboration\Support\Data;
 
 trait HasLiveEditing
 {

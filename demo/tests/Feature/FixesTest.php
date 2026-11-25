@@ -5,13 +5,13 @@ use App\Models\Document;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
-use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
-use SolutionForest\FilamentCollaboration\Documents\SharedField;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
-use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
-use SolutionForest\FilamentCollaboration\Presence\Participant;
-use SolutionForest\FilamentCollaboration\Rooms\RoomContext;
+use SolutionForest\Collaboration\Contracts\PresenceRepository;
+use SolutionForest\Collaboration\Documents\DocumentRepository;
+use SolutionForest\Collaboration\Documents\SharedField;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\PresenceMode;
+use SolutionForest\Collaboration\Presence\Participant;
+use SolutionForest\Collaboration\Rooms\RoomContext;
 use Tests\Support\Editor;
 
 // Bugs found by a review of the whole package, each kept from coming back.

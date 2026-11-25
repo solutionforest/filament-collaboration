@@ -1,13 +1,13 @@
 <?php
 
 use Carbon\CarbonImmutable;
-use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
-use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
-use SolutionForest\FilamentCollaboration\Enums\PresenceChange;
-use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
-use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
-use SolutionForest\FilamentCollaboration\Presence\Participant;
-use SolutionForest\FilamentCollaboration\Presence\RedisPresenceRepository;
+use SolutionForest\Collaboration\Broadcasting\Audience;
+use SolutionForest\Collaboration\Contracts\PresenceRepository;
+use SolutionForest\Collaboration\Enums\PresenceChange;
+use SolutionForest\Collaboration\Enums\PresenceMode;
+use SolutionForest\Collaboration\Presence\DatabasePresenceRepository;
+use SolutionForest\Collaboration\Presence\Participant;
+use SolutionForest\Collaboration\Presence\RedisPresenceRepository;
 use Tests\TestCase;
 
 // The same behaviour from every presence store.

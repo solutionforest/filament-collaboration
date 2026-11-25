@@ -7,11 +7,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Documents\DocumentRepository;
+use SolutionForest\Collaboration\Permissions;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
-use SolutionForest\FilamentCollaboration\Permissions;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

@@ -7,8 +7,8 @@ namespace SolutionForest\FilamentCollaboration\Concerns;
 use Filament\Actions\ViewAction;
 use Filament\Support\Components\Attributes\Exposed;
 use Livewire\Attributes\On;
-use SolutionForest\FilamentCollaboration\Rooms\RelationVersions;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Rooms\RelationVersions;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use Throwable;
 
 /**

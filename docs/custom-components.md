@@ -164,7 +164,7 @@ In the service provider's `boot()`. The `class_exists` check keeps the package u
 
 ```php
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\AdapterType;
 
 if (class_exists(CollaborationPlugin::class)) {

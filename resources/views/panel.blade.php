@@ -93,7 +93,7 @@
                     x-on:keydown.enter.ctrl.prevent="post()"
                     x-on:keydown.escape="if (query !== null) { query = null; $event.stopPropagation() }"
                     rows="3"
-                    maxlength="{{ \SolutionForest\FilamentCollaboration\Comments\RecordComments::MAX_LENGTH }}"
+                    maxlength="{{ \SolutionForest\Collaboration\Comments\RecordComments::MAX_LENGTH }}"
                     placeholder="{{ __('filament-collaboration::collaboration.comments.placeholder') }}"
                     aria-label="{{ __('filament-collaboration::collaboration.panel.comments') }}"
                 ></textarea>

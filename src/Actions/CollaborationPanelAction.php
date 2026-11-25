@@ -9,8 +9,8 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Concerns\InteractsWithCollaboration;
-use SolutionForest\FilamentCollaboration\Support\Data;
 
 /**
  * One slide-over for a record's comments and its history: field comments

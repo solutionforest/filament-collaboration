@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
+use SolutionForest\Collaboration\Comments\RecordComments;
+use SolutionForest\Collaboration\Events\CommentPosted;
 use SolutionForest\FilamentCollaboration\Actions\CollaborationPanelAction;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Comments\RecordComments;
-use SolutionForest\FilamentCollaboration\Events\CommentPosted;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

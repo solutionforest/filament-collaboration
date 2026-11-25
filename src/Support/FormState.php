@@ -9,6 +9,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use SolutionForest\Collaboration\Support\Data;
 
 /** @internal */
 final class FormState

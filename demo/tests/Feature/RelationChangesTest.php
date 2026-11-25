@@ -11,10 +11,10 @@ use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Rooms\RelationVersions;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Rooms\RelationVersions;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

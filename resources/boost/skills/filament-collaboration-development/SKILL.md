@@ -65,7 +65,7 @@ Prefer a Gate ability string over a closure for `collaborative()`: a closure dec
 Every sync re-checks the user, panel, tenant and record, and the resource's `canEdit()` / `canView()`. Add a `collaborate` policy ability to stop someone typing into the shared draft (they still edit and merge on save). After changing roles or field access:
 
 ```php
-use SolutionForest\FilamentCollaboration\Permissions;
+use SolutionForest\Collaboration\Permissions;
 
 Permissions::changed($post); // or Permissions::changed() for everybody
 ```
@@ -86,7 +86,7 @@ CollaborationPlugin::make()
 $panel->databaseNotifications(); // mentioned people get a Filament database notification
 ```
 
-`CollaborationPlugin::make()->commentsAndHistory(false)` (or a closure given `$record`) turns it off: no button, and no posting or restoring. One slide-over: **Comments** (on the record or a field, resolve and reopen, `@mentions`) and **History** (versions every 5 minutes while editing, on save and around a restore; restoring applies for everybody). Listen to `SolutionForest\FilamentCollaboration\Events\CommentPosted` (`record`, `by`, `comment`, `url`) to send comments elsewhere.
+`CollaborationPlugin::make()->commentsAndHistory(false)` (or a closure given `$record`) turns it off: no button, and no posting or restoring. One slide-over: **Comments** (on the record or a field, resolve and reopen, `@mentions`) and **History** (versions every 5 minutes while editing, on save and around a restore; restoring applies for everybody). Listen to `SolutionForest\Collaboration\Events\CommentPosted` (`record`, `by`, `comment`, `url`) to send comments elsewhere.
 
 ## Relation managers
 
@@ -113,7 +113,7 @@ $table->columns([PresenceColumn::make()])
 Every field goes through an adapter, Filament's own too (`filament-text-input`, `filament-value`, `filament-rich-editor`, `filament-repeater`, `filament-file-upload`, `filament-markdown-editor`, `filament-code-editor`): copy them from `resources/js/adapters/filament.js`. Make a field the package does not know live the same way: name an adapter in PHP and register it in JavaScript. For a new field of the app's own, `php artisan make:collaborative-field Name --kind=text|choice` writes the field, its view, its Alpine component and adapter, and the service provider that registers them; edit those files rather than starting from scratch. Formats: `text`, `html`, `rich` (a ProseMirror / TipTap document, with `FilamentCollaboration.prosemirror` helpers), `value` and `items` (a list by key; positions carry `item` and `path`). Optional: `undo()`/`redo()` and `recover(error)` on the context, `geometry()` and `isDirty()` on the handle.
 
 ```php
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\AdapterType;
 
 // In a service provider's boot(): every TinyEditor field uses the 'tinymce' adapter.

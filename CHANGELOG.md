@@ -16,6 +16,9 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 ### Changed
 
 - **The demo is a real blog and its CMS.** Fieldnotes now has a home page, article pages, archives by category, tag and author with search, static pages edited in the CMS, a 404 page, Open Graph tags, an RSS feed and a sitemap. The CMS gains a dashboard (with who is editing what now), Categories, Tags and Authors, a cover image on articles, and 18 articles written for the demo, with generated covers. The package itself is unchanged.
+- **Built on [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration).** The merge engine, shared drafts, presence, comments storage, version history and the sync endpoint now come from that package, which also serves Livewire and Inertia apps. Nothing changes for panels: the tables, config file and plugin options are the same.
+- **Moved classes keep their old names** as aliases: `Permissions`, `Contracts\PresenceRepository`, the `Enums` and the `Events`. Code that type-hints other moved classes (`Crdt`, `Documents`, `Presence`, `Rooms\RoomContext`) uses the `SolutionForest\Collaboration` namespace now. `RoomContext` keeps the panel, tenant, resource and page in `meta()`.
+- **Restoring a deleted record** from an open page checks the `restore` ability through the record's policy, as resources do by default.
 
 ## [0.3.0] - 2026-11-25
 

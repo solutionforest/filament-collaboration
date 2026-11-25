@@ -20,7 +20,7 @@ use PHPStan\Type\StaticType;
 use PHPStan\Type\StringType;
 use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 
 /** @internal */
 final readonly class MacroMethod implements MethodReflection

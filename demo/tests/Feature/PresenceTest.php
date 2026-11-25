@@ -4,9 +4,9 @@ use App\Filament\Resources\Documents\Pages\ListDocuments;
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
-use SolutionForest\FilamentCollaboration\Presence\Participant;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Contracts\PresenceRepository;
+use SolutionForest\Collaboration\Presence\Participant;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 
