@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "69bee9bc6d3069e2b549c013f44cd4dc",
+    "content-hash": "a058cf878cfc8987006268cfc68b1cad",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -6395,7 +6395,7 @@
             "dist": {
                 "type": "path",
                 "url": "..",
-                "reference": "3317cf26f443d1cf2f8de9da466f1c99b5059943"
+                "reference": "7696ac8dca30ef5933b76b60aa67ae91296940d5"
             },
             "require": {
                 "filament/filament": "^5.8.3",
@@ -6455,16 +6455,16 @@
         },
         {
             "name": "solutionforest/laravel-collaboration",
-            "version": "dev-feat/collaboration-core",
+            "version": "dev-main",
             "source": {
                 "type": "git",
                 "url": "git@github.com:solutionforest/laravel-collaboration.git",
-                "reference": "d473fa2e21cd0ca01d2f8c8b06fad3ba1d1a0b91"
+                "reference": "ca13d0553bf9b10e5db376a6b693ce190b67be6c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/solutionforest/laravel-collaboration/zipball/d473fa2e21cd0ca01d2f8c8b06fad3ba1d1a0b91",
-                "reference": "d473fa2e21cd0ca01d2f8c8b06fad3ba1d1a0b91",
+                "url": "https://api.github.com/repos/solutionforest/laravel-collaboration/zipball/ca13d0553bf9b10e5db376a6b693ce190b67be6c",
+                "reference": "ca13d0553bf9b10e5db376a6b693ce190b67be6c",
                 "shasum": ""
             },
             "require": {
@@ -6487,6 +6487,7 @@
                 "inertiajs/inertia-laravel": "For the Inertia adapter (^3.0).",
                 "livewire/livewire": "For the Livewire adapter (^4.0)."
             },
+            "default-branch": true,
             "type": "library",
             "extra": {
                 "laravel": {
@@ -6539,10 +6540,10 @@
                 "vue"
             ],
             "support": {
-                "source": "https://github.com/solutionforest/laravel-collaboration/tree/feat/collaboration-core",
+                "source": "https://github.com/solutionforest/laravel-collaboration/tree/main",
                 "issues": "https://github.com/solutionforest/laravel-collaboration/issues"
             },
-            "time": "2026-11-25T12:55:43+00:00"
+            "time": "2026-11-25T13:21:27+00:00"
         },
         {
             "name": "spatie/invade",
@@ -14110,7 +14111,7 @@
     "aliases": [
         {
             "package": "solutionforest/laravel-collaboration",
-            "version": "dev-feat/collaboration-core",
+            "version": "dev-main",
             "alias": "0.1.0",
             "alias_normalized": "0.1.0.0"
         }
