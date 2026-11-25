@@ -95,6 +95,12 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     }
 
     execFileSync('php', ['artisan', 'migrate', '--seed', '--force'], { cwd: demo, env, stdio: 'ignore' })
+
+    // Scenarios use the articles created after the seeded ones, which are written for readers.
+    const seeded = new DatabaseSync(database, { readOnly: true })
+    const firstArticle = Number(seeded.prepare('select max(id) as id from documents').get().id) + 1
+
+    seeded.close()
     // More articles than there are scenarios, each a copy of a seeded one.
     execFileSync('php', ['tests/browser/articles.php', '80'], { cwd: demo, env, stdio: 'ignore' })
 
@@ -270,5 +276,5 @@ export async function start({ viewport = { width: 1440, height: 900 }, optimized
     /** Runs Artisan against this server's database and caches. */
     const artisan = (...args) => execFileSync('php', ['artisan', ...args], { cwd: demo, env, stdio: 'ignore' })
 
-    return { artisan, base, bases, browser, article, db, edit, env, log, problems, reverb, sessions, signIn, stop, stopReverb }
+    return { artisan, base, bases, browser, article, db, edit, env, firstArticle, log, problems, reverb, sessions, signIn, stop, stopReverb }
 }

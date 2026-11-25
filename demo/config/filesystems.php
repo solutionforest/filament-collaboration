@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Private files are never served by URL; the public disk below is.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
@@ -42,6 +43,8 @@ return [
             'driver' => 'local',
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Served by Laravel, so covers and uploads show without `php artisan storage:link`.
+            'serve' => true,
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

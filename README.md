@@ -202,7 +202,9 @@ The full documentation is at **[solutionforest.github.io/filament-collaboration]
 
 ## Try the demo
 
-The `demo/` folder is a complete Laravel app you can run in a few minutes: **Fieldnotes CMS**, a small newsroom with a Filament admin panel and a public blog. It comes with 15 articles and 100 editors, so you can see how presence looks on a busy team.
+The `demo/` folder is a complete Laravel app you can run in a few minutes: **Fieldnotes**, a small city magazine with a public blog and the Filament CMS its editors write it in. It comes with 18 articles by seven named authors, four static pages, categories, tags and 100 editors, so you can see how presence looks on a busy team. The content and the people are fictional; the covers are generated.
+
+![The Fieldnotes blog's home page: a featured article and recent articles with their covers](docs/media/public-home.png)
 
 ### Run it
 
@@ -214,7 +216,7 @@ touch database/database.sqlite && php artisan migrate --seed
 php artisan serve --no-reload
 ```
 
-Open `/admin` and sign in as `alice@example.test`. In a second browser, or a private window, sign in as `bob@example.test`. The password for both is `password`. The public blog is at `/blog`.
+The blog is at `/`. Open the CMS at `/admin` and sign in as `alice@example.test`. In a second browser, or a private window, sign in as `bob@example.test`. The password for both is `password`.
 
 ### What to try
 
@@ -238,7 +240,7 @@ Open `/admin` and sign in as `alice@example.test`. In a second browser, or a pri
 | --- | --- |
 | ![Bob's initials on the closed Publishing tab](docs/media/hidden-field.png) | ![Following Bob from field to field](docs/media/follow.png) |
 
-**5. Edit two languages at once.** The **Translated pages** resource has English and Chinese tabs. Each language has its own draft, so Alice and Bob can each work on one.
+**5. Edit two languages at once.** The blog's static pages, under **Pages**, have English and Chinese tabs. Each language has its own draft, so Alice and Bob can each work on one.
 
 **6. Try editors from other packages.** The demo includes TinyMCE, CKEditor, Quill and Trix, each made live by a short adapter.
 

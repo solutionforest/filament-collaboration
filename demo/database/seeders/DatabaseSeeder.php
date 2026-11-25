@@ -2,129 +2,114 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
 use App\Models\Document;
 use App\Models\Page;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
-/** Editors and articles only. Presence is never seeded: it comes from real sessions. */
+/**
+ * The Fieldnotes blog: sections, tags, people, articles and static pages, with
+ * their covers. Presence is never seeded: it comes from real sessions.
+ */
 class DatabaseSeeder extends Seeder
 {
-    /** Translated pages, for editing two languages at once. */
-    private function pages(): void
-    {
-        Page::query()->updateOrCreate(['slug' => 'about'], [
-            'title' => ['en' => 'About Fieldnotes', 'zh_HK' => '關於 Fieldnotes'],
-            'summary' => ['en' => 'Who we are and what we write about.', 'zh_HK' => '我們是誰，寫些甚麼。'],
-        ]);
-        Page::query()->updateOrCreate(['slug' => 'contact'], [
-            'title' => ['en' => 'Contact us', 'zh_HK' => '聯絡我們'],
-            'summary' => ['en' => 'Write to the newsroom.', 'zh_HK' => '寫信給編輯部。'],
-        ]);
-    }
-
     private const FIRST_NAMES = ['Ava', 'Noah', 'Mia', 'Leo', 'Zoe', 'Kai', 'Ivy', 'Omar', 'Luna', 'Ezra', 'Nina', 'Hugo', 'Vera', 'Jude', 'Chloe', 'Finn', 'Nora', 'Theo', 'Ruby', 'Ari'];
 
     private const LAST_NAMES = ['Wong', 'Patel', 'Kim', 'Rossi', 'Silva', 'Cohen', 'Park', 'Diaz', 'Singh', 'Berg', 'Walsh', 'Sato', 'Novak', 'Costa', 'Ali', 'Lau', 'Yip', 'Moreau', 'Haddad'];
 
-    private const ARTICLES = [
-        ['A field guide to slower mornings', 'Stories', 'review'],
-        ['Inside the harbour repair sheds', 'Stories', 'published'],
-        ['How we choose what to cover', 'Guides', 'published'],
-        ['The libraries that stay open late', 'News', 'draft'],
-        ['Planning a city walk with no map', 'Guides', 'draft'],
-        ['What the night bus drivers know', 'Stories', 'review'],
-        ['Small farms on rooftop Kowloon', 'News', 'published'],
-        ['A beginner’s guide to oral history', 'Guides', 'draft'],
-        ['The last typewriter shop', 'Stories', 'draft'],
-        ['Our newsroom style guide, revised', 'Guides', 'review'],
-        ['Why the ferry timetable changed', 'News', 'published'],
-        ['Notes from a week without email', 'Stories', 'draft'],
-    ];
-
     public function run(): void
     {
         $this->pages();
+        $this->taxonomy();
+        $this->people();
+        $this->articles();
+    }
 
+    /** Static pages, in English and Chinese. About and Contact are pages 1 and 2. */
+    private function pages(): void
+    {
+        foreach (BlogContent::pages() as $page) {
+            Page::query()->updateOrCreate(['slug' => $page['slug']], $page);
+        }
+    }
+
+    private function taxonomy(): void
+    {
+        foreach (BlogContent::categories() as $position => $category) {
+            Category::query()->updateOrCreate(['slug' => $category['slug']], [...$category, 'position' => $position]);
+        }
+
+        foreach (BlogContent::tags() as $name => $description) {
+            Tag::query()->updateOrCreate(['name' => $name], ['description' => $description]);
+        }
+    }
+
+    /** Alice, Bob and Carol, whom the scenarios sign in as, and a hundred editors in all. */
+    private function people(): void
+    {
         $password = Hash::make('password');
-        $editors = [];
 
         foreach ([['alice', 'Alice Chen'], ['bob', 'Bob Martinez'], ['carol', 'Carol Okafor']] as [$email, $name]) {
-            $editors[] = User::query()->updateOrCreate(['email' => $email.'@example.test'], ['name' => $name, 'password' => $password]);
+            User::query()->updateOrCreate(['email' => $email.'@example.test'], ['name' => $name, 'password' => $password]);
         }
 
         for ($i = 0; $i < 97; $i++) {
             $name = self::FIRST_NAMES[$i % count(self::FIRST_NAMES)].' '.self::LAST_NAMES[$i % count(self::LAST_NAMES)];
-            $editors[] = User::query()->updateOrCreate(
+            User::query()->updateOrCreate(
                 ['email' => sprintf('editor%03d@example.test', $i + 1)],
                 ['name' => $name, 'password' => $password],
             );
         }
 
-        $planning = $this->article('team-planning', [
-            'title' => 'Team planning',
-            'category' => 'Guides',
-            'status' => 'published',
-            'author_id' => $editors[0]->id,
-            'excerpt' => 'A practical guide to planning the next editorial release together.',
-            'body_html' => '<p>One plan, written by the whole desk.</p><h2>Before the meeting</h2><ul><li><p>Read last week’s notes</p></li><li><p>Add the stories you want to pitch</p></li></ul>',
-            'tags' => ['planning', 'newsroom'],
-            'published_at' => now()->subDays(3),
-        ]);
+        foreach (BlogContent::authors() as $email => $profile) {
+            User::query()->where('email', $email)->update($profile);
+        }
+    }
 
-        $this->article('better-collaboration', [
-            'title' => 'A better way to collaborate',
-            'category' => 'Stories',
-            'status' => 'draft',
-            'author_id' => $editors[1]->id,
-            'excerpt' => 'The people and habits behind a more connected newsroom.',
-            'body_html' => '<p>Great stories begin with a conversation.</p>',
-            'tags' => ['culture'],
-        ]);
+    private function articles(): void
+    {
+        $authors = User::query()->whereIn('email', array_keys(BlogContent::authors()))->pluck('id', 'email');
 
-        $spring = $this->article('spring-product-update', [
-            'title' => 'Spring product update',
-            'category' => 'News',
-            'status' => 'published',
-            'author_id' => $editors[0]->id,
-            'excerpt' => 'A first look at what the team has been building this season.',
-            'body_html' => '<h2>What is new this season</h2>'
-                .'<p>We rebuilt the reading experience from the first paragraph to the last, so long articles are calmer and quicker to load.</p>'
-                .'<p>Editors can now work on the same article at the same time, and see each other while they do it.</p>'
-                .'<h3>Coming next</h3>'
-                .'<ul><li><p>Reading lists for subscribers</p></li><li><p>Audio versions of long reads</p></li></ul>'
-                .'<p>Welcome to the public Fieldnotes blog.</p>',
-            'tags' => ['product', 'release'],
-            'key_points' => [
-                ['point' => 'Faster reading on long articles', 'highlight' => true],
-                ['point' => 'Editors work on one article together', 'highlight' => false],
-            ],
-            'seo_title' => 'Spring product update | Fieldnotes',
-            'seo_description' => 'What shipped this season at Fieldnotes.',
-            'seo_keywords' => 'product update, spring',
-            'published_at' => now()->subDay(),
-        ]);
+        foreach (BlogContent::articles() as $index => $article) {
+            $published = $article['status'] === 'published';
 
-        foreach (self::ARTICLES as $index => [$title, $category, $status]) {
-            $this->article(str($title)->slug()->toString(), [
-                'title' => $title,
-                'category' => $category,
-                'status' => $status,
-                'author_id' => $editors[($index + 2) % count($editors)]->id,
-                'excerpt' => $title.', reported by the Fieldnotes desk.',
-                'body_html' => '<p>Opening paragraph for “'.e($title).'”.</p><p>Add reporting, quotes and context here.</p>',
-                'tags' => ['desk'],
-                'published_at' => $status === 'published' ? now()->subHours($index + 4) : null,
+            Document::query()->updateOrCreate(['slug' => $article['slug']], [
+                ...collect($article)->except(['author', 'days_ago'])->all(),
+                'author_id' => $authors[$article['author']] ?? null,
+                // A few hours apart within a day, so the newest is always first.
+                'published_at' => $published ? now()->subDays($article['days_ago'] ?? 0)->subHours(2 + $index) : null,
+                'cover_image' => $this->cover($article['slug']),
+                'cover_alt' => 'An abstract landscape under a pale sun, in the colours of the '.$article['category'].' section.',
             ]);
         }
 
-        $spring->relatedPosts()->sync([$planning->getKey() => ['position' => 0]]);
+        foreach (BlogContent::related() as $slug => $relatedSlugs) {
+            $ids = Document::query()->whereIn('slug', $relatedSlugs)->pluck('id', 'slug');
+
+            Document::query()->where('slug', $slug)->firstOrFail()->relatedPosts()->sync(
+                collect($relatedSlugs)->values()->mapWithKeys(fn (string $related, int $position): array => [$ids[$related] => ['position' => $position]])->all(),
+            );
+        }
     }
 
-    /** @param array<string, mixed> $attributes */
-    private function article(string $slug, array $attributes): Document
+    /**
+     * The article's cover, from database/seeders/covers, copied to the public disk.
+     * The covers are drawn by `npm run covers`, so they are free to use.
+     */
+    private function cover(string $slug): ?string
     {
-        return Document::query()->updateOrCreate(['slug' => $slug], $attributes);
+        $source = __DIR__."/covers/{$slug}.jpg";
+
+        if (! is_file($source)) {
+            return null;
+        }
+
+        Storage::disk('public')->put("covers/{$slug}.jpg", (string) file_get_contents($source));
+
+        return "covers/{$slug}.jpg";
     }
 }

@@ -4,6 +4,7 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 use Predis\Client;
 
 abstract class TestCase extends BaseTestCase
@@ -11,6 +12,9 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Seeding copies covers to the public disk: never into the working app's storage.
+        Storage::fake('public');
 
         // FILAMENT_COLLABORATION_PRESENCE=redis runs every test on Redis presence, in a database of its own.
         if (config('filament-collaboration.presence') === 'redis') {

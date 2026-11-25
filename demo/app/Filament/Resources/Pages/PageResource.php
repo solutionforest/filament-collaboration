@@ -22,17 +22,22 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use LaraZeus\SpatieTranslatable\Resources\Concerns\Translatable;
 use SolutionForest\FilamentCollaboration\Tables\PresenceColumn;
+use UnitEnum;
 
-/** Translated pages: each language is its own shared draft, in one room. */
+/** The site's static pages, in English and Chinese: each language is its own shared draft, in one room. */
 class PageResource extends Resource
 {
     use Translatable;
 
     protected static ?string $model = Page::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLanguage;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static ?string $navigationLabel = 'Translated pages';
+    protected static string|UnitEnum|null $navigationGroup = 'Content';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'title';
 
     public static function form(Schema $schema): Schema
     {

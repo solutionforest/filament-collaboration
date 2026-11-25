@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\Support\Editor;
 
 it('requires authentication for collaboration endpoints', function (): void {
@@ -197,14 +198,20 @@ it('saves article details and rejects stale edits to them', function (): void {
     $this->assertDatabaseHas('documents', ['id' => $document->id, 'category' => 'Guides', 'status' => 'review', 'slug' => 'article-guide', 'excerpt' => 'Editorial summary']);
 });
 
-it('seeds sample article drafts without duplicating them on repeat runs', function (): void {
+it('seeds the blog without duplicating it on repeat runs', function (): void {
     $this->seed(DatabaseSeeder::class);
     $this->seed(DatabaseSeeder::class);
-    $this->assertDatabaseCount('documents', 15);
+    $this->assertDatabaseCount('documents', 18);
     $this->assertDatabaseCount('users', 100);
+    $this->assertDatabaseCount('categories', 4);
+    $this->assertDatabaseCount('tags', 10);
+    $this->assertDatabaseCount('pages', 4);
     $this->assertDatabaseCount('filament_collaboration_updates', 0);
     $this->assertDatabaseHas('documents', ['title' => 'Team planning', 'status' => 'published']);
-    $this->assertDatabaseCount('document_relations', 1);
+    $this->assertDatabaseCount('document_relations', 7);
+    // Every article has a cover, copied to the public disk.
+    expect(Document::query()->whereNull('cover_image')->count())->toBe(0);
+    Storage::disk('public')->assertExists('covers/spring-product-update.jpg');
     $this->assertDatabaseCount('filament_collaboration_participants', 0);
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Documents\Tables;
 
+use App\Models\Category;
 use App\Models\Document;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -10,6 +11,7 @@ use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -24,6 +26,7 @@ class DocumentsTable
             ->poll('3s')
             ->recordUrl(fn (Document $record): string => route('filament.admin.resources.documents.edit', $record))
             ->columns([
+                ImageColumn::make('cover_image')->label('')->disk('public')->imageHeight(40)->imageWidth(64)->extraImgAttributes(['class' => 'rounded-md object-cover']),
                 TextColumn::make('title')->searchable()->weight('medium')->limit(44)->description(
                     fn (Document $record): ?string => $record->slug ? '/blog/'.$record->slug : null,
                 ),
@@ -46,11 +49,7 @@ class DocumentsTable
                     'review' => 'In review',
                     'published' => 'Published',
                 ]),
-                SelectFilter::make('category')->options([
-                    'News' => 'News',
-                    'Guides' => 'Guides',
-                    'Stories' => 'Stories',
-                ]),
+                SelectFilter::make('category')->options(fn (): array => Category::options()),
                 TrashedFilter::make(),
             ])
             ->recordActions([

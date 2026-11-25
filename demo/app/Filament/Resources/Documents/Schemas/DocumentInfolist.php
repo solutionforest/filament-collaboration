@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Documents\Schemas;
 
 use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -20,7 +21,7 @@ class DocumentInfolist
                 TextEntry::make('status')->badge(),
                 TextEntry::make('published_at')->dateTime()->placeholder('Not scheduled'),
                 TextEntry::make('tags')->badge()->separator(',')->placeholder('No tags'),
-                TextEntry::make('featured_image_url')->label('Featured image')->placeholder('None')->columnSpanFull(),
+                ImageEntry::make('cover_image')->label('Cover image')->disk('public')->placeholder('None')->columnSpanFull(),
                 TextEntry::make('excerpt')->label('Summary')->placeholder('No summary yet')->columnSpanFull(),
                 TextEntry::make('body_html')->label('Body')->html()->placeholder('No body yet')->columnSpanFull(),
                 TextEntry::make('updated_at')->label('Last updated')->dateTime(),

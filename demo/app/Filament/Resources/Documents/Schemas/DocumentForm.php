@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Documents\Schemas;
 
+use App\Models\Category;
 use App\Models\Document;
+use App\Models\Tag;
 use App\Models\User;
 use Demo\CkEditor\CkEditor;
 use Demo\Quill\QuillEditor;
@@ -147,13 +149,14 @@ class DocumentForm
                         )->searchable()->preload()->default(fn () => auth()->id()),
                     ]),
                     Section::make('Discovery')->schema([
-                        Select::make('category')->options([
-                            'News' => 'News',
-                            'Guides' => 'Guides',
-                            'Stories' => 'Stories',
-                        ])->default('News')->required(),
-                        TagsInput::make('tags')->placeholder('Add a tag'),
-                        TextInput::make('featured_image_url')->label('Featured image URL')->url()->maxLength(2048),
+                        // Managed under Taxonomy; an article keeps the category's name.
+                        Select::make('category')->options(fn (): array => Category::options())->default('News')->required(),
+                        TagsInput::make('tags')->placeholder('Add a tag')
+                            ->suggestions(fn (): array => Tag::query()->orderBy('name')->pluck('name')->all()),
+                        FileUpload::make('cover_image')->label('Cover image')->image()->disk('public')->directory('covers')
+                            ->maxSize(4096)->imagePreviewHeight('140'),
+                        TextInput::make('cover_alt')->label('Cover description')->maxLength(200)
+                            ->helperText('For readers who cannot see the image.'),
                         Select::make('relatedPosts')
                             ->label('Related posts')
                             ->multiple()

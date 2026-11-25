@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class Document extends Model
 {
@@ -33,7 +35,8 @@ class Document extends Model
         'status',
         'excerpt',
         'body_html',
-        'featured_image_url',
+        'cover_image',
+        'cover_alt',
         'tags',
         'published_at',
         'seo_title',
@@ -68,6 +71,41 @@ class Document extends Model
             'published_at' => 'datetime',
             'robots_noindex' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // A tag typed into an article joins the list of tags.
+        static::saved(function (Document $document): void {
+            if ($document->wasChanged('tags') || $document->wasRecentlyCreated) {
+                Tag::ensure((array) ($document->tags ?? []));
+            }
+        });
+    }
+
+    /** @return BelongsTo<Category, $this> */
+    public function categoryModel(): BelongsTo
+    {
+        return $this->belongsTo(Category::class, 'category', 'name');
+    }
+
+    /** @return Collection<int, Tag> */
+    public function tagModels(): Collection
+    {
+        $names = array_filter((array) ($this->tags ?? []));
+
+        return $names === [] ? new Collection : Tag::query()->whereIn('name', $names)->orderBy('name')->get();
+    }
+
+    public function coverUrl(): ?string
+    {
+        return filled($this->cover_image) ? Storage::disk('public')->url((string) $this->cover_image) : null;
+    }
+
+    /** At about 230 words a minute, rounded up. */
+    public function readingMinutes(): int
+    {
+        return max(1, (int) ceil(str_word_count(strip_tags($this->bodyHtml())) / 230));
     }
 
     /** @return BelongsTo<User, $this> */

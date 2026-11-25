@@ -8,6 +8,10 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+### Changed
+
+- **The demo is a real blog and its CMS.** Fieldnotes now has a home page, article pages, archives by category, tag and author with search, static pages edited in the CMS, a 404 page, Open Graph tags, an RSS feed and a sitemap. The CMS gains a dashboard (with who is editing what now), Categories, Tags and Authors, a cover image on articles, and 18 articles written for the demo, with generated covers. The package itself is unchanged.
+
 ## [0.3.0] - 2026-11-25
 
 A JavaScript API in the style of Livewire and Alpine, and a page on how the package works with Filament.

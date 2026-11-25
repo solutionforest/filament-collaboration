@@ -7,7 +7,8 @@ import { start } from './harness.mjs'
 let app
 let alice
 let bob
-let nextArticle = 4
+/** The next article for a scenario of its own; set once the harness has seeded the database. */
+let nextArticle = 0
 
 const field = (page, name) => page.locator(`[id="form.${name}"]`)
 const body = (page) => page.locator('.fi-page .tiptap').first()
@@ -93,6 +94,7 @@ async function startSave(page) {
 
 before(async () => {
     app = await start()
+    nextArticle = app.firstArticle
     ;[alice, bob] = await Promise.all([app.signIn('alice'), app.signIn('bob')])
 })
 
@@ -941,12 +943,14 @@ describe('third-party HTML editors, through adapters', () => {
 describe('live uploads', () => {
     test('a file one person uploads appears for the other at once, and either save keeps it', async () => {
         const id = await together()
-        const items = (page) => page.locator('.fi-page [x-data^="fileUploadFormComponent"] .filepond--item')
+        // The gallery's upload: the article's cover is an upload field too.
+        const gallery = (page) => page.locator('.fi-page .fi-section', { hasText: 'Gallery' }).locator('[x-data^="fileUploadFormComponent"]')
+        const items = (page) => gallery(page).locator('.filepond--item')
         const known = app.problems.length
         // A 1x1 PNG.
         const buffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
-        await alice.locator('.fi-page [x-data^="fileUploadFormComponent"] input[type=file]').setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer })
+        await gallery(alice).locator('input[type=file]').setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer })
 
         await eventually(async () => assert.equal(await items(bob).count(), 1), 'Bob does not see the upload', 20000)
 

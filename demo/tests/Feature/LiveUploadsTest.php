@@ -37,8 +37,8 @@ it('makes upload fields live, as a list of files', function (): void {
     arrangeGallery($this);
     $editor = Editor::open($this, $this->alice, $this->article);
 
-    expect($editor->config['fields'])->toMatchArray(['gallery' => 'items'])
-        ->and($editor->config['uploads'])->toBe(['gallery']);
+    expect($editor->config['fields'])->toMatchArray(['gallery' => 'items', 'cover_image' => 'items'])
+        ->and($editor->config['uploads'])->toBe(['gallery', 'cover_image']);
 
     $editor->sync();
 
