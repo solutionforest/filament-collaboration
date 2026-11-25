@@ -45,10 +45,12 @@ jobs:
         with:
           # Pages between themselves are checked above, and the site is only live after this run.
           # Links into this repository are checked too: lychee uses the workflow's token.
+          # Except the changelog's comparisons, which name a tag that is only pushed after the release is merged.
           args: >-
             --no-progress --root-dir website/.vitepress/dist
             --exclude 'solutionforest\.github\.io'
             --exclude '^file://'
+            --exclude 'github\.com/solutionforest/filament-collaboration/compare/'
             'website/.vitepress/dist/**/*.html'
           fail: true
 
