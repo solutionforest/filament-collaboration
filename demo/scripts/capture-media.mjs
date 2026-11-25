@@ -15,7 +15,8 @@ mkdirSync(media, { recursive: true })
 
 const app = await start({ optimized: true })
 
-// Uploaded images are served from this run's storage, as `storage:link` would for an app.
+// Uploaded images are served from this run's storage, as `storage:link` would for an app:
+// with routes cached, as here, Laravel does not serve the public disk itself.
 const storageLink = path.join(demo, 'public/storage')
 const linked = !existsSync(storageLink)
 
@@ -213,8 +214,11 @@ try {
     await shoot(alice, 'hundred-editors', { '.fi-collab-avatar-more': 1, '.fi-collab-outline': 4, '.fi-collab-caret': 10 })
     console.log('people on screen in hundred-editors:', count + 1, 'including Alice')
 
+    // The public blog, as readers see what the editors publish.
+    await alice.goto(`${app.base}/`)
+    await shoot(alice, 'public-home', { '.featured': 1, '.card': 3 })
     await alice.goto(`${app.base}/blog/spring-product-update`)
-    await shoot(alice, 'public-article', { '.body h2': 1 })
+    await shoot(alice, 'public-article', { '.prose h2': 1 })
 
     assert.deepEqual(app.problems, [], 'the browser reported problems')
 } finally {

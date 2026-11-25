@@ -61,7 +61,7 @@ it('sends mentioned people a database notification, but not the author', functio
 
     expect($this->bob->notifications()->count())->toBe(1)
         ->and($this->alice->notifications()->count())->toBe(0)
-        ->and($this->bob->notifications()->first()->data['title'])->toBe('Alice Chen mentioned you on Article');
+        ->and($this->bob->notifications()->first()->data['title'])->toBe("Alice Chen mentioned you on {$this->article->title}");
 });
 
 it('suggests the people who can be mentioned', function (): void {

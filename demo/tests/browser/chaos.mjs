@@ -113,7 +113,7 @@ const snapshot = (page) =>
 
 try {
     for (let round = 0; round < ROUNDS; round++) {
-        await Promise.all(pages.map((page) => app.edit(page, 4 + (round % 30))))
+        await Promise.all(pages.map((page) => app.edit(page, app.firstArticle + (round % 30))))
         await Promise.all(pages.map(async (page) => {
             for (let step = 0; step < 40; step++) await act(page).catch(() => {})
         }))
