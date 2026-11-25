@@ -8,6 +8,14 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+### Added
+
+- **How it works with Filament**, a new documentation page: how the browser script works with Filament's fields and Livewire, why the package has its own merge engine instead of Yjs, and which parts would work without Filament.
+
+### Fixed
+
+- Diagrams on the documentation website are drawn as pictures, in light and dark, instead of showing their Mermaid code.
+
 ## [0.2.0] - 2026-11-25
 
 Faster polling with Redis, several panels with their own guards, Laravel Octane, and a documentation website.

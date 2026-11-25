@@ -8,9 +8,11 @@
         "build": "npm run sync && vitepress build",
         "preview": "vitepress preview",
         "brand": "node scripts/brand.mjs",
-        "check": "node scripts/check-links.mjs"
+        "check": "node scripts/check-links.mjs",
+        "diagrams": "node scripts/diagrams.mjs"
     },
     "devDependencies": {
+        "mermaid": "^11.17.2",
         "vitepress": "^1.6.4"
     }
 }

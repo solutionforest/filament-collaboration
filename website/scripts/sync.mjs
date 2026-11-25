@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { slugify } from '../.vitepress/slugify.mjs'
+import { diagramAlt, diagramName } from './mermaid.mjs'
 
 const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repo = path.resolve(site, '..')
@@ -120,6 +121,13 @@ const pages = [
         body: read('docs/custom-components.md').replace(/^# .*\n/, ''),
     },
     {
+        path: 'how-it-works.md',
+        source: 'docs/how-it-works.md',
+        title: 'How it works with Filament',
+        description: 'How the browser script works with Filament, why the package has its own merge engine instead of Yjs, and what works without Filament.',
+        body: read('docs/how-it-works.md').replace(/^# .*\n/, ''),
+    },
+    {
         path: 'architecture.md',
         source: 'docs/architecture.md',
         title: 'Architecture and performance',
@@ -154,6 +162,7 @@ const files = {
     'docs/guide.md': (anchor) => anchors.get(anchor) ?? '/guide/first-resource',
     'docs/custom-components.md': (anchor) => '/adapters/custom-components' + (anchor ? `#${anchor}` : ''),
     'docs/architecture.md': (anchor) => '/architecture' + (anchor ? `#${anchor}` : ''),
+    'docs/how-it-works.md': (anchor) => '/how-it-works' + (anchor ? `#${anchor}` : ''),
     'CHANGELOG.md': () => '/changelog',
     'README.md': (anchor) => anchors.get(anchor) ?? '/',
     'LICENSE': () => 'https://github.com/solutionforest/filament-collaboration/blob/main/LICENSE',
@@ -185,9 +194,32 @@ function link(target, source) {
     return `https://github.com/solutionforest/filament-collaboration/blob/main/${resolved}${anchor ? `#${anchor}` : ''}`
 }
 
+/** The SVG's own size, so the page does not shift as it loads. */
+function svgSize(file) {
+    const box = readFileSync(file, 'utf8').match(/viewBox="[\d.-]+ [\d.-]+ ([\d.]+) ([\d.]+)"/)
+
+    return box ? { width: Math.round(Number(box[1])), height: Math.round(Number(box[2])) } : null
+}
+
+/** A mermaid block as the pictures `npm run diagrams` drew of it, light and dark. */
+function diagram(code) {
+    const name = diagramName(code)
+    const file = path.join(site, 'public/diagrams', `${name}.svg`)
+
+    if (!existsSync(file)) throw new Error(`A diagram changed: run npm run diagrams in website/ and commit public/diagrams/.`)
+
+    const { width, height } = svgSize(file) ?? { width: 800, height: 400 }
+    const alt = diagramAlt(code).replace(/"/g, '&quot;')
+
+    return ['light', 'dark']
+        .map((variant) => `<img class="diagram diagram-${variant}" src="/diagrams/${name}${variant === 'dark' ? '-dark' : ''}.svg" alt="${alt}" width="${width}" height="${height}" loading="lazy">`)
+        .join('\n')
+}
+
 for (const page of pages) {
     let fence = false
     const body = page.body
+        .replace(/^```mermaid\n([\s\S]*?)^```$/gm, (match, code) => `<figure class="diagram">\n${diagram(code)}\n</figure>`)
         .split('\n')
         .map((line) => {
             if (line.startsWith('```')) fence = !fence

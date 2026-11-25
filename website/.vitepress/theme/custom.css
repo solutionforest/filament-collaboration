@@ -412,3 +412,24 @@
 :root:not(.dark) .vp-doc a > code {
     color: #92400e;
 }
+
+/* Diagrams, drawn by `npm run diagrams`: the light or the dark picture, as wide as they were drawn. */
+.vp-doc figure.diagram {
+    margin: 24px 0;
+    overflow-x: auto;
+}
+
+.vp-doc figure.diagram img {
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+}
+
+.vp-doc .diagram-dark,
+.dark .vp-doc .diagram-light {
+    display: none;
+}
+
+.dark .vp-doc .diagram-dark {
+    display: block;
+}
