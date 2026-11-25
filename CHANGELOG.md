@@ -8,11 +8,29 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-25
+
+Faster polling with Redis, several panels with their own guards, Laravel Octane, and a documentation website.
+
 ### Added
 
-- **Several panels with their own guards.** The Reverb channel admits people signed in with any session guard, not only the default one, so a panel with `->authGuard()` gets pushed changes. Tests cover two panels editing one record together, a token refused on another panel, and a panel without the plugin.
-- **Laravel Octane.** A CI job runs two editors on a single Swoole worker; the browser tests run on Octane with `OCTANE=swoole`.
-- **Draft heads in the cache.** With a Redis or Memcached cache store, a poll with nothing new reads no draft from the database: with presence, cache and sessions in Redis, it makes one query instead of two. `FILAMENT_COLLABORATION_DRAFT_CACHE` turns it on or off.
+- **Draft heads in the cache.** With a Redis or Memcached cache store, a poll with nothing new reads no draft from the database. With presence, cache and sessions in Redis, an idle poll makes one query instead of two: the record, for the policy check. Every committed change gives the draft a new random token, so a cached head is never out of date. `FILAMENT_COLLABORATION_DRAFT_CACHE` turns it on or off.
+- **Laravel Octane.** Documented and tested: a new CI job runs two editors on a single Swoole worker, so every request goes through the same application in memory. `OCTANE=swoole` runs the browser tests on Octane.
+- **Several panels.** Tests and a guide section for two panels editing one record together, a token refused on another panel, and a panel without the plugin.
+- **Documentation website** at [solutionforest.github.io/filament-collaboration](https://solutionforest.github.io/filament-collaboration/), built with VitePress from `docs/`, the README and this changelog, with a social card per page.
+- **README** rewritten: the social card, a plain-language introduction, features under short headings, and a guided tour of the demo with screenshots.
+
+### Changed
+
+- **The Reverb channel asks every session guard**, the default one first, and admits whoever of the signed-in people is in the room. Before, only the default guard was asked. Nothing changes for an app with one guard.
+- **The draft cache turns itself on** when `cache_store` (or the default cache) is Redis or Memcached. The package must stay the only writer of `filament_collaboration_documents`: a change made to that table directly is not seen by polls until the next change through the package. Set `FILAMENT_COLLABORATION_DRAFT_CACHE=false` if you write to it yourself.
+- The load test (`npm run test:load`) gains `CACHE=redis`, with the cache and sessions in Redis.
+
+### Fixed
+
+- **Reverb with a panel on its own guard** (`->authGuard()`): `/broadcasting/auth` answered 403, and changes arrived by polling instead of being pushed.
+- ESLint now lints the website's Node scripts as Node code.
+- A browser test clicked the comments button before Livewire had started after a reload.
 
 ## [0.1.0] - 2026-11-24
 
@@ -34,5 +52,6 @@ The first release: Google Docs-style collaborative editing for Filament 5.
 - **A Laravel Boost skill and guideline** for AI assistants.
 - **Requirements:** PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+.
 
-[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/solutionforest/filament-collaboration/releases/tag/v0.1.0
