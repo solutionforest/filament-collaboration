@@ -8,6 +8,10 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-26
+
+Built on [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which also brings the same collaboration to Livewire and Inertia apps. Panels work as before.
+
 ### Added
 
 - **A lightbox on the documentation website**: the home page's screenshots, and every image and diagram in the docs, open larger, with their caption and arrows to the next.
@@ -82,7 +86,8 @@ The first release: Google Docs-style collaborative editing for Filament 5.
 - **A Laravel Boost skill and guideline** for AI assistants.
 - **Requirements:** PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+.
 
-[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/solutionforest/filament-collaboration/releases/tag/v0.1.0
