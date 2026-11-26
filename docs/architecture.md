@@ -32,7 +32,7 @@ The draft is a CRDT, so edits made at the same time merge the same way in every 
 - **Picked values** are last-writer-wins registers.
 - **Repeaters and builders** are a sequence of item keys, so adding, removing and moving items merge like text. Text sub-fields are sequences of their own; other sub-fields are registers.
 
-The merge engine is written twice, in PHP (`src/Crdt` of [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which this package builds on) and JavaScript (`resources/js/crdt`). Both replay the same recorded sessions (`tests/Fixtures/convergence.json`), and the JavaScript tests run 2,000 random sessions with four editors that must all converge.
+The merge engine is written twice, in PHP (`src/Crdt`) and JavaScript (`resources/js/crdt`), both in [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which this package builds on: its browser script imports the JavaScript engine from there. Both replay the same recorded sessions (`tests/Fixtures/convergence.json`), and the JavaScript tests run 2,000 random sessions with four editors that must all converge.
 
 ## The server
 

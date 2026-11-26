@@ -17,7 +17,7 @@ export class Binding {
 
     /** Only bound once the room has its document. */
     get document() {
-        return /** @type {import('../crdt/document.js').Document} */ (this.room.document)
+        return /** @type {import('@solutionforest/laravel-collaboration/crdt/document.js').Document} */ (this.room.document)
     }
 
     /** Bindings are only made for a room inside a Livewire component. */

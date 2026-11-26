@@ -1,5 +1,5 @@
-import { hasLoneSurrogate, wellFormed } from '../crdt/id.js'
-import { normalizeValue, sameValue } from '../crdt/document.js'
+import { hasLoneSurrogate, wellFormed } from '@solutionforest/laravel-collaboration/crdt/id.js'
+import { normalizeValue, sameValue } from '@solutionforest/laravel-collaboration/crdt/document.js'
 import { modelOf, plain } from '../dom.js'
 import { measureText } from '../ui/measure-text.js'
 import { buildDocument, geometry, replacement, toDraft, toEditor } from './prosemirror.js'

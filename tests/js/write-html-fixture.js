@@ -7,7 +7,7 @@ const { window } = new JSDOM('<!doctype html><body></body>')
 Object.assign(globalThis, { DOMParser: window.DOMParser, Node: window.Node })
 
 const { htmlToDocument } = await import('../../resources/js/adapters/html.js')
-const { toDocument, toTokens } = await import('../../resources/js/crdt/rich-text.js')
+const { toDocument, toTokens } = await import('@solutionforest/laravel-collaboration/crdt/rich-text.js')
 
 export const samples = [
     '<h2>Title</h2><p>Hello <strong>bold</strong> and <a href="https://example.com">a link</a></p>',

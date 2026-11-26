@@ -11,9 +11,27 @@
         "target": "ES2022",
         "module": "ESNext",
         "moduleResolution": "Bundler",
-        "lib": ["ES2023", "DOM", "DOM.Iterable"],
-        "types": ["node"],
-        "skipLibCheck": true
+        "lib": [
+            "ES2023",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        "types": [
+            "node"
+        ],
+        "skipLibCheck": true,
+        "paths": {
+            "@solutionforest/laravel-collaboration/crdt/*": [
+                "./node_modules/@solutionforest/laravel-collaboration/resources/js/crdt/*"
+            ]
+        }
     },
-    "include": ["resources/js/**/*.js", "resources/js/**/*.d.ts", "tests/js/**/*.js", "vite.config.js"]
+    "include": [
+        "resources/js/**/*.js",
+        "resources/js/**/*.d.ts",
+        "tests/js/**/*.js",
+        "vite.config.js",
+        "node_modules/@solutionforest/laravel-collaboration/resources/js/crdt/*.js"
+    ],
+    "exclude": []
 }

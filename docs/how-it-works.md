@@ -82,7 +82,7 @@ Not as it ships: the package is a Filament plugin. Some of its parts do not depe
 ```mermaid
 %% Which parts of the package need Filament, Livewire or Laravel.
 flowchart TB
-    engine["Merge engine — needs nothing\nresources/js/crdt, laravel-collaboration src/Crdt"]
+    engine["Merge engine — needs nothing\nlaravel-collaboration: resources/js/crdt, src/Crdt"]
     room["Room and adapter API — needs Livewire and Alpine\nresources/js/room, bindings, adapters/registry.js"]
     filamentAdapters["Filament adapters — needs Filament\nresources/js/adapters/filament.js"]
     server["Sync endpoint, tokens, presence, saving — needs Filament\nsrc/"]
@@ -97,7 +97,7 @@ flowchart TB
     class filamentAdapters,server filament
 ```
 
-- **The merge engine needs nothing.** `resources/js/crdt` imports no library and no browser API, so it runs in any browser or in Node, and `src/Crdt` in laravel-collaboration is plain PHP.
+- **The merge engine needs nothing.** It lives in laravel-collaboration: `resources/js/crdt` imports no library and no browser API, so it runs in any browser or in Node, and `src/Crdt` is plain PHP.
 - **The room and the adapter API need Livewire and Alpine.** They start only when both are on the page, read and write the form through the Livewire component, and save through it.
 - **The server side needs Filament.** The sync endpoint is a panel route, the token is issued by a Filament page, access is checked with the resource's `canEdit()` and `canView()`, and saving goes through Filament's `EditRecord`.
 

@@ -1,4 +1,4 @@
-import { Document } from '../../../resources/js/crdt/document.js'
+import { Document } from '@solutionforest/laravel-collaboration/crdt/document.js'
 
 /**
  * Editors without a browser: real sessions, real tokens, the same CRDT and the
