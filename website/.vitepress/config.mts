@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, type HeadConfig } from 'vitepress'
 import { slugify } from './slugify.mjs'
 
@@ -7,7 +8,9 @@ const repo = 'https://github.com/solutionforest/filament-collaboration'
 const name = 'Filament Collaboration'
 const tagline = 'Google Docs-style collaborative editing for Filament'
 const description =
-    'Live fields, presence, carets, comments and version history for Filament 5 forms. Everyone on a record edits the same draft as they type, with its own CRDT, over plain HTTP or Laravel Reverb.'
+    'Live fields, presence, carets, comments and version history for Filament 5 forms, powered by Laravel Collaboration over HTTP or Reverb.'
+const changelog = readFileSync(new URL('../../CHANGELOG.md', import.meta.url), 'utf8')
+const latestVersion = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]
 
 /** The page's address on the site, from its file. */
 const urlOf = (relativePath: string) => site + relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
@@ -97,7 +100,7 @@ export default defineConfig({
             { text: 'Adapters', link: '/adapters/', activeMatch: '^/adapters/' },
             { text: 'Architecture', link: '/architecture' },
             {
-                text: 'v0.3.0',
+                text: latestVersion ? `v${latestVersion}` : 'Versions',
                 items: [
                     { text: 'Changelog', link: '/changelog' },
                     { text: 'Releases', link: `${repo}/releases` },

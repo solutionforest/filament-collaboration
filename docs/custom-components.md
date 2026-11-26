@@ -41,6 +41,8 @@ The generated field is a starting point: the rest of this guide explains each fi
 
 ## Before you start: which kind is your field?
 
+Import `SolutionForest\Collaboration\Enums\FieldKind` from the Laravel Collaboration core. Register the field through the Filament plugin and its `FilamentCollaboration.adapter()` browser API.
+
 | Your field holds | Kind | Adapter `format` | Two people at once |
 | --- | --- | --- | --- |
 | Plain text: a composer, a code box, a notes widget | `FieldKind::Text` | `text` | both keep their typing, with carets |

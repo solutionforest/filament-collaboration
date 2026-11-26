@@ -124,7 +124,7 @@ const pages = [
         path: 'how-it-works.md',
         source: 'docs/how-it-works.md',
         title: 'How it works with Filament',
-        description: 'How the browser script works with Filament, why the package has its own merge engine instead of Yjs, and what works without Filament.',
+        description: 'How Filament fields and saves use the Laravel Collaboration core, and how to use collaboration outside Filament.',
         body: read('docs/how-it-works.md').replace(/^# .*\n/, ''),
     },
     {

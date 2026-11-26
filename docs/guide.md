@@ -25,7 +25,16 @@ composer require solutionforest/filament-collaboration
 php artisan migrate
 ```
 
-The migrations are loaded from the package, so there is nothing to publish.
+Composer installs Laravel Collaboration as a dependency. The Filament plugin loads its own migrations for the `filament_collaboration_*` tables and ships the browser bundle as a Filament asset. Use `config/filament-collaboration.php` and the panel setup below.
+
+**Upgrading an existing Filament app.** Update the plugin and core together, then run `php artisan migrate`. The core split keeps the existing Filament tables, routes and configuration. If your app pins the core directly, update its Composer requirement to `^0.2.2`.
+
+```bash
+composer update solutionforest/filament-collaboration solutionforest/laravel-collaboration --with-all-dependencies
+php artisan migrate
+```
+
+For custom integrations, use `SolutionForest\Collaboration` imports for the shared types. The plugin keeps aliases for `Permissions`, `Contracts\PresenceRepository` and the moved enums and events. If your app uses the core's `Rooms\RoomContext`, read Filament's panel, tenant, resource and page identifiers with `meta($key)`.
 
 **Register the plugin** in your panel provider:
 
@@ -141,9 +150,9 @@ Everybody still on it is told at once, by name: "Bob deleted this record". Their
 - When a record is **gone for good** (no soft deletes, or force-deleted), its draft, edit history and unsaved images are deleted with it.
 - Someone who could no longer reach the record anyway, say after moving to another team, is only told they no longer have access.
 
-This works for deletions anywhere in your app that go through Eloquent, not only Filament's delete action. Query-builder deletes (`Post::where(...)->delete()`) fire no model events: call `app(DeletedRecords::class)->deleted($post)` for those, if people may be editing them.
+Deletions through Eloquent notify the room. For a query-builder delete that bypasses model events, call `app(\SolutionForest\Collaboration\Rooms\DeletedRecords::class)->deleted($post)` if people may be editing the record.
 
-**React to saves and merges** with Laravel events, all in `SolutionForest\FilamentCollaboration\Events`:
+**React to saves and merges** with Laravel events from `SolutionForest\Collaboration\Events`.
 
 | Event | When | Has |
 | --- | --- | --- |
@@ -494,7 +503,7 @@ Media library and Curator fields, which save through a relationship, still merge
 
 ## 9. Extending
 
-**Your own field type.** Tell the package how to share a field it does not know:
+**Your own field type.** Implement the plugin's `FieldType` contract and use `FieldKind` from Laravel Collaboration.
 
 ```php
 use Filament\Forms\Components\Field;
@@ -648,7 +657,7 @@ The package ships a [Laravel Boost](https://laravel.com/docs/boost) skill, `fila
 php artisan boost:update
 ```
 
-The guideline goes into your `CLAUDE.md` / `AGENTS.md`, and the skill into `.claude/skills` and `.agents/skills`. It covers the traits, which fields are live, permissions, comments and history, relation managers, adapters, Reverb and Redis presence, testing and common mistakes. The demo uses it.
+Boost writes the guideline to `CLAUDE.md` or `AGENTS.md` and the skill to the corresponding skills directory. The skill covers panel setup and directs you to Laravel Collaboration for shared types, storage, sync and the merge engine. Run `php artisan boost:update` again after upgrading the plugin to refresh the installed guidance.
 
 ## 10. Debugging
 

@@ -8,9 +8,12 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-26
+
 ### Changed
 
 - Require `solutionforest/laravel-collaboration` 0.2.2 or later in the 0.2 series, matching the core version used by the browser build.
+- Update the Filament guides, architecture diagrams and Laravel Boost guidance for the extracted core, including setup, upgrades and where to find shared APIs.
 
 ## [0.4.1] - 2026-11-26
 
@@ -96,7 +99,8 @@ The first release: Google Docs-style collaborative editing for Filament 5.
 - **A Laravel Boost skill and guideline** for AI assistants.
 - **Requirements:** PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+.
 
-[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.2.0...v0.3.0
