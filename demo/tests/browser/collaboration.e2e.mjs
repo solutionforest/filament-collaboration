@@ -923,7 +923,10 @@ describe('third-party HTML editors, through adapters', () => {
             await alice.keyboard.type('the fox', { delay: 25 })
             await eventually(async () => assert.equal((await text(bob, name)).trim(), 'the fox'), 'Bob did not get the text')
 
-            await Promise.all([call(alice, name, 'place', 4), call(bob, name, 'place', 8)])
+            const ranges = await Promise.all([call(alice, name, 'place', 4), call(bob, name, 'place', 8)])
+
+            if (name === 'trix') assert.deepEqual(ranges, [[3, 3], [7, 7]], 'Trix must update both editor selections before typing')
+
             await Promise.all([alice.keyboard.type(' quick', { delay: 70 }), bob.keyboard.type(' jumps', { delay: 65 })])
 
             await eventually(async () => {
