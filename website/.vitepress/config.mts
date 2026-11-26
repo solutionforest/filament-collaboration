@@ -100,6 +100,13 @@ export default defineConfig({
             { text: 'Adapters', link: '/adapters/', activeMatch: '^/adapters/' },
             { text: 'Architecture', link: '/architecture' },
             {
+                text: 'Packages',
+                items: [
+                    { text: 'Filament Collaboration: for Filament panels', link: 'https://solutionforest.github.io/filament-collaboration/' },
+                    { text: 'Laravel Collaboration: for Livewire and Inertia', link: 'https://solutionforest.github.io/laravel-collaboration/' },
+                ],
+            },
+            {
                 text: latestVersion ? `v${latestVersion}` : 'Versions',
                 items: [
                     { text: 'Changelog', link: '/changelog' },

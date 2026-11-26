@@ -11,6 +11,8 @@
 ![Coverage 95%](https://img.shields.io/badge/coverage-95%25-16a34a)
 ![License MIT](https://img.shields.io/badge/license-MIT-blue)
 
+> Built on **[Laravel Collaboration](https://solutionforest.github.io/laravel-collaboration/)**, the same engine for Livewire and Inertia (React, Vue) apps outside Filament.
+
 **Google Docs-style collaborative editing for Filament.**
 
 Several people can open the same record and edit it together. Each person sees who else is there, which field they are in and what they are typing. When anyone saves, everybody's changes are saved together, so nobody overwrites a colleague.
@@ -84,7 +86,7 @@ The package also ships a **[Laravel Boost](https://laravel.com/docs/boost)** ski
 
 Every combination of PHP and Laravel is tested on each push. See [Quality](#quality).
 
-Laravel Collaboration provides the merge engine, shared drafts, presence and sync. This plugin provides the Filament fields, panel routes and save integration. For standalone Livewire or Inertia (React or Vue) forms, use the [Laravel Collaboration setup guide](https://github.com/solutionforest/laravel-collaboration#installation).
+Laravel Collaboration provides the merge engine, shared drafts, presence and sync. This plugin provides the Filament fields, panel routes and save integration. For standalone Livewire or Inertia (React or Vue) forms, use the [Laravel Collaboration setup guide](https://solutionforest.github.io/laravel-collaboration/getting-started).
 
 ## Quick start
 
