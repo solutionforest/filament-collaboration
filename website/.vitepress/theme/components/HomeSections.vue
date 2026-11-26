@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Family from './Family.vue'
 import { withBase } from 'vitepress'
 
 const gallery = [
@@ -68,6 +69,8 @@ php artisan migrate</code></pre>
                 </figure>
             </div>
         </section>
+
+        <Family current="filament" />
 
         <section class="home-section home-cta">
             <h2>Requirements</h2>
