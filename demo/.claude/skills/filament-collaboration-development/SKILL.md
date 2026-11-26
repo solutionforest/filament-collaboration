@@ -1,6 +1,6 @@
 ---
 name: filament-collaboration-development
-description: "Use when working with solutionforest/filament-collaboration: real-time collaborative editing of Filament records. Trigger on CollaborationPlugin, InteractsWithCollaboration, HasPresence, PresenceColumn, ->collaborative(), ->lockWhileEditing(), CollaborationPanelAction, comments, @mentions, version history, SharesRelationChanges, adapters for third-party editors (FilamentCollaboration.adapter, AdapterType), Reverb broadcasting for collaboration, or Redis presence. Tasks include making a resource collaborative, choosing which fields are live, permissions, translated pages, uploads, comments and history, relation managers, scaling presence, and testing."
+description: Use when adding or maintaining collaborative editing in Filament with solutionforest/filament-collaboration. Covers CollaborationPlugin, InteractsWithCollaboration, HasPresence, live fields and adapters, comments and history, Redis and Reverb, and the shared Laravel Collaboration core.
 license: MIT
 metadata:
   author: solutionforest
@@ -8,9 +8,11 @@ metadata:
 
 # solutionforest/filament-collaboration
 
-Several people edit one record at once. Live fields are merged by the package's own CRDT, kept on the server as one shared draft per record (per language on translated pages). Everybody sees avatars, field outlines and carets. Fields that cannot be live merge field by field on save.
+Several people edit one Filament record at once. Laravel Collaboration merges live fields into one shared draft per record and language. Filament Collaboration connects the draft to panel fields, presence UI and Filament's save lifecycle. Fields that cannot be live merge field by field on save.
 
-Requires PHP 8.3+, Laravel 12+, Filament 5.8.3+. Full guide: `docs/guide.md` in the package repository (not in the installed package).
+Requires PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+, and `solutionforest/laravel-collaboration:^0.2.2`, which Composer installs as a dependency. [Filament usage guide](https://solutionforest.github.io/filament-collaboration/guide/first-resource)
+
+Use `SolutionForest\FilamentCollaboration` for panel APIs and `SolutionForest\Collaboration` for shared types such as `Permissions`, `Enums\FieldKind`, `Contracts\PresenceRepository` and collaboration events. For changes to the merge engine, draft storage, presence backend or sync internals, inspect the installed core at `vendor/solutionforest/laravel-collaboration`. For standalone Livewire or Inertia (React or Vue) forms, follow the [Laravel Collaboration documentation](https://github.com/solutionforest/laravel-collaboration#installation).
 
 ## Setup
 
@@ -18,6 +20,8 @@ Requires PHP 8.3+, Laravel 12+, Filament 5.8.3+. Full guide: `docs/guide.md` in 
 composer require solutionforest/filament-collaboration
 php artisan migrate
 ```
+
+In a Filament app the plugin loads its own migrations, uses the `filament_collaboration_*` tables, registers sync within the panel and reads `config/filament-collaboration.php`. This setup uses Filament's bundled browser assets.
 
 ```php
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
@@ -156,11 +160,11 @@ FILAMENT_COLLABORATION_REDIS_CONNECTION=default
 FILAMENT_COLLABORATION_CACHE_STORE=redis           # shared by all servers, with atomic locks: serialises saves
 ```
 
-Several application servers can share one database. Bind your own `Contracts\PresenceRepository` to keep presence elsewhere.
+Several application servers can share one database. Bind `SolutionForest\Collaboration\Contracts\PresenceRepository` to keep presence elsewhere.
 
 ## Events
 
-`SharedDraftSaved` (with the contributors), `ConflictDetected`, `ConflictResolved`, `ChangesMerged`, `DraftEdited` (with `audit()` on), `CommentPosted`.
+Import these from `SolutionForest\Collaboration\Events`: `SharedDraftSaved` (with the contributors), `ConflictDetected`, `ConflictResolved`, `ChangesMerged`, `DraftEdited` (with `audit()` on), `CommentPosted`.
 
 ## Testing
 

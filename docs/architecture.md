@@ -32,9 +32,11 @@ The draft is a CRDT, so edits made at the same time merge the same way in every 
 - **Picked values** are last-writer-wins registers.
 - **Repeaters and builders** are a sequence of item keys, so adding, removing and moving items merge like text. Text sub-fields are sequences of their own; other sub-fields are registers.
 
-The merge engine is written twice, in PHP (`src/Crdt`) and JavaScript (`resources/js/crdt`), both in [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which this package builds on: its browser script imports the JavaScript engine from there. Both replay the same recorded sessions (`tests/Fixtures/convergence.json`), and the JavaScript tests run 2,000 random sessions with four editors that must all converge.
+Laravel Collaboration owns the PHP engine in `src/Crdt` and the JavaScript engine in `resources/js/crdt`. The Filament browser build imports the core's `@solutionforest/laravel-collaboration/crdt/*` exports and bundles them with its field adapters. Both implementations replay the same recorded sessions (`tests/Fixtures/convergence.json` in the plugin repo), and the JavaScript tests run 2,000 random sessions with four editors that must all converge. [Laravel Collaboration source](https://github.com/solutionforest/laravel-collaboration)
 
 ## The server
+
+Filament registers the panel route, checks access through its resource and panel policies, and saves through Filament. The core processes sync requests and manages drafts, presence, comments and history using the plugin's configuration and table prefix.
 
 - `POST {panel}/_collaboration/sync` carries a page's edits, caret and heartbeat in one request, and answers with what the page is missing.
 - Each page renders an encrypted token naming its room, user, panel, tenant, record and the fields it may read and write. Each request is authorised again against it.
@@ -92,9 +94,9 @@ On one core this measures correctness across servers, not how throughput scales:
 
 | Command | Where | What |
 | --- | --- | --- |
-| `vendor/bin/pest` | `demo/` | 332 tests: the package's unit tests and the demo's feature tests; `FILAMENT_COLLABORATION_PRESENCE=redis` runs them on Redis presence |
+| `vendor/bin/pest` | `demo/` | Package unit tests and demo feature tests. Set `FILAMENT_COLLABORATION_PRESENCE=redis` to run them on Redis presence. |
 | `vendor/bin/phpstan analyse` | `demo/` | level 10, on the package and the demo |
-| `npm run test:e2e` | `demo/` | 54 scenarios in real browsers; `BROWSER=webkit`, `TRANSPORT=reverb`, `THROTTLE=8` for a slow CPU |
+| `npm run test:e2e` | `demo/` | Real-browser scenarios. Set `BROWSER=webkit` for WebKit, `TRANSPORT=reverb` for Reverb or `THROTTLE=8` for a slow CPU. |
 | `npm run test:chaos -- 10 42` | `demo/` | four browsers pressing random keys; every round must converge |
 | `npm run test:load -- 100 45` | `demo/` | editors and seconds; `TRANSPORT=reverb`, `ACTIVE=0.1`, `SERVERS=2`, `PRESENCE=redis` and `CACHE=redis` (cache and sessions in Redis) also apply |
 | `npm run test:latency` | `demo/` | key press to another screen |

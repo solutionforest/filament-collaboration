@@ -76,6 +76,7 @@ The package also ships a **[Laravel Boost](https://laravel.com/docs/boost)** ski
 | PHP | 8.3, 8.4 |
 | Laravel | 12, 13 |
 | Filament | 5.8.3 or later |
+| Laravel Collaboration | `^0.2.2`, installed by Composer |
 | Database | MySQL / MariaDB, PostgreSQL, SQLite |
 | Cache | Any store with atomic locks, shared by all app servers (Redis, database; file on a single server) |
 | Servers | PHP-FPM, `php artisan serve` or [Laravel Octane](docs/guide.md#laravel-octane); several panels, each with its own guard if you like ([guide](docs/guide.md#several-panels)) |
@@ -83,7 +84,7 @@ The package also ships a **[Laravel Boost](https://laravel.com/docs/boost)** ski
 
 Every combination of PHP and Laravel is tested on each push. See [Quality](#quality).
 
-The shared drafts, presence and sync come from [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which also brings the same collaboration to Livewire and Inertia apps outside Filament. Composer installs it for you.
+Laravel Collaboration provides the merge engine, shared drafts, presence and sync. This plugin provides the Filament fields, panel routes and save integration. For standalone Livewire or Inertia (React or Vue) forms, use the [Laravel Collaboration setup guide](https://github.com/solutionforest/laravel-collaboration#installation).
 
 ## Quick start
 
@@ -286,7 +287,7 @@ Then update Boost:
 php artisan boost:update
 ```
 
-Your assistant now knows the traits, which fields are live, adapters, comments and history, relation managers, Redis presence and how to test them. You can also read the skill on its own, in [`resources/boost/skills`](resources/boost/skills/filament-collaboration-development/SKILL.md).
+The skill covers panel setup, field adapters, permissions, testing and where shared APIs live after the core split. [Filament Collaboration skill](resources/boost/skills/filament-collaboration-development/SKILL.md)
 
 ## Quality
 
@@ -294,11 +295,11 @@ Every push runs [`tests.yml`](.github/workflows/tests.yml):
 
 | Check | What it covers |
 | --- | --- |
-| Pest | 332 tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, and on the oldest supported Filament, 5.8.3. At least 95% line coverage. The whole suite runs again with presence in Redis. |
+| Pest | Package and demo tests on PHP 8.3 and 8.4 × Laravel 12 and 13 with Filament 5, and on the oldest supported Filament, 5.8.3. At least 95% line coverage. The whole suite runs again with presence in Redis. |
 | PHPStan | Level 10, on the package and the demo |
 | Pint | Laravel's code style |
 | JavaScript | `tsc --strict` over JSDoc types, ESLint, and the CRDT's unit tests with at least 95% coverage |
-| Browsers | 54 scenarios in Chromium, with polling and with Reverb, and in WebKit. The run fails if any browser reports an error. |
+| Browsers | Scenarios in Chromium with polling and Reverb, and in WebKit with polling. The run fails if any browser reports an error. |
 | Chaos | [Nightly](.github/workflows/chaos.yml): four browsers press random keys, and every copy must end up the same with no editor error |
 | Load | [On demand](.github/workflows/load.yml): hundreds of editors across two servers, with database or Redis presence, polling or Reverb |
 

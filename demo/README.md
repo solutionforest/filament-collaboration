@@ -48,3 +48,5 @@ The stylesheet is plain CSS with no build step, so the PHP tests render the site
 `scripts/browser-*.mjs` are the earlier prototype's browser checks. They target its removed Yjs endpoints and no longer run; `npm run test:e2e` covers what they did.
 
 AI assistants: `boost.json` opts into the package's Laravel Boost skill, so `CLAUDE.md`, `AGENTS.md` and `.claude/skills/filament-collaboration-development` describe how to use it. After changing `resources/boost` in the package, run `php artisan boost:update`.
+
+Composer installs Laravel Collaboration for drafts, presence, sync and the merge engine. This demo uses the local Filament plugin and its panel setup.

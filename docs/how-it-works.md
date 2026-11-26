@@ -1,6 +1,6 @@
 # How it works with Filament
 
-You do not need this page to use the package. It explains, in plain words, how the browser script works with Filament, why the package has its own merge engine instead of Yjs, and which parts would work without Filament.
+Filament Collaboration connects panel fields and Filament's save lifecycle to the merge engine, drafts and sync provided by Laravel Collaboration.
 
 ## The browser script and Filament
 
@@ -16,7 +16,7 @@ flowchart TB
     subgraph script ["collaboration.js"]
         adapters["Adapters: one per kind of field"]
         binding["Binding: carets, per-person undo, recovery"]
-        engine["Merge engine (CRDT): text, rich text, values, lists"]
+        engine["Laravel Collaboration CRDT: text, rich text, values, lists"]
         room["Room: outbox, sync, presence, Reverb"]
     end
     subgraph laravel ["Laravel"]
@@ -36,7 +36,7 @@ flowchart TB
 1. **The page says it is collaborative.** The `InteractsWithCollaboration` trait renders a small hidden element through a Filament render hook. It carries an encrypted token, the sync URL and the list of live fields. The script, registered as a normal Filament asset, finds the element and attaches to the page's Livewire component.
 2. **Each field gets an adapter.** An adapter knows how to read and write one kind of field. A text input is read from the browser's `input` event. Filament's `RichEditor` is TipTap (ProseMirror) inside an Alpine component, so its adapter takes the editor from Alpine with `getEditor()`. Selects, toggles, dates, repeaters, uploads, and the Markdown and code editors have adapters too, through the same `FilamentCollaboration.adapter()` that [other editors](guide.md#adapters-for-other-editors) use.
 3. **Your typing becomes small operations.** The adapter compares the field with the shared draft, and only what changed becomes operations, such as "insert *ing* after this character". They are applied to your copy at once.
-4. **Typing goes to the package's own endpoint, not through Livewire.** Every 0.4 seconds, or at once with Reverb, the browser sends its operations to `{panel}/_collaboration/sync`. Laravel checks the user and the policy again, validates every operation, stores it in the shared draft and answers with what this browser is missing.
+4. **Typing goes to the panel's sync endpoint.** Every 0.4 seconds, or at once with Reverb, the browser sends its operations to `{panel}/_collaboration/sync`. The core rechecks access through the Filament integration, validates each operation, updates the shared draft and returns the changes this browser is missing.
 5. **Colleagues' changes go into the field, and into Livewire.** The adapter writes them into the field with your caret kept in place, and the script tells Livewire the new value with `queueUpdate`, so the form state is right without a Livewire request per keystroke.
 6. **Save is still Filament's Save.** The trait's `save()` takes a lock, takes the shared draft with everybody's typing, merges the fields that cannot be live, then calls Filament's own save. Validation, hooks and notifications run as usual.
 
@@ -59,11 +59,11 @@ sequenceDiagram
 
 ## Why not Yjs
 
-Both Yjs and this package's engine are **CRDTs**: a way to merge edits made at the same time so that every copy ends up the same. The package started on Yjs and replaced it with its own engine.
+Both Yjs and the Laravel Collaboration engine are **CRDTs** that converge when people edit concurrently. The engine was originally developed for Filament Collaboration and now lives in the Laravel Collaboration core.
 
-| | Yjs | This package |
+| | Yjs | Filament Collaboration on the Laravel core |
 | --- | --- | --- |
-| What it is | A mature, widely used JavaScript library | A small engine written for this package, in both PHP and JavaScript |
+| What it is | A mature, widely used JavaScript library | A small engine in PHP and JavaScript |
 | Who orders the edits | Nobody: copies merge in any order, even peer to peer | Laravel: each edit is applied under a database row lock |
 | Can Laravel read the document? | Not easily: Yjs has its own binary format, with no mature PHP version, so it usually needs a Node server such as y-websocket or Hocuspocus | Yes: PHP reads and changes the draft itself, so it checks every operation before anybody else sees it |
 | Server to run | A separate Node WebSocket server | Your Laravel app, over HTTP polling or Laravel Reverb |
@@ -77,28 +77,18 @@ Yjs suits apps where browsers sync directly, or through a Node server that never
 
 ## Without Filament
 
-Not as it ships: the package is a Filament plugin. Some of its parts do not depend on Filament at all, though.
+Laravel Collaboration supports standalone Livewire and Inertia (React or Vue) forms, with its own setup, UI and routes. [Laravel Collaboration installation](https://github.com/solutionforest/laravel-collaboration#installation)
 
 ```mermaid
-%% Which parts of the package need Filament, Livewire or Laravel.
+%% How Filament and standalone Laravel apps use the same collaboration core.
 flowchart TB
-    engine["Merge engine — needs nothing\nlaravel-collaboration: resources/js/crdt, src/Crdt"]
-    room["Room and adapter API — needs Livewire and Alpine\nresources/js/room, bindings, adapters/registry.js"]
-    filamentAdapters["Filament adapters — needs Filament\nresources/js/adapters/filament.js"]
-    server["Sync endpoint, tokens, presence, saving — needs Filament\nsrc/"]
-    engine --> room
-    room --> filamentAdapters
-    room --> server
-    classDef free fill:#dcfce7,stroke:#16a34a,color:#14532d
-    classDef livewire fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef filament fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-    class engine free
-    class room livewire
-    class filamentAdapters,server filament
+    filament["Filament plugin: panel routes, field adapters and Filament saves"]
+    standalone["Laravel Collaboration UI: Livewire, React and Vue"]
+    core["Laravel Collaboration core: sync, drafts and presence"]
+    engine["Shared PHP and JavaScript merge engine"]
+    filament --> core
+    standalone --> core
+    core --> engine
 ```
 
-- **The merge engine needs nothing.** It lives in laravel-collaboration: `resources/js/crdt` imports no library and no browser API, so it runs in any browser or in Node, and `src/Crdt` is plain PHP.
-- **The room and the adapter API need Livewire and Alpine.** They start only when both are on the page, read and write the form through the Livewire component, and save through it.
-- **The server side needs Filament.** The sync endpoint is a panel route, the token is issued by a Filament page, access is checked with the resource's `canEdit()` and `canView()`, and saving goes through Filament's `EditRecord`.
-
-Using it with plain Livewire, Inertia or another framework would mean a new server endpoint and a new way to read and save the form. The merge engine and the adapters could be reused as they are.
+The Filament plugin uses its own room client and field adapters, which integrate with Livewire and Alpine in the panel. The core's JavaScript merge engine runs in browsers and Node, and its PHP counterpart runs without Filament.
