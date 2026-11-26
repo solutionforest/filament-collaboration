@@ -1,5 +1,5 @@
 import { AdapterBinding } from '../bindings/adapter.js'
-import { Document } from '../crdt/document.js'
+import { Document } from '@solutionforest/laravel-collaboration/crdt/document.js'
 import { FormDom, plain } from '../dom.js'
 import { reveal } from '../ui/containers.js'
 import { FieldLocks } from '../ui/field-locks.js'

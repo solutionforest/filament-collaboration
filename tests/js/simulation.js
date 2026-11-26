@@ -1,4 +1,4 @@
-import { Document } from '../../resources/js/crdt/document.js'
+import { Document } from '@solutionforest/laravel-collaboration/crdt/document.js'
 
 /**
  * Editors changing one record concurrently, through a server that orders

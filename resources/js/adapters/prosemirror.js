@@ -1,4 +1,4 @@
-import { characters } from '../crdt/id.js'
+import { characters } from '@solutionforest/laravel-collaboration/crdt/id.js'
 
 /**
  * Helpers for adapters of ProseMirror and TipTap editors, such as Filament's

@@ -7,8 +7,8 @@ const { window } = new JSDOM('<!doctype html><body></body>')
 Object.assign(globalThis, { DOMParser: window.DOMParser, Node: window.Node })
 
 const { documentToHtml, htmlToDocument, pointAt, positionOf, units } = await import('../../resources/js/adapters/html.js')
-const { canonical } = await import('../../resources/js/crdt/id.js')
-const { toDocument, toTokens } = await import('../../resources/js/crdt/rich-text.js')
+const { canonical } = await import('@solutionforest/laravel-collaboration/crdt/id.js')
+const { toDocument, toTokens } = await import('@solutionforest/laravel-collaboration/crdt/rich-text.js')
 
 /** @param {string} html */
 const shared = (html) => toDocument(toTokens(htmlToDocument(html)))

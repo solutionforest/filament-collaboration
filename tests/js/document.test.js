@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Document } from '../../resources/js/crdt/document.js'
-import { toDocument, toTokens } from '../../resources/js/crdt/rich-text.js'
+import { Document } from '@solutionforest/laravel-collaboration/crdt/document.js'
+import { toDocument, toTokens } from '@solutionforest/laravel-collaboration/crdt/rich-text.js'
 import { paragraph, simulate } from './simulation.js'
 
 /**

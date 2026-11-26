@@ -1,4 +1,4 @@
-import { characters } from '../crdt/id.js'
+import { characters } from '@solutionforest/laravel-collaboration/crdt/id.js'
 
 /**
  * One edit: at a character index, what was removed and what was inserted.
