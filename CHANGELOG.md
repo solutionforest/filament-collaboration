@@ -8,6 +8,10 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+### Changed
+
+- Require `solutionforest/laravel-collaboration` 0.2.2 or later in the 0.2 series, matching the core version used by the browser build.
+
 ## [0.4.1] - 2026-11-26
 
 ### Changed
