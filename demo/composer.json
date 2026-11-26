@@ -26,10 +26,6 @@
     },
     "repositories": [
         {
-            "type": "vcs",
-            "url": "https://github.com/solutionforest/laravel-collaboration.git"
-        },
-        {
             "type": "path",
             "url": "..",
             "options": {
