@@ -21,6 +21,7 @@
         "laravel/reverb": "^1.14",
         "laravel/tinker": "^3.0",
         "solutionforest/filament-collaboration": "*@dev",
+        "solutionforest/laravel-collaboration": "^0.1 || ^0.2",
         "spatie/laravel-package-tools": "^1.92"
     },
     "repositories": [

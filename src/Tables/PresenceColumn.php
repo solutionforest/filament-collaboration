@@ -7,13 +7,13 @@ namespace SolutionForest\FilamentCollaboration\Tables;
 use Closure;
 use Filament\Tables\Columns\ViewColumn;
 use Illuminate\Database\Eloquent\Model;
+use SolutionForest\Collaboration\Contracts\PresenceRepository;
+use SolutionForest\Collaboration\Enums\PresenceMode;
+use SolutionForest\Collaboration\Presence\Identity;
+use SolutionForest\Collaboration\Presence\Participant;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
-use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
-use SolutionForest\FilamentCollaboration\Presence\Identity;
-use SolutionForest\FilamentCollaboration\Presence\Participant;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
-use SolutionForest\FilamentCollaboration\Support\Data;
 
 /** Who is on each record. Give the table a `poll()` to keep it current. */
 class PresenceColumn extends ViewColumn

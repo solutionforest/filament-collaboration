@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Commands;
 
 use Illuminate\Console\Command;
-use SolutionForest\FilamentCollaboration\Permissions;
+use SolutionForest\Collaboration\Permissions;
 
 class RefreshPermissionsCommand extends Command
 {

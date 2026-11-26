@@ -8,8 +8,8 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
-use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
-use SolutionForest\FilamentCollaboration\Support\Data;
+use SolutionForest\Collaboration\Merge\ThreeWayMerge;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Support\FormState;
 
 /** @internal used by `InteractsWithCollaboration` */

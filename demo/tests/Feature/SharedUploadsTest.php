@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
-use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Documents\DocumentRepository;
+use SolutionForest\Collaboration\Documents\SharedUploads;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

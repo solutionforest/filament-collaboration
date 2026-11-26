@@ -3,7 +3,7 @@
 use App\Models\Document;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Broadcasting\RoomChanged;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
 use SolutionForest\FilamentCollaboration\FilamentCollaborationServiceProvider;
 use Tests\Support\Editor;

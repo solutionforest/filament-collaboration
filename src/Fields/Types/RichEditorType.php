@@ -6,9 +6,9 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\RichEditor;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 class RichEditorType implements FieldType, UsesAdapter
 {

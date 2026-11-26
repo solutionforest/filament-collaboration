@@ -19,29 +19,29 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
+use SolutionForest\Collaboration\Crdt\Document;
+use SolutionForest\Collaboration\Crdt\Html;
+use SolutionForest\Collaboration\Documents\DocumentRepository;
+use SolutionForest\Collaboration\Documents\DraftVersions;
+use SolutionForest\Collaboration\Documents\EditTrail;
+use SolutionForest\Collaboration\Documents\Fingerprint;
+use SolutionForest\Collaboration\Documents\SharedField;
+use SolutionForest\Collaboration\Documents\SharedUploads;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Events\ChangesMerged;
+use SolutionForest\Collaboration\Events\ConflictDetected;
+use SolutionForest\Collaboration\Events\ConflictResolved;
+use SolutionForest\Collaboration\Events\SharedDraftSaved;
+use SolutionForest\Collaboration\Merge\ThreeWayMerge;
+use SolutionForest\Collaboration\Permissions;
+use SolutionForest\Collaboration\Presence\Identity;
+use SolutionForest\Collaboration\Rooms\RoomContext;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Saving\LiveSave;
+use SolutionForest\Collaboration\Support\Data;
+use SolutionForest\Collaboration\Support\SaveLock;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Crdt\Document;
-use SolutionForest\FilamentCollaboration\Crdt\Html;
-use SolutionForest\FilamentCollaboration\Documents\DocumentRepository;
-use SolutionForest\FilamentCollaboration\Documents\DraftVersions;
-use SolutionForest\FilamentCollaboration\Documents\EditTrail;
-use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
-use SolutionForest\FilamentCollaboration\Documents\SharedField;
-use SolutionForest\FilamentCollaboration\Documents\SharedUploads;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
-use SolutionForest\FilamentCollaboration\Events\ChangesMerged;
-use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
-use SolutionForest\FilamentCollaboration\Events\ConflictResolved;
-use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
-use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
-use SolutionForest\FilamentCollaboration\Permissions;
-use SolutionForest\FilamentCollaboration\Presence\Identity;
-use SolutionForest\FilamentCollaboration\Rooms\RoomContext;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
-use SolutionForest\FilamentCollaboration\Saving\LiveSave;
-use SolutionForest\FilamentCollaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Support\FormState;
-use SolutionForest\FilamentCollaboration\Support\SaveLock;
 
 /**
  * Turns an `EditRecord` page into a shared document.
@@ -380,7 +380,7 @@ trait InteractsWithCollaboration
 
         if ($this->isCollaborationLive()) {
             $documents->reconcile($room, $this->getSharedFields($theirs));
-            $live = LiveSave::prepare($documents, $room, $this->collaborationClient, $this->collaborationSync, $writable, $this->getCollaborationAllowedValues());
+            $live = LiveSave::prepare($documents, $room, $this->collaborationClient, $this->collaborationSync, $writable, $this->getCollaborationAllowedValues(), Filament::auth()->user());
         }
 
         $mine = $this->getCollaborationFormValues();

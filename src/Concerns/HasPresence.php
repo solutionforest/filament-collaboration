@@ -10,8 +10,8 @@ use Filament\Resources\Resource;
 use Filament\Support\Components\Attributes\Unexposed;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
-use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\PresenceMode;
 use SolutionForest\FilamentCollaboration\Rooms\RoomRenderer;
 use SolutionForest\FilamentCollaboration\Support\PageInspector;
 

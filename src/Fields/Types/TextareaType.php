@@ -6,9 +6,9 @@ namespace SolutionForest\FilamentCollaboration\Fields\Types;
 
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Textarea;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 class TextareaType implements FieldType, UsesAdapter
 {

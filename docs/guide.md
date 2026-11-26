@@ -158,7 +158,7 @@ This works for deletions anywhere in your app that go through Eloquent, not only
 A save publishes what colleagues typed too, so an audit that only records who pressed Save credits them with everybody's work. `SharedDraftSaved` says who changed each field since it was last saved:
 
 ```php
-use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
+use SolutionForest\Collaboration\Events\SharedDraftSaved;
 
 Event::listen(function (SharedDraftSaved $event): void {
     $event->user;               // who pressed Save
@@ -190,7 +190,7 @@ CollaborationPlugin::make()->audit();
 ```
 
 ```php
-use SolutionForest\FilamentCollaboration\Documents\EditTrail;
+use SolutionForest\Collaboration\Documents\EditTrail;
 
 app(EditTrail::class)->for($post);
 // [['user_name' => 'Alice Chen', 'user_type' => User::class, 'user_id' => '7', 'field' => 'title', 'at' => CarbonImmutable], ...]
@@ -464,7 +464,7 @@ class PostPolicy
 **After changing roles or field access**, tell open tabs to fetch a new token:
 
 ```php
-use SolutionForest\FilamentCollaboration\Permissions;
+use SolutionForest\Collaboration\Permissions;
 
 Permissions::changed($post); // people on this record
 Permissions::changed();      // everybody
@@ -499,7 +499,7 @@ Media library and Curator fields, which save through a relationship, still merge
 ```php
 use Filament\Forms\Components\Field;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 
 class StarRatingType implements FieldType
 {
@@ -533,7 +533,7 @@ A third-party editor, such as a TinyMCE or CKEditor field, keeps its content in 
 
 ```php
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\AdapterType;
 
 CollaborationPlugin::registerFieldTypes(

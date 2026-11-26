@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Broadcasting\RoomChanged;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Rooms\RoomResolver;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

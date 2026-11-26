@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Str;
-use SolutionForest\FilamentCollaboration\Merge\ThreeWayMerge;
+use SolutionForest\Collaboration\Merge\ThreeWayMerge;
 
 it('sees edits inside repeaters, whose item keys are random', function (): void {
     $items = fn (string ...$names): array => collect($names)->mapWithKeys(fn (string $name): array => [(string) Str::uuid() => ['name' => $name]])->all();

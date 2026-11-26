@@ -6,34 +6,51 @@ namespace SolutionForest\FilamentCollaboration;
 
 use Closure;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Support\Assets\Css;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Support\Facades\Broadcast;
-use Illuminate\Support\Facades\Event;
+use Illuminate\Database\Eloquent\Model;
+use SolutionForest\Collaboration\Collaboration;
+use SolutionForest\Collaboration\CollaborationServiceProvider;
+use SolutionForest\Collaboration\Contracts\AuthorizesRooms;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Presence\Palette;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Actions\CollaborateAction;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomChanged;
-use SolutionForest\FilamentCollaboration\Broadcasting\RoomNotifier;
 use SolutionForest\FilamentCollaboration\Commands\MakeCollaborativeFieldCommand;
 use SolutionForest\FilamentCollaboration\Commands\PruneUploadsCommand;
 use SolutionForest\FilamentCollaboration\Commands\RefreshPermissionsCommand;
-use SolutionForest\FilamentCollaboration\Contracts\PresenceRepository;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\FieldResolver;
-use SolutionForest\FilamentCollaboration\Presence\DatabasePresenceRepository;
-use SolutionForest\FilamentCollaboration\Presence\Identity;
-use SolutionForest\FilamentCollaboration\Presence\RedisPresenceRepository;
-use SolutionForest\FilamentCollaboration\Rooms\DeletedRecords;
-use SolutionForest\FilamentCollaboration\Support\Data;
+use SolutionForest\FilamentCollaboration\Rooms\RoomAuthorizer;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
+/**
+ * Filament on top of solutionforest/laravel-collaboration: the core keeps the
+ * drafts, presence and sync; this package adds panels, fields and actions.
+ */
 class FilamentCollaborationServiceProvider extends PackageServiceProvider
 {
     public static string $name = 'filament-collaboration';
+
+    /** Classes that moved to the core, under their old names, so existing code keeps working. */
+    private const MOVED = [
+        'Permissions',
+        'Contracts\\PresenceRepository',
+        'Enums\\FieldKind',
+        'Enums\\PresenceChange',
+        'Enums\\PresenceMode',
+        'Events\\ChangesMerged',
+        'Events\\CommentPosted',
+        'Events\\ConflictDetected',
+        'Events\\ConflictResolved',
+        'Events\\DraftEdited',
+        'Events\\SharedDraftSaved',
+    ];
 
     public function configurePackage(Package $package): void
     {
@@ -47,74 +64,25 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
-        $this->app->bindIf(PresenceRepository::class, fn (): PresenceRepository => config('filament-collaboration.presence') === 'redis'
-            ? new RedisPresenceRepository
-            : new DatabasePresenceRepository);
+        foreach (self::MOVED as $class) {
+            $old = __NAMESPACE__.'\\'.$class;
 
-        // One per request, so a request's changes are pushed once.
-        $this->app->scoped(RoomNotifier::class);
-    }
-
-    /**
-     * Only people syncing in a room, in the same audience, may hear it: they
-     * passed the room's authorisation to get there. Registered on the default
-     * broadcaster, so call this again if you switch broadcaster at runtime.
-     *
-     * Each panel may sign people in with a guard of its own, so every session
-     * guard is asked, and whoever of them is in the room may listen.
-     */
-    public static function registerChannel(): void
-    {
-        $guards = self::sessionGuards();
-
-        Broadcast::channel(
-            RoomChanged::channel('{room}').'.{audience}',
-            static function (Authenticatable $user, string $room, string $audience) use ($guards): bool {
-                $presence = app(PresenceRepository::class);
-                $people = [$user];
-
-                foreach ($guards as $guard) {
-                    $signedIn = request()->user($guard);
-
-                    if ($signedIn instanceof Authenticatable) {
-                        $people[] = $signedIn;
-                    }
-                }
-
-                foreach ($people as $person) {
-                    if ($presence->isPresent($room, Identity::for($person)->key, $audience)) {
-                        return true;
-                    }
-                }
-
-                return false;
-            },
-            ['guards' => $guards],
-        );
-    }
-
-    /**
-     * The session guards, the default one first.
-     *
-     * @return list<string>
-     */
-    private static function sessionGuards(): array
-    {
-        $guards = [];
-
-        foreach (Data::map(config('auth.guards')) as $name => $guard) {
-            if ((Data::map($guard)['driver'] ?? null) === 'session') {
-                $guards[] = (string) $name;
+            if (! class_exists($old, false) && ! interface_exists($old, false) && ! enum_exists($old, false)) {
+                class_alias('SolutionForest\\Collaboration\\'.$class, $old);
             }
         }
 
-        $default = Data::nullableString(config('auth.defaults.guard'));
+        // Filament keeps its own tables and registers sync inside each panel.
+        Collaboration::ignoreMigrations();
+        Collaboration::ignoreRoutes();
 
-        if ($default !== null && in_array($default, $guards, true)) {
-            $guards = [$default, ...array_values(array_diff($guards, [$default]))];
-        }
+        $this->app->bind(AuthorizesRooms::class, RoomAuthorizer::class);
+    }
 
-        return $guards === [] && $default !== null ? [$default] : $guards;
+    /** Kept for applications that call it after switching broadcaster at runtime. */
+    public static function registerChannel(): void
+    {
+        CollaborationServiceProvider::registerChannel();
     }
 
     public function packageBooted(): void
@@ -122,12 +90,7 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
         // Loaded, not published: a published copy would create the tables twice.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
-        // Images inserted into drafts that were never saved. Runs wherever the scheduler does.
-        $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
-            if (config('filament-collaboration.prune_uploads_after') !== null) {
-                $schedule->command(PruneUploadsCommand::class)->daily()->withoutOverlapping()->onOneServer();
-            }
-        });
+        $this->configureCore();
 
         FilamentAsset::register([
             Css::make('collaboration', __DIR__.'/../resources/dist/collaboration.css'),
@@ -138,13 +101,6 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
             return CollaborateAction::fromMacro($this, $ignore, $presence);
         });
 
-        static::registerChannel();
-
-        // Tells a room at once when its record is deleted, and cleans up after it.
-        Event::listen('eloquent.deleted: *', static function (string $event, array $payload): void {
-            app(DeletedRecords::class)->handle($event, $payload);
-        });
-
         Field::macro('collaborative', function (bool|Closure|string $condition = true, ?string $adapter = null, FieldKind $as = FieldKind::Text): Field {
             $field = FieldResolver::markField($this, $condition);
 
@@ -153,6 +109,41 @@ class FilamentCollaborationServiceProvider extends PackageServiceProvider
 
         Field::macro('lockWhileEditing', function (bool $condition = true): Field {
             return FieldResolver::markLock($this, $condition);
+        });
+    }
+
+    /**
+     * Tells the core how Filament works: its settings come from this package's
+     * config and from the current panel's plugin, and people are the panel's.
+     */
+    private function configureCore(): void
+    {
+        Collaboration::readConfigUsing(static fn (string $key, mixed $default): mixed => $key === 'table_prefix'
+            ? 'filament_collaboration_'
+            : config("filament-collaboration.{$key}", $default));
+
+        Collaboration::resolveUsersUsing(static fn (): ?Authenticatable => Filament::auth()->user());
+        Collaboration::nameUsersUsing(static fn (Authenticatable $user): ?string => $user instanceof Model ? Filament::getUserName($user) : null);
+
+        // Filament's fallback avatar service would receive everybody's name, so it is not used.
+        Collaboration::giveUsersAvatarsUsing(static fn (Authenticatable $user): ?string => $user instanceof HasAvatar ? $user->getFilamentAvatarUrl() : null);
+
+        Collaboration::broadcast(static fn (): bool => CollaborationPlugin::find()?->isBroadcasting() ?? false);
+        Collaboration::audit(static fn (): bool => CollaborationPlugin::find()?->isAuditing() ?? false);
+        Collaboration::reportEditorErrors(static fn (): bool => CollaborationPlugin::find()?->reportsEditorErrors() ?? false);
+        Collaboration::colors(static fn (): array => CollaborationPlugin::find()?->getColors() ?? Palette::DEFAULT);
+
+        Collaboration::scopeRoomsUsing(static function (?Model $record): mixed {
+            $plugin = CollaborationPlugin::find();
+
+            if ($record !== null) {
+                return $plugin?->getRoomScope($record);
+            }
+
+            // A list or create page's room is the resource's, in this tenant.
+            $tenant = Filament::getTenant();
+
+            return [$plugin?->getRoomScope(), $tenant === null ? null : Data::string($tenant->getKey())];
         });
     }
 }

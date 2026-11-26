@@ -20,9 +20,9 @@ use LogicException;
 use ReflectionFunction;
 use ReflectionNamedType;
 use ReflectionObject;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
 use SolutionForest\FilamentCollaboration\Fields\Types\UploadType;
 use SolutionForest\FilamentCollaboration\Support\FormState;
@@ -79,7 +79,7 @@ final readonly class FieldResolver
 
             // Every live field goes through an adapter, Filament's own too: named by its type, or by its kind.
             if (isset($live[$path])) {
-                $adapters[$path] = $this->adapterOf($field) ?? $live[$path]->defaultAdapter();
+                $adapters[$path] = $this->adapterOf($field) ?? self::defaultAdapter($live[$path]);
             }
         }
 
@@ -387,5 +387,16 @@ final readonly class FieldResolver
         // A field no type knows, such as a third-party editor, marked `->collaborative()`:
         // its whole value is shared, and the latest change wins.
         return $condition !== null ? FieldKind::Value : null;
+    }
+
+    /** The JavaScript adapter of Filament's own fields of this kind, used when a field type names none. */
+    public static function defaultAdapter(FieldKind $kind): string
+    {
+        return match ($kind) {
+            FieldKind::Text => 'filament-text-input',
+            FieldKind::RichText => 'filament-rich-editor',
+            FieldKind::Value => 'filament-value',
+            FieldKind::Items => 'filament-repeater',
+        };
     }
 }

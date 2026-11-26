@@ -6,9 +6,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
+use SolutionForest\Collaboration\Documents\EditTrail;
+use SolutionForest\Collaboration\Events\DraftEdited;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Documents\EditTrail;
-use SolutionForest\FilamentCollaboration\Events\DraftEdited;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

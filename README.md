@@ -83,6 +83,8 @@ The package also ships a **[Laravel Boost](https://laravel.com/docs/boost)** ski
 
 Every combination of PHP and Laravel is tested on each push. See [Quality](#quality).
 
+The shared drafts, presence and sync come from [solutionforest/laravel-collaboration](https://github.com/solutionforest/laravel-collaboration), which also brings the same collaboration to Livewire and Inertia apps outside Filament. Composer installs it for you.
+
 ## Quick start
 
 **1. Install the package**

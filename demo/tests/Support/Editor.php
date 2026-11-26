@@ -6,7 +6,7 @@ use App\Filament\Resources\Documents\DocumentResource;
 use App\Models\Document as Article;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
-use SolutionForest\FilamentCollaboration\Crdt\Document;
+use SolutionForest\Collaboration\Crdt\Document;
 use Tests\TestCase;
 
 /** A browser tab, played by PHP: a real page load, then the real endpoint. */

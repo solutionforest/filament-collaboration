@@ -6,8 +6,8 @@ use Filament\Forms\Components\Field;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Livewire\Livewire;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 use Tests\Support\Editor;
 use Tests\Support\SchemaPage;
 

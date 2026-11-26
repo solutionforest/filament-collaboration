@@ -8,12 +8,14 @@ use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use SolutionForest\FilamentCollaboration\Broadcasting\Audience;
+use SolutionForest\Collaboration\Broadcasting\Audience;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Enums\PresenceMode;
+use SolutionForest\Collaboration\Permissions;
+use SolutionForest\Collaboration\Rooms\RoomContext;
+use SolutionForest\Collaboration\Rooms\RoomResolver;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
-use SolutionForest\FilamentCollaboration\Enums\PresenceMode;
-use SolutionForest\FilamentCollaboration\Permissions;
-use SolutionForest\FilamentCollaboration\Support\Data;
 
 /** Renders the element the browser starts a room from, with a freshly issued token. */
 final readonly class RoomRenderer
@@ -66,19 +68,22 @@ final readonly class RoomRenderer
             scope: $subject === null ? null : $this->rooms->forScope($subject),
             mode: $mode,
             client: $client,
-            panel: $panel->getId(),
-            tenant: $tenant === null ? null : Data::string($tenant->getKey()),
+            guard: $panel->getAuthGuard(),
             user: Data::string($user->getAuthIdentifier()),
             fields: $fields,
             visible: array_map(strval(...), array_keys($labels + $fields)),
-            resource: $resource,
-            page: $page,
             model: $record === null ? null : $record::class,
             key: $record === null ? null : Data::string($record->getKey()),
             expiresAt: now()->getTimestamp() + max(1, Data::int(config('filament-collaboration.token_lifetime'), 900)),
             allowed: $allowed,
             permissions: Permissions::version($room),
             locale: $record === null ? null : $locale,
+            meta: [
+                'panel' => $panel->getId(),
+                'tenant' => $tenant === null ? null : Data::string($tenant->getKey()),
+                'resource' => $resource,
+                'page' => $page,
+            ],
         );
 
         return view('filament-collaboration::room', [

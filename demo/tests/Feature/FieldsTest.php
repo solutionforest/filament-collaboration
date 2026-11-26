@@ -12,11 +12,11 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Schema;
 use Livewire\Livewire;
-use SolutionForest\FilamentCollaboration\Documents\Fingerprint;
-use SolutionForest\FilamentCollaboration\Documents\SharedField;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Documents\Fingerprint;
+use SolutionForest\Collaboration\Documents\SharedField;
+use SolutionForest\Collaboration\Enums\FieldKind;
+use SolutionForest\Collaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Fields\Types\ItemsType;
-use SolutionForest\FilamentCollaboration\Permissions;
 use SolutionForest\FilamentCollaboration\Support\FormState;
 use Tests\Support\SchemaPage;
 

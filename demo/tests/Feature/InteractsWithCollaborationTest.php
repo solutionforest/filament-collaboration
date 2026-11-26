@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+use SolutionForest\Collaboration\Events\ChangesMerged;
+use SolutionForest\Collaboration\Events\ConflictDetected;
+use SolutionForest\Collaboration\Events\ConflictResolved;
+use SolutionForest\Collaboration\Events\SharedDraftSaved;
 use SolutionForest\FilamentCollaboration\CollaborationPlugin;
-use SolutionForest\FilamentCollaboration\Events\ChangesMerged;
-use SolutionForest\FilamentCollaboration\Events\ConflictDetected;
-use SolutionForest\FilamentCollaboration\Events\ConflictResolved;
-use SolutionForest\FilamentCollaboration\Events\SharedDraftSaved;
 use Tests\Support\Editor;
 use Tests\TestCase;
 

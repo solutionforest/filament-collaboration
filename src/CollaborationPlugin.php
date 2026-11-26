@@ -13,11 +13,11 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use LogicException;
+use SolutionForest\Collaboration\Http\Controllers\SyncController;
+use SolutionForest\Collaboration\Http\Middleware\KeepSessionReadOnly;
+use SolutionForest\Collaboration\Support\Data;
 use SolutionForest\FilamentCollaboration\Concerns\HasPresence;
-use SolutionForest\FilamentCollaboration\Http\Controllers\SyncController;
-use SolutionForest\FilamentCollaboration\Http\Middleware\KeepSessionReadOnly;
 use SolutionForest\FilamentCollaboration\Plugin\Concerns as PluginConcerns;
-use SolutionForest\FilamentCollaboration\Support\Data;
 
 class CollaborationPlugin implements Plugin
 {

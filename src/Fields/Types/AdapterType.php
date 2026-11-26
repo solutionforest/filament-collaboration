@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace SolutionForest\FilamentCollaboration\Fields\Types;
 
 use Filament\Forms\Components\Field;
+use SolutionForest\Collaboration\Enums\FieldKind;
 use SolutionForest\FilamentCollaboration\Contracts\FieldType;
 use SolutionForest\FilamentCollaboration\Contracts\UsesAdapter;
-use SolutionForest\FilamentCollaboration\Enums\FieldKind;
 
 /**
  * Fields edited through a JavaScript adapter, such as a third-party editor:
