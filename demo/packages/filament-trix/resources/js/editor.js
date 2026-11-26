@@ -69,10 +69,15 @@ export default function demoTrix({ state }) {
             })
         },
 
-        /** For the browser tests: put the caret at a position. */
+        /** Place the caret in the first paragraph for the browser tests. */
         place(position) {
             this.trix.focus()
-            FilamentCollaboration.html.select(this.trix, { anchor: position, head: position })
+
+            // The HTML position counts the opening block marker. Set Trix's range
+            // directly so its editing model is ready for the first keystroke.
+            this.trix.editor.setSelectedRange(position - 1)
+
+            return this.trix.editor.getSelectedRange()
         },
 
         text() {

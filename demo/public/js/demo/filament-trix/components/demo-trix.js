@@ -6431,10 +6431,7 @@ function fa({ state: e }) {
 			});
 		},
 		place(e) {
-			this.trix.focus(), FilamentCollaboration.html.select(this.trix, {
-				anchor: e,
-				head: e
-			});
+			return this.trix.focus(), this.trix.editor.setSelectedRange(e - 1), this.trix.editor.getSelectedRange();
 		},
 		text() {
 			return this.trix.textContent;

@@ -8,6 +8,12 @@ Until 1.0.0, a minor version may include breaking changes; they are listed under
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-26
+
+### Fixed
+
+- Stabilize the two-editor Trix browser test in WebKit by setting both editors' native selections before typing.
+
 ## [0.4.2] - 2026-11-26
 
 ### Changed
@@ -99,7 +105,8 @@ The first release: Google Docs-style collaborative editing for Filament 5.
 - **A Laravel Boost skill and guideline** for AI assistants.
 - **Requirements:** PHP 8.3+, Laravel 12 or 13, Filament 5.8.3+.
 
-[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/solutionforest/filament-collaboration/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/solutionforest/filament-collaboration/compare/v0.3.0...v0.4.0
